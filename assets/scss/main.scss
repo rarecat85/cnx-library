@@ -9,6 +9,92 @@
 body {
   margin: 0;
   padding: 0;
+  font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 400;
+  background-color: #F2F2F2; // Cool Gray
+  color: #2A2F36; // Charcoal Gray
+}
+
+// Vuetify 컴포넌트에도 노토 산스 적용 (선택자 우선순위 사용)
+.v-application,
+.v-application .v-btn,
+.v-application .v-text-field,
+.v-application .v-card,
+.v-application .v-alert {
+  font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+// 타이틀만 font-weight 600 적용 (선택자 우선순위 사용)
+.v-application h1,
+.v-application h2,
+.v-application h3,
+.v-application h4,
+.v-application h5,
+.v-application h6,
+.v-application .text-h1,
+.v-application .text-h2,
+.v-application .text-h3,
+.v-application .text-h4,
+.v-application .text-h5,
+.v-application .text-h6 {
+  font-weight: 600;
+}
+
+// 카드 타이틀은 font-weight 700 적용
+.v-application .v-card-title {
+  font-weight: 700;
+}
+
+// 카드 타이틀의 line-height 제거 (1로 설정하여 최소 간격)
+.v-application .v-card .v-card-title {
+  line-height: 1;
+}
+
+// 브랜드 색상 팔레트 적용
+.v-application {
+  background-color: #F2F2F2;
+  color: #2A2F36;
+}
+
+// 카드 스타일 개선 (브랜드 스타일)
+.v-application .v-card {
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 44, 91, 0.08);
+  background-color: #FFFFFF;
+}
+
+// 버튼 스타일 개선 (브랜드 스타일)
+.v-application .v-btn {
+  border-radius: 8px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  box-shadow: 0 2px 4px rgba(0, 44, 91, 0.2);
+}
+
+.v-application .v-btn--elevated {
+  box-shadow: 0 2px 8px rgba(0, 44, 91, 0.3);
+}
+
+.v-application .v-btn--variant-elevated.v-theme--light {
+  background-color: #002C5B;
+  color: #FFFFFF;
+}
+
+// 입력 필드 스타일 개선
+.v-application .v-text-field {
+  .v-field {
+    border-radius: 8px;
+  }
+  
+  .v-field__outline {
+    border-width: 1px;
+  }
+}
+
+// 입력 필드 포커스 시
+.v-application .v-text-field .v-field--focused .v-field__outline {
+  border-width: 2px;
 }
 
 // 커스텀 스타일 추가 가능

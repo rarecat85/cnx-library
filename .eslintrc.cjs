@@ -6,23 +6,19 @@ module.exports = {
     es2022: true
   },
   extends: [
-    'plugin:vue/vue3-recommended',
-    'plugin:@typescript-eslint/recommended',
-    '@nuxtjs/eslint-config-typescript'
+    'plugin:vue/vue3-recommended'
   ],
   parser: 'vue-eslint-parser',
   parserOptions: {
     ecmaVersion: 2022,
-    parser: '@typescript-eslint/parser',
     sourceType: 'module'
   },
   plugins: [
-    '@typescript-eslint'
+    'vue'
   ],
   rules: {
     'vue/multi-word-component-names': 'off',
-    '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
-    '@typescript-eslint/no-explicit-any': 'warn'
+    'no-undef': 'off'
   },
   ignorePatterns: [
     '.nuxt',
@@ -31,4 +27,3 @@ module.exports = {
     'node_modules'
   ]
 }
-

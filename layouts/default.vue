@@ -6,7 +6,7 @@
   </v-app>
 </template>
 
-<script setup lang="ts">
+<script setup>
 // 기본 레이아웃
 </script>
 

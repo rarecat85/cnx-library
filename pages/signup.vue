@@ -13,23 +13,32 @@
         sm="8"
         lg="4"
       >
-        <v-card
-          class="login-card"
-        >
+        <v-card class="signup-card">
           <div class="text-center mb-8">
-            <h1 class="login-title mb-2">
+            <h1 class="signup-title mb-2">
               CNX Library
             </h1>
-            <p class="login-subtitle">
-              로그인하여 시작하세요
+            <p class="signup-subtitle">
+              회원가입
             </p>
           </div>
 
           <v-form
-            ref="loginForm"
+            ref="signupForm"
             validate-on="submit"
-            @submit.prevent="handleLogin"
+            @submit.prevent="handleSignup"
           >
+            <v-text-field
+              v-model="name"
+              label="이름"
+              prepend-inner-icon="mdi-account-outline"
+              variant="outlined"
+              :rules="nameRules"
+              :disabled="loading"
+              class="mb-2"
+              density="comfortable"
+            />
+
             <v-text-field
               v-model="email"
               label="이메일"
@@ -56,6 +65,32 @@
               @click:append-inner="showPassword = !showPassword"
             />
 
+            <v-text-field
+              v-model="confirmPassword"
+              label="비밀번호 확인"
+              :type="showConfirmPassword ? 'text' : 'password'"
+              prepend-inner-icon="mdi-lock-check-outline"
+              :append-inner-icon="showConfirmPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+              variant="outlined"
+              :rules="confirmPasswordRules"
+              :disabled="loading"
+              class="mb-2"
+              density="comfortable"
+              @click:append-inner="showConfirmPassword = !showConfirmPassword"
+            />
+
+            <v-select
+              v-model="center"
+              label="근무지(센터)"
+              :items="centerOptions"
+              prepend-inner-icon="mdi-office-building-outline"
+              variant="outlined"
+              :rules="centerRules"
+              :disabled="loading"
+              class="mb-2"
+              density="comfortable"
+            />
+
             <v-alert
               v-if="error"
               type="error"
@@ -64,21 +99,16 @@
               class="error-alert mb-4"
               @click:close="error = ''"
             >
-              <div class="error-content">
-                <div class="error-message">
-                  {{ error }}
-                  <a
-                    v-if="showResendButton"
-                    href="#"
-                    class="resend-link"
-                    :class="{ 'resending': resending }"
-                    :disabled="resending || loading"
-                    @click.prevent="handleResendVerification"
-                  >
-                    인증 이메일 재전송
-                  </a>
-                </div>
-              </div>
+              {{ error }}
+            </v-alert>
+
+            <v-alert
+              v-if="successMessage"
+              type="success"
+              variant="tonal"
+              class="success-alert mb-4"
+            >
+              {{ successMessage }}
             </v-alert>
 
             <v-btn
@@ -88,25 +118,18 @@
               size="large"
               :loading="loading"
               :disabled="loading"
-              class="login-btn"
+              class="signup-btn"
               elevation="2"
             >
-              로그인
+              회원가입
             </v-btn>
           </v-form>
 
           <div class="auth-links text-center mt-4">
             <NuxtLink
-              to="/signup"
+              to="/login"
               class="auth-link"
-            >
-              회원가입
-            </NuxtLink>
-            <span class="auth-link-divider" />
-            <a
-              href="/forgot-password"
-              class="auth-link"
-            >비밀번호찾기</a>
+            >로그인</NuxtLink>
           </div>
           
           <div class="logo-bottom text-center mt-6">
@@ -127,21 +150,34 @@ definePageMeta({
   middleware: []
 })
 
-const { login, loading, resendVerificationEmailForLogin } = useAuth()
+const { signup, loading } = useAuth()
 const router = useRouter()
 
+const name = ref('')
 const email = ref('')
 const password = ref('')
+const confirmPassword = ref('')
+const center = ref('')
 const error = ref('')
-const loginForm = ref()
+const successMessage = ref('')
+const signupForm = ref()
 const showPassword = ref(false)
-const showResendButton = ref(false)
-const resending = ref(false)
+const showConfirmPassword = ref(false)
+
+const centerOptions = [
+  '강남1센터',
+  '강남2센터',
+  '용산센터'
+]
 
 // 폼 검증 규칙
+const nameRules = [
+  (v) => !!v || '이름을 입력해주세요'
+]
+
 const emailRules = [
   (v) => !!v || '이메일을 입력해주세요',
-  (v) => /.+@.+\..+/.test(v) || '올바른 이메일 형식이 아닙니다'
+  (v) => /.+@concentrix\.com$/.test(v) || '@concentrix.com 이메일만 사용 가능합니다'
 ]
 
 const passwordRules = [
@@ -149,54 +185,43 @@ const passwordRules = [
   (v) => (v && v.length >= 6) || '비밀번호는 6자 이상이어야 합니다'
 ]
 
-// 로그인 처리
-const handleLogin = async () => {
+const confirmPasswordRules = [
+  (v) => !!v || '비밀번호 확인을 입력해주세요',
+  (v) => v === password.value || '비밀번호가 일치하지 않습니다'
+]
+
+const centerRules = [
+  (v) => !!v || '근무지(센터)를 선택해주세요'
+]
+
+// 회원가입 처리
+const handleSignup = async () => {
   error.value = ''
-  showResendButton.value = false
+  successMessage.value = ''
   
   // 폼 검증
-  const { valid } = await loginForm.value.validate()
+  const { valid } = await signupForm.value.validate()
   if (!valid) return
 
-  const result = await login(email.value, password.value)
+  const result = await signup(email.value, password.value, name.value, center.value)
   
   if (result.success) {
-    // 로그인 성공 시 메인 페이지로 이동
-    await router.push('/')
+    successMessage.value = '회원가입이 완료되었습니다. 이메일을 확인하여 인증을 완료해주세요.'
+    // 폼 초기화
+    name.value = ''
+    email.value = ''
+    password.value = ''
+    confirmPassword.value = ''
+    center.value = ''
+    signupForm.value.resetValidation()
   } else {
-    error.value = result.error || '로그인에 실패했습니다.'
-    // 이메일 인증 미완료 에러인 경우 재전송 버튼 표시
-    if (result.error && result.error.includes('이메일 인증이 완료되지 않았습니다')) {
-      showResendButton.value = true
-    }
+    error.value = result.error || '회원가입에 실패했습니다.'
   }
-}
-
-// 인증 이메일 재전송
-const handleResendVerification = async () => {
-  if (!email.value || !password.value) {
-    error.value = '이메일과 비밀번호를 입력해주세요.'
-    return
-  }
-
-  resending.value = true
-  error.value = ''
-  
-  const result = await resendVerificationEmailForLogin(email.value, password.value)
-  
-  if (result.success) {
-    error.value = '인증 이메일이 재전송되었습니다. 이메일을 확인해주세요.'
-    showResendButton.value = false
-  } else {
-    error.value = result.error || '이메일 재전송에 실패했습니다.'
-  }
-  
-  resending.value = false
 }
 
 // 페이지 메타데이터
 useHead({
-  title: '로그인 - CNX Library'
+  title: '회원가입 - CNX Library'
 })
 </script>
 
@@ -206,7 +231,7 @@ useHead({
   background: linear-gradient(135deg, #F2F2F2 0%, #E8E8E8 100%);
 }
 
-.login-card {
+.signup-card {
   padding: 48px 40px;
   max-width: 440px;
   margin: 0 auto;
@@ -229,52 +254,15 @@ useHead({
   font-weight: 400;
 }
 
-.error-alert {
+.error-alert,
+.success-alert {
   min-height: 48px;
+  display: flex;
+  align-items: center;
   margin-top: 16px;
-  position: relative;
 }
 
-.error-alert :deep(.v-alert__content) {
-  width: 100%;
-}
-
-.error-alert :deep(.v-btn--icon.v-alert__close) {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-}
-
-.error-content {
-  width: 100%;
-}
-
-.error-message {
-  line-height: 1.5;
-}
-
-.resend-link {
-  display: block;
-  margin-top: 8px;
-  color: #002C5B;
-  text-decoration: underline;
-  font-size: 14px;
-  cursor: pointer;
-  transition: color 0.2s;
-}
-
-.resend-link:hover {
-  color: #001a3d;
-}
-
-.resend-link.resending,
-.resend-link:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-
-.login-title {
+.signup-title {
   font-size: 32px;
   font-weight: 700;
   color: #002C5B;
@@ -282,16 +270,15 @@ useHead({
   margin: 0;
 }
 
-.login-subtitle {
+.signup-subtitle {
   font-size: 16px;
   color: #6b7280;
   margin: 0;
   font-weight: 400;
 }
 
-
-/* 로그인 버튼 스타일 */
-.login-btn {
+/* 회원가입 버튼 스타일 */
+.signup-btn {
   height: 48px;
   font-size: 16px;
   font-weight: 500;
@@ -314,17 +301,9 @@ useHead({
   text-decoration: underline;
 }
 
-.auth-link-divider {
-  display: inline-block;
-  width: 1px;
-  height: 12px;
-  margin: 0 12px;
-  background-color: #d1d5db;
-  vertical-align: middle;
-}
-
 /* 입력 필드 간격 조정 */
-:deep(.v-text-field) {
+:deep(.v-text-field),
+:deep(.v-select) {
   margin-bottom: 0;
 }
 

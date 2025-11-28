@@ -103,10 +103,12 @@
               회원가입
             </NuxtLink>
             <span class="auth-link-divider" />
-            <a
-              href="/forgot-password"
+            <NuxtLink
+              to="/forgot-password"
               class="auth-link"
-            >비밀번호찾기</a>
+            >
+              비밀번호찾기
+            </NuxtLink>
           </div>
           
           <div class="logo-bottom text-center mt-6">
@@ -166,7 +168,7 @@ const handleLogin = async () => {
   } else {
     error.value = result.error || '로그인에 실패했습니다.'
     // 이메일 인증 미완료 에러인 경우 재전송 버튼 표시
-    if (result.error && result.error.includes('이메일 인증이 완료되지 않았습니다')) {
+    if (result.error && (result.error.includes('이메일 인증이 완료되지 않았습니다') || result.error.includes('이메일 재인증이 필요합니다'))) {
       showResendButton.value = true
     }
   }

@@ -26,3 +26,8 @@ logs
 # TypeScript
 *.tsbuildinfo
 
+# Firebase Functions
+functions/node_modules/
+functions/.env
+functions/*.log
+

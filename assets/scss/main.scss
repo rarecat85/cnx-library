@@ -97,6 +97,17 @@ body {
   border-width: 2px;
 }
 
+// 모바일 우선 레이아웃 (최대 너비 768px)
+.v-application {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+// v-main이 전체 너비를 차지하도록
+.v-application .v-main {
+  width: 100%;
+}
+
 // 커스텀 스타일 추가 가능
 // .custom-class {
 //   // 스타일 정의

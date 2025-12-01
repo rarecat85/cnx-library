@@ -56,6 +56,17 @@
               @click:append-inner="showPassword = !showPassword"
             />
 
+            <div class="remember-me-container mb-4">
+              <v-checkbox
+                v-model="rememberMe"
+                label="자동로그인"
+                color="primary"
+                hide-details
+                :disabled="loading"
+                density="compact"
+              />
+            </div>
+
             <v-alert
               v-if="error"
               type="error"
@@ -129,7 +140,7 @@ definePageMeta({
   middleware: []
 })
 
-const { login, loading, resendVerificationEmailForLogin } = useAuth()
+const { login, loading, resendVerificationEmailForLogin, user, getAutoLoginInfo } = useAuth()
 const router = useRouter()
 
 const email = ref('')
@@ -139,6 +150,67 @@ const loginForm = ref()
 const showPassword = ref(false)
 const showResendButton = ref(false)
 const resending = ref(false)
+const rememberMe = ref(false)
+
+// 페이지 로드 시 자동로그인 확인 및 처리
+onMounted(async () => {
+  if (!process.client) return
+  
+  // 로컬스토리지에서 자동로그인 체크 상태 불러오기
+  const savedRememberMe = localStorage.getItem('rememberMe')
+  if (savedRememberMe === 'true') {
+    rememberMe.value = true
+  }
+  
+  // onAuthStateChanged의 첫 번째 콜백이 실행될 때까지 대기
+  const authStateReady = useState('auth_state_ready')
+  const authInitialized = useState('auth_initialized', () => false)
+  
+  if (!authInitialized.value && authStateReady.value) {
+    try {
+      await Promise.race([
+        authStateReady.value,
+        new Promise(resolve => setTimeout(resolve, 5000)) // 최대 5초 대기
+      ])
+    } catch (error) {
+      console.error('인증 상태 확인 대기 중 오류:', error)
+    }
+  }
+  
+  // 인증 상태 로딩이 완료될 때까지 대기
+  const { loading: authLoading } = useAuth()
+  if (authLoading.value) {
+    const maxWait = 3000
+    const startTime = Date.now()
+    while (authLoading.value && (Date.now() - startTime) < maxWait) {
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+  }
+  
+  // 이미 로그인된 상태인지 확인 (Firebase Auth persistence)
+  if (user.value) {
+    await router.push('/')
+    return
+  }
+  
+  // 자동로그인 정보 확인
+  const autoLoginInfo = getAutoLoginInfo()
+  if (autoLoginInfo) {
+    // 자동로그인 정보가 있고 만료되지 않았음
+    // Firebase Auth의 currentUser 확인
+    const { $firebaseAuth } = useNuxtApp()
+    const auth = $firebaseAuth
+    
+    if (auth && auth.currentUser) {
+      // 이미 로그인되어 있으면 메인 페이지로 이동
+      await router.push('/')
+      return
+    }
+    
+    // 이메일 필드에 자동으로 채우기 (사용자 편의)
+    email.value = autoLoginInfo.email
+  }
+})
 
 // 폼 검증 규칙
 const emailRules = [
@@ -160,7 +232,7 @@ const handleLogin = async () => {
   const { valid } = await loginForm.value.validate()
   if (!valid) return
 
-  const result = await login(email.value, password.value)
+  const result = await login(email.value, password.value, rememberMe.value)
   
   if (result.success) {
     // 로그인 성공 시 메인 페이지로 이동
@@ -347,6 +419,35 @@ useHead({
 /* 카드 내부 여백 조정 */
 :deep(.v-card-text) {
   padding: 0;
+}
+
+/* 자동로그인 체크박스 스타일 */
+.remember-me-container {
+  display: flex;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.remember-me-container :deep(.v-checkbox) {
+  margin: 0;
+}
+
+.remember-me-container :deep(.v-checkbox .v-label) {
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.remember-me-container :deep(.v-checkbox .v-selection-control) {
+  min-height: 0;
+}
+
+.remember-me-container :deep(.v-checkbox .v-selection-control__input) {
+  width: 18px;
+  height: 18px;
+}
+
+.remember-me-container :deep(.v-checkbox .v-icon) {
+  font-size: 18px;
 }
 </style>
 

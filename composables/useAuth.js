@@ -25,40 +25,105 @@ export const useAuth = () => {
 
   const user = useState('firebase_user', () => null)
   const loading = useState('auth_loading', () => true)
+  const authInitialized = useState('auth_initialized', () => false)
 
   // 클라이언트 사이드에서만 Firebase Auth 초기화
   if (process.client && auth) {
-    // 인증 상태 감지
-    onAuthStateChanged(auth, async (firebaseUser) => {
-      user.value = firebaseUser
-      loading.value = false
-      
-      // 이메일 인증 완료 시 Firestore 업데이트
-      if (firebaseUser && firebaseUser.emailVerified && firestore) {
-        try {
-          const userRef = doc(firestore, 'users', firebaseUser.uid)
-          const userDoc = await getDoc(userRef)
+    // 즉시 현재 사용자 확인 (persistence가 복원되었을 수 있음)
+    const checkInitialUser = async () => {
+      try {
+        const currentUser = auth.currentUser
+        if (currentUser) {
+          // 사용자 정보 다시 로드하여 최신 상태 확인
+          await currentUser.reload()
+          user.value = currentUser
+          loading.value = false
           
-          // 사용자 문서가 존재하고 아직 인증 시간이 업데이트되지 않은 경우
-          if (userDoc.exists()) {
-            const userData = userDoc.data()
-            if (!userData.emailVerifiedAt) {
-              await setDoc(userRef, {
-                emailVerified: true,
-                emailVerifiedAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
-              }, { merge: true })
+          // 이메일 인증 완료 시 Firestore 업데이트
+          if (currentUser.emailVerified && firestore) {
+            try {
+              const userRef = doc(firestore, 'users', currentUser.uid)
+              const userDoc = await getDoc(userRef)
+              
+              if (userDoc.exists()) {
+                const userData = userDoc.data()
+                if (!userData.emailVerifiedAt) {
+                  await setDoc(userRef, {
+                    emailVerified: true,
+                    emailVerifiedAt: serverTimestamp(),
+                    updatedAt: serverTimestamp()
+                  }, { merge: true })
+                }
+              }
+            } catch (error) {
+              console.error('이메일 인증 상태 업데이트 실패:', error)
             }
           }
-        } catch (error) {
-          console.error('이메일 인증 상태 업데이트 실패:', error)
         }
+      } catch (error) {
+        console.error('초기 사용자 확인 실패:', error)
+      }
+    }
+    
+    // 초기 사용자 확인 실행
+    checkInitialUser()
+    
+    // onAuthStateChanged의 첫 번째 콜백이 실행될 때까지 기다리는 Promise
+    let authStateReadyResolver = null
+    const authStateReady = new Promise((resolve) => {
+      authStateReadyResolver = resolve
+    })
+    
+    // 인증 상태 변경 감지 (첫 번째 콜백이 실행되면 resolve)
+    let firstCallback = true
+    onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        // 사용자가 로그인된 경우
+        user.value = firebaseUser
+        loading.value = false
+        
+        // 이메일 인증 완료 시 Firestore 업데이트
+        if (firebaseUser.emailVerified && firestore) {
+          try {
+            const userRef = doc(firestore, 'users', firebaseUser.uid)
+            const userDoc = await getDoc(userRef)
+            
+            if (userDoc.exists()) {
+              const userData = userDoc.data()
+              if (!userData.emailVerifiedAt) {
+                await setDoc(userRef, {
+                  emailVerified: true,
+                  emailVerifiedAt: serverTimestamp(),
+                  updatedAt: serverTimestamp()
+                }, { merge: true })
+              }
+            }
+          } catch (error) {
+            console.error('이메일 인증 상태 업데이트 실패:', error)
+          }
+        }
+      } else {
+        // 사용자가 로그인되지 않은 경우
+        user.value = null
+        loading.value = false
+      }
+      
+      // 첫 번째 콜백만 resolve
+      if (firstCallback && authStateReadyResolver) {
+        firstCallback = false
+        authInitialized.value = true
+        authStateReadyResolver()
+        authStateReadyResolver = null
       }
     })
+    
+    // authStateReady를 전역 상태로 저장하여 다른 곳에서 사용 가능하도록
+    useState('auth_state_ready', () => authStateReady)
   } else {
     // 서버 사이드이거나 auth가 없으면 로딩 완료
     if (process.server || !auth) {
       loading.value = false
+      authInitialized.value = true
     }
   }
 
@@ -245,8 +310,81 @@ export const useAuth = () => {
     return { verified: auth.currentUser.emailVerified }
   }
 
+  // 간단한 Base64 인코딩/디코딩 (보안 강화를 위한 기본 인코딩)
+  const encodeEmail = (email) => {
+    if (!process.client) return email
+    try {
+      return btoa(encodeURIComponent(email))
+    } catch {
+      return email
+    }
+  }
+
+  const decodeEmail = (encodedEmail) => {
+    if (!process.client) return encodedEmail
+    try {
+      return decodeURIComponent(atob(encodedEmail))
+    } catch {
+      return encodedEmail
+    }
+  }
+
+  // 자동로그인 정보 저장 (이메일은 Base64 인코딩하여 저장)
+  const saveAutoLoginInfo = (email, rememberMe) => {
+    if (!process.client) return
+    
+    if (rememberMe) {
+      const expiryDate = new Date()
+      expiryDate.setMonth(expiryDate.getMonth() + 1) // 30일 후
+      
+      // 이메일을 Base64 인코딩하여 저장 (보안 강화)
+      const encodedEmail = encodeEmail(email)
+      localStorage.setItem('autoLoginEmail', encodedEmail)
+      localStorage.setItem('autoLoginExpiry', expiryDate.toISOString())
+      localStorage.setItem('rememberMe', 'true')
+    } else {
+      localStorage.removeItem('autoLoginEmail')
+      localStorage.removeItem('autoLoginExpiry')
+      localStorage.removeItem('rememberMe')
+    }
+  }
+
+  // 자동로그인 정보 조회 (이메일은 디코딩하여 반환)
+  const getAutoLoginInfo = () => {
+    if (!process.client) return null
+    
+    const encodedEmail = localStorage.getItem('autoLoginEmail')
+    const expiry = localStorage.getItem('autoLoginExpiry')
+    
+    if (!encodedEmail || !expiry) return null
+    
+    const expiryDate = new Date(expiry)
+    const now = new Date()
+    
+    // 만료일이 지났으면 제거
+    if (now > expiryDate) {
+      localStorage.removeItem('autoLoginEmail')
+      localStorage.removeItem('autoLoginExpiry')
+      localStorage.removeItem('rememberMe')
+      return null
+    }
+    
+    // 이메일 디코딩하여 반환
+    const email = decodeEmail(encodedEmail)
+    return { email, expiry: expiryDate }
+  }
+
+  // 자동로그인 정보 제거
+  const clearAutoLoginInfo = () => {
+    if (!process.client) return
+    
+    localStorage.removeItem('autoLoginEmail')
+    localStorage.removeItem('autoLoginExpiry')
+    localStorage.removeItem('rememberMe')
+  }
+
   // 로그인
-  const login = async (email, password) => {
+  const login = async (email, password, rememberMe = false) => {
     if (!auth || !firestore) {
       console.error('Firebase가 초기화되지 않았습니다.')
       return { success: false, error: 'Firebase가 초기화되지 않았습니다.' }
@@ -330,6 +468,9 @@ export const useAuth = () => {
         }
       }
       
+      // 자동로그인 정보 저장
+      saveAutoLoginInfo(email, rememberMe)
+      
       user.value = firebaseUser
       return { success: true, user: firebaseUser }
     } catch (error) {
@@ -360,6 +501,7 @@ export const useAuth = () => {
     try {
       await signOut(auth)
       user.value = null
+      clearAutoLoginInfo()
       await router.push('/login')
       return { success: true }
     } catch (error) {
@@ -436,7 +578,9 @@ export const useAuth = () => {
     resendVerificationEmailForLogin,
     checkEmailVerificationStatus,
     sendPasswordResetEmail: sendPasswordResetEmailToUser,
-    confirmPasswordReset
+    confirmPasswordReset,
+    getAutoLoginInfo,
+    clearAutoLoginInfo
   }
 }
 

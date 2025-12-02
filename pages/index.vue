@@ -1,26 +1,42 @@
 <template>
-  <PageLayout
-    header-type="home"
-    :show-header-text="true"
-    :header-text="headerText"
-  >
-    <div>
-      <h1 class="page-title mb-4">
-        CNX Library
-      </h1>
-      <p class="page-subtitle mb-4">
-        환영합니다! {{ user?.email }}
-      </p>
-      <v-btn 
-        color="primary" 
-        variant="elevated"
-        :loading="loading"
-        @click="handleLogout"
-      >
-        로그아웃
-      </v-btn>
-    </div>
-  </PageLayout>
+  <v-app>
+    <PageLayout
+      header-type="home"
+      :show-header-text="true"
+      :header-text="headerText"
+      :show-header-actions="true"
+      @toggle-drawer="drawer = !drawer"
+    >
+      <div>
+        <h1 class="page-title mb-4">
+          CNX Library
+        </h1>
+        <p class="page-subtitle mb-4">
+          환영합니다! {{ user?.email }}
+        </p>
+        <v-btn 
+          color="primary" 
+          variant="elevated"
+          :loading="loading"
+          @click="handleLogout"
+        >
+          로그아웃
+        </v-btn>
+      </div>
+    </PageLayout>
+
+    <v-navigation-drawer
+      v-model="drawer"
+      location="right"
+      temporary
+      :width="drawerWidth"
+      class="side-navigation"
+    >
+      <div class="drawer-content">
+        <SideNavigation />
+      </div>
+    </v-navigation-drawer>
+  </v-app>
 </template>
 
 <script setup>
@@ -29,9 +45,26 @@ definePageMeta({
   middleware: 'auth'
 })
 
+const drawer = useState('navigationDrawer', () => false)
 const { user, logout, loading } = useAuth()
 const { $firebaseFirestore } = useNuxtApp()
 const firestore = $firebaseFirestore
+
+// 반응형 drawer 너비 계산
+const drawerWidth = ref(280)
+
+onMounted(() => {
+  const updateWidth = () => {
+    drawerWidth.value = window.innerWidth >= 769 ? 360 : 280
+  }
+  
+  updateWidth()
+  window.addEventListener('resize', updateWidth)
+  
+  onBeforeUnmount(() => {
+    window.removeEventListener('resize', updateWidth)
+  })
+})
 
 const userData = ref(null)
 const headerText = computed(() => {
@@ -91,6 +124,49 @@ useHead({
   color: #6b7280;
   margin: 0;
   font-weight: 400;
+}
+
+.side-navigation {
+  z-index: 1000;
+}
+
+.side-navigation :deep(.v-navigation-drawer__content) {
+  background-color: #002C5B;
+}
+
+.side-navigation :deep(.v-navigation-drawer) {
+  border: none;
+}
+
+.side-navigation :deep(.v-navigation-drawer__border) {
+  display: none;
+}
+
+.drawer-content {
+  padding: rem(16);
+  color: #FFFFFF;
+}
+
+/* 768px 이하: 전체 화면 기준 우측에 붙어서 */
+@media (max-width: 768px) {
+  .side-navigation :deep(.v-navigation-drawer) {
+    width: rem(280);
+  }
+}
+
+/* 769px 이상: 768px 이너 안쪽으로 들어오도록 */
+@media (min-width: 769px) {
+  .side-navigation :deep(.v-navigation-drawer) {
+    width: rem(360);
+    left: auto;
+    right: calc((100vw - #{rem(768)}) / 2);
+    max-width: rem(768);
+  }
+  
+  /* 오버레이가 768px 컨테이너 영역만 덮도록 */
+  .side-navigation :deep(.v-overlay__scrim) {
+    display: none;
+  }
 }
 </style>
 

@@ -1,49 +1,89 @@
 <template>
   <div class="page-layout">
     <div class="page-background">
-      <!-- 상단 헤더 영역 (책 아이콘 + 선택적 텍스트) -->
+      <!-- 상단 헤더 영역 (책 아이콘 + 선택적 텍스트 + 액션 버튼) -->
       <div class="page-header">
         <div class="page-header-inner">
-          <div class="page-header-left">
-            <!-- 책 아이콘 (인증 페이지 - 기능 없음) -->
-            <div
-              v-if="headerType === 'icon'"
-              class="page-icon"
-            >
-              <v-icon size="28">mdi-book-open-variant</v-icon>
-            </div>
-            
-            <!-- 책 아이콘 버튼 (홈으로 이동) -->
-            <v-btn
-              v-else-if="headerType === 'home'"
-              icon
-              variant="text"
-              class="header-icon-btn"
-              @click="goHome"
-            >
-              <v-icon size="28">mdi-book-open-variant</v-icon>
-            </v-btn>
-            
-            <!-- 뒤로가기 + 책 아이콘 (다른 페이지) -->
-            <div
-              v-else-if="headerType === 'back-home'"
-              class="header-icons"
-            >
-              <v-btn
-                icon
-                variant="text"
-                class="header-icon-btn"
-                @click="goBack"
+          <div class="page-header-top">
+            <div class="page-header-left">
+              <!-- 책 아이콘 (인증 페이지 - 기능 없음) -->
+              <div
+                v-if="headerType === 'icon'"
+                class="page-icon"
               >
-                <v-icon size="24">mdi-arrow-left</v-icon>
-              </v-btn>
+                <v-icon size="28">mdi-book-open-variant</v-icon>
+              </div>
+              
+              <!-- 책 아이콘 버튼 (홈으로 이동) -->
               <v-btn
+                v-else-if="headerType === 'home'"
                 icon
                 variant="text"
                 class="header-icon-btn"
                 @click="goHome"
               >
                 <v-icon size="28">mdi-book-open-variant</v-icon>
+              </v-btn>
+              
+              <!-- 뒤로가기 + 책 아이콘 (다른 페이지) -->
+              <div
+                v-else-if="headerType === 'back-home'"
+                class="header-icons"
+              >
+                <v-btn
+                  icon
+                  variant="text"
+                  class="header-icon-btn"
+                  @click="goBack"
+                >
+                  <v-icon size="24">mdi-arrow-left</v-icon>
+                </v-btn>
+                <v-btn
+                  icon
+                  variant="text"
+                  class="header-icon-btn"
+                  @click="goHome"
+                >
+                  <v-icon size="28">mdi-book-open-variant</v-icon>
+                </v-btn>
+              </div>
+            </div>
+
+            <!-- 우측 액션 버튼들 (로그인 상태일 때만) -->
+            <div
+              v-if="showHeaderActions"
+              class="page-header-actions"
+            >
+              <v-btn
+                icon
+                variant="text"
+                class="header-action-btn"
+              >
+                <v-icon size="24">mdi-account-circle-outline</v-icon>
+              </v-btn>
+
+              <v-btn
+                icon
+                variant="text"
+                class="header-action-btn notification-btn"
+              >
+                <v-badge
+                  :content="0"
+                  :model-value="false"
+                  color="error"
+                  overlap
+                >
+                  <v-icon size="24">mdi-bell-outline</v-icon>
+                </v-badge>
+              </v-btn>
+
+              <v-btn
+                icon
+                variant="text"
+                class="header-action-btn"
+                @click="$emit('toggle-drawer')"
+              >
+                <v-icon size="24">mdi-menu</v-icon>
               </v-btn>
             </div>
           </div>
@@ -106,8 +146,14 @@ defineProps({
   useEnglishFont: {
     type: Boolean,
     default: false // true일 때 Montserrat, false일 때 Noto Sans KR
+  },
+  showHeaderActions: {
+    type: Boolean,
+    default: false // 로그인 상태일 때 우측 액션 버튼 표시
   }
 })
+
+defineEmits(['toggle-drawer'])
 
 const goHome = () => {
   router.push('/')
@@ -153,9 +199,22 @@ const goBack = () => {
   gap: rem(20);
 }
 
+.page-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
 .page-header-left {
   display: flex;
   align-items: center;
+}
+
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: rem(4);
 }
 
 .page-icon {
@@ -179,6 +238,24 @@ const goBack = () => {
 
 .header-icon-btn:hover {
   background-color: rgba(255, 255, 255, 0.1);
+}
+
+.header-action-btn {
+  color: #FFFFFF;
+  min-width: rem(44);
+  width: rem(44);
+  height: rem(44);
+}
+
+.header-action-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.notification-btn :deep(.v-badge__badge) {
+  font-size: rem(10);
+  min-width: rem(18);
+  height: rem(18);
+  padding: 0 rem(4);
 }
 
 .header-text-content {

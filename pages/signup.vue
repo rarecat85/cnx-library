@@ -1,24 +1,37 @@
 <template>
-  <v-container
-    fluid
-    class="fill-height"
-  >
-    <v-row
-      align="center"
-      justify="center"
-      class="fill-height"
-    >
-      <v-col
-        cols="12"
-        sm="8"
-        lg="4"
+  <div class="login-page">
+    <div class="login-background">
+      <!-- 상단 헤더 영역 (로고 + 텍스트) -->
+      <div class="login-header">
+        <div class="login-header-inner">
+          <div class="login-logo">
+            <ConcentrixLogo />
+          </div>
+          <div class="header-text-content">
+            <div class="header-text-line">Share Knowledge,</div>
+            <div class="header-text-line">Grow Together</div>
+          </div>
+        </div>
+      </div>
+      
+      <v-container
+        fluid
+        class="login-container"
       >
-        <v-card class="signup-card">
+        <v-row
+          justify="center"
+          class="login-row"
+        >
+          <v-col
+            cols="12"
+            class="login-col"
+          >
+            <v-card class="login-card">
           <div class="text-center mb-8">
-            <h1 class="signup-title mb-2">
+            <h1 class="login-title mb-2">
               CNX Library
             </h1>
-            <p class="signup-subtitle">
+            <p class="login-subtitle">
               회원가입
             </p>
           </div>
@@ -139,9 +152,11 @@
             </div>
           </div>
         </v-card>
-      </v-col>
-    </v-row>
-  </v-container>
+          </v-col>
+        </v-row>
+      </v-container>
+    </div>
+  </div>
 </template>
 
 <script setup>
@@ -221,20 +236,122 @@ const handleSignup = async () => {
 
 // 페이지 메타데이터
 useHead({
-  title: '회원가입 - CNX Library'
+  title: '회원가입 - CNX Library',
+  link: [
+    {
+      rel: 'preconnect',
+      href: 'https://fonts.googleapis.com'
+    },
+    {
+      rel: 'preconnect',
+      href: 'https://fonts.gstatic.com',
+      crossorigin: ''
+    },
+    {
+      rel: 'stylesheet',
+      href: 'https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap'
+    }
+  ]
 })
 </script>
 
 <style scoped>
-.fill-height {
+.login-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #F2F2F2 0%, #E8E8E8 100%);
+  width: 100%;
+  position: relative;
 }
 
-.signup-card {
+.login-background {
+  min-height: 100vh;
+  background: linear-gradient(to bottom, #002C5B 0%, #002C5B 50%, #F2F2F2 50%, #F2F2F2 100%);
+  position: relative;
+}
+
+.login-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 25vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  padding: 24px 16px;
+}
+
+.login-header-inner {
+  max-width: 768px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.login-logo {
+  display: flex;
+  align-items: center;
+}
+
+.login-logo :deep(.logo-svg) {
+  height: 28px;
+  width: auto;
+  color: #FFFFFF;
+}
+
+.header-text-content {
+  text-align: left;
+}
+
+.header-text-line {
+  font-size: 40px;
+  font-weight: 300;
+  color: #FFFFFF;
+  line-height: 1.1;
+  letter-spacing: 0.2px;
+  font-family: 'Montserrat', 'Noto Sans KR', sans-serif;
+}
+
+.login-container {
+  padding: 0;
+  height: 100vh;
+  position: relative;
+}
+
+.login-row {
+  height: 100vh;
+  align-items: flex-start;
+  padding-top: calc(56px + 15vh);
+  margin: 0;
+}
+
+.login-col {
+  display: flex;
+  justify-content: center;
+  padding: 0 16px;
+  height: calc(100vh - 56px - 15vh);
+  align-self: flex-end;
+}
+
+.login-card {
   padding: 48px 40px;
-  max-width: 440px;
-  margin: 0 auto;
+  max-width: 768px;
+  width: 100%;
+  margin: 0;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  background-color: #FFFFFF;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.login-card :deep(.v-card__content) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
 }
 
 .logo-bottom {
@@ -262,7 +379,7 @@ useHead({
   margin-top: 16px;
 }
 
-.signup-title {
+.login-title {
   font-size: 32px;
   font-weight: 700;
   color: #002C5B;
@@ -270,7 +387,7 @@ useHead({
   margin: 0;
 }
 
-.signup-subtitle {
+.login-subtitle {
   font-size: 16px;
   color: #6b7280;
   margin: 0;
@@ -283,6 +400,52 @@ useHead({
   font-size: 16px;
   font-weight: 500;
   border-radius: 8px;
+}
+
+/* 모바일 반응형 */
+@media (max-width: 768px) {
+  .login-row {
+    padding-top: calc(56px + 10vh);
+  }
+
+  .login-col {
+    height: calc(100vh - 56px - 10vh);
+  }
+
+  .login-header {
+    min-height: 25vh;
+  }
+
+  .login-card {
+    padding: 32px 24px;
+    border-radius: 12px 12px 0 0;
+  }
+
+  .header-text-line {
+    font-size: 28px;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-row {
+    padding-top: calc(56px + 10vh);
+  }
+
+  .login-col {
+    height: calc(100vh - 56px - 10vh);
+  }
+
+  .login-header {
+    min-height: 25vh;
+  }
+
+  .login-card {
+    padding: 24px 20px;
+  }
+
+  .header-text-line {
+    font-size: 24px;
+  }
 }
 
 /* 인증 링크 스타일 */

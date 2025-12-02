@@ -2,12 +2,31 @@ const { onCall } = require('firebase-functions/v2/https')
 const { initializeApp } = require('firebase-admin/app')
 const { getAuth } = require('firebase-admin/auth')
 const { getFirestore } = require('firebase-admin/firestore')
+const functions = require('firebase-functions')
 
 // Firebase Admin 초기화
 initializeApp()
 
 const auth = getAuth()
 const firestore = getFirestore()
+
+// 네이버 API 인증 정보 (환경 변수에서 가져오기)
+const getNaverConfig = () => {
+  // 로컬 개발 환경
+  if (process.env.NAVER_CLIENT_ID && process.env.NAVER_CLIENT_SECRET) {
+    return {
+      clientId: process.env.NAVER_CLIENT_ID,
+      clientSecret: process.env.NAVER_CLIENT_SECRET
+    }
+  }
+  
+  // 배포 환경 (Firebase Functions config)
+  const config = functions.config()
+  return {
+    clientId: config?.naver?.client_id || '',
+    clientSecret: config?.naver?.client_secret || ''
+  }
+}
 
 /**
  * 이메일 인증 완료 후 Firestore 업데이트
@@ -156,6 +175,83 @@ exports.resendVerificationEmailWithReset = onCall({
     return {
       success: false,
       error: error.message || '재인증 이메일 발송에 실패했습니다.'
+    }
+  }
+})
+
+/**
+ * 네이버 도서 검색 API 호출
+ * 
+ * 이 함수는 네이버 도서 검색 API를 호출하여 도서 정보를 검색합니다.
+ */
+exports.searchNaverBooks = onCall({
+  cors: true
+}, async (request) => {
+  try {
+    const { query, start = 1, display = 20 } = request.data
+
+    if (!query || query.trim() === '') {
+      return {
+        success: false,
+        error: '검색어를 입력해주세요.'
+      }
+    }
+
+    // display 최대값 제한 (네이버 API 최대 100)
+    const displayLimit = Math.min(display, 100)
+    const startValue = Math.max(1, start)
+
+    // 네이버 API 인증 정보 가져오기
+    const naverConfig = getNaverConfig()
+    
+    if (!naverConfig.clientId || !naverConfig.clientSecret) {
+      return {
+        success: false,
+        error: '네이버 API 인증 정보가 설정되지 않았습니다.'
+      }
+    }
+
+    // 네이버 도서 검색 API 호출
+    const apiUrl = 'https://openapi.naver.com/v1/search/book.json'
+    const params = new URLSearchParams({
+      query: query.trim(),
+      display: displayLimit.toString(),
+      start: startValue.toString()
+    })
+
+    const response = await fetch(`${apiUrl}?${params.toString()}`, {
+      method: 'GET',
+      headers: {
+        'X-Naver-Client-Id': naverConfig.clientId,
+        'X-Naver-Client-Secret': naverConfig.clientSecret
+      }
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('네이버 API 오류:', response.status, errorText)
+      return {
+        success: false,
+        error: `네이버 API 호출 실패: ${response.status}`
+      }
+    }
+
+    const data = await response.json()
+
+    return {
+      success: true,
+      data: {
+        total: data.total || 0,
+        start: data.start || startValue,
+        display: data.display || displayLimit,
+        items: data.items || []
+      }
+    }
+  } catch (error) {
+    console.error('네이버 도서 검색 오류:', error)
+    return {
+      success: false,
+      error: error.message || '도서 검색에 실패했습니다.'
     }
   }
 })

@@ -77,9 +77,11 @@ const handleSearch = () => {
 }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+@use '@/assets/scss/functions' as *;
+
 .app-header {
-  box-shadow: 0 2px 8px rgba(0, 44, 91, 0.12);
+  box-shadow: 0 rem(2) rem(8) rgba(0, 44, 91, 0.12);
   padding: 0;
 }
 
@@ -106,13 +108,13 @@ const handleSearch = () => {
 /* 최상단 줄 */
 .header-top-row {
   width: 100%;
-  max-width: 768px;
+  max-width: rem(768);
   margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 16px;
-  height: 56px;
+  padding: rem(8) rem(16);
+  height: rem(56);
 }
 
 .logo-container {
@@ -121,7 +123,7 @@ const handleSearch = () => {
 }
 
 .logo-container :deep(.logo-svg) {
-  height: 28px;
+  height: rem(28);
   width: auto;
   color: #FFFFFF;
 }
@@ -129,14 +131,14 @@ const handleSearch = () => {
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: rem(4);
 }
 
 .action-btn {
   color: #FFFFFF;
-  min-width: 44px;
-  width: 44px;
-  height: 44px;
+  min-width: rem(44);
+  width: rem(44);
+  height: rem(44);
 }
 
 .action-btn:hover {
@@ -144,18 +146,18 @@ const handleSearch = () => {
 }
 
 .notification-btn :deep(.v-badge__badge) {
-  font-size: 10px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
+  font-size: rem(10);
+  min-width: rem(18);
+  height: rem(18);
+  padding: 0 rem(4);
 }
 
 /* 검색 영역 줄 */
 .header-search-row {
   width: 100%;
-  max-width: 768px;
+  max-width: rem(768);
   margin: 0 auto;
-  padding: 8px 16px 12px;
+  padding: rem(8) rem(16) rem(12);
 }
 
 .search-input {
@@ -164,26 +166,26 @@ const handleSearch = () => {
 
 .search-input :deep(.v-field) {
   background-color: #FFFFFF;
-  border-radius: 8px;
+  border-radius: rem(8);
 }
 
 .search-input :deep(.v-field__input) {
-  padding: 10px 14px;
-  font-size: 15px;
+  padding: rem(10) rem(14);
+  font-size: rem(15);
 }
 
 .search-input :deep(.v-field__outline) {
-  border-width: 1px;
+  border-width: rem(1);
 }
 
 .search-input :deep(.v-field__append-inner) {
-  padding: 0 8px;
+  padding: 0 rem(8);
   cursor: pointer;
 }
 
 .search-input :deep(.v-field__append-inner .v-icon) {
   color: #002C5B;
-  font-size: 24px;
+  font-size: rem(24);
 }
 </style>
 

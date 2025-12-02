@@ -1,0 +1,9 @@
+// SCSS 함수 파일
+// px를 rem으로 변환하는 함수 (기본 16px = 1rem 기준)
+
+@use 'sass:math';
+
+@function rem($px) {
+  @return math.div($px, 16) * 1rem;
+}
+

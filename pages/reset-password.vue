@@ -248,20 +248,22 @@ useHead({
 })
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+@use '@/assets/scss/functions' as *;
+
 .fill-height {
   min-height: 100vh;
   background: linear-gradient(135deg, #F2F2F2 0%, #E8E8E8 100%);
 }
 
 .reset-password-card {
-  padding: 48px 40px;
-  max-width: 440px;
+  padding: rem(48) rem(40);
+  max-width: rem(440);
   margin: 0 auto;
 }
 
 .reset-password-title {
-  font-size: 32px;
+  font-size: rem(32);
   font-weight: 700;
   color: #002C5B;
   line-height: 1.2;
@@ -269,57 +271,57 @@ useHead({
 }
 
 .reset-password-subtitle {
-  font-size: 16px;
+  font-size: rem(16);
   color: #6b7280;
   margin: 0;
   font-weight: 400;
 }
 
 .processing-text {
-  font-size: 16px;
+  font-size: rem(16);
   color: #6b7280;
   margin: 0;
 }
 
 .success-title {
-  font-size: 24px;
+  font-size: rem(24);
   font-weight: 600;
   color: #002C5B;
   margin: 0;
 }
 
 .success-text {
-  font-size: 16px;
+  font-size: rem(16);
   color: #6b7280;
   margin: 0;
 }
 
 .error-title {
-  font-size: 24px;
+  font-size: rem(24);
   font-weight: 600;
   color: #CC3256;
   margin: 0;
 }
 
 .error-text {
-  font-size: 16px;
+  font-size: rem(16);
   color: #6b7280;
   margin: 0;
 }
 
 .login-btn,
 .reset-btn {
-  height: 48px;
-  font-size: 16px;
+  height: rem(48);
+  font-size: rem(16);
   font-weight: 500;
-  border-radius: 8px;
+  border-radius: rem(8);
 }
 
 .error-alert {
-  min-height: 48px;
+  min-height: rem(48);
   display: flex;
   align-items: center;
-  margin-top: 16px;
+  margin-top: rem(16);
 }
 
 /* 입력 필드 간격 조정 */
@@ -338,7 +340,7 @@ useHead({
 
 /* 메시지가 있을 때만 표시 */
 :deep(.v-input__details:has(.v-messages__message)) {
-  padding-bottom: 6px;
+  padding-bottom: rem(6);
 }
 
 /* 카드 내부 여백 조정 */

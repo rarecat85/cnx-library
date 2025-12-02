@@ -30,9 +30,11 @@
 // Concentrix 로고 컴포넌트
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+@use '@/assets/scss/functions' as *;
+
 .logo-svg {
-  height: 28px;
+  height: rem(28);
   width: auto;
   color: currentColor;
 }

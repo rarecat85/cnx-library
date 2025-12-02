@@ -54,6 +54,7 @@
           >
             <div
               class="header-text-line"
+              :class="{ 'english-text': useEnglishFont }"
               v-html="headerText"
             />
           </div>
@@ -72,7 +73,10 @@
             cols="12"
             class="page-col"
           >
-            <v-card class="page-card">
+            <v-card
+              class="page-card"
+              rounded="t-lg"
+            >
               <slot />
             </v-card>
           </v-col>
@@ -98,6 +102,10 @@ defineProps({
     type: String,
     default: 'icon', // 'icon' | 'home' | 'back-home'
     validator: (value) => ['icon', 'home', 'back-home'].includes(value)
+  },
+  useEnglishFont: {
+    type: Boolean,
+    default: false // true일 때 Montserrat, false일 때 Noto Sans KR
   }
 })
 
@@ -110,7 +118,9 @@ const goBack = () => {
 }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+@use '@/assets/scss/functions' as *;
+
 .page-layout {
   min-height: 100vh;
   width: 100%;
@@ -132,15 +142,15 @@ const goBack = () => {
   align-items: flex-start;
   justify-content: center;
   z-index: 1;
-  padding: 8px 16px;
+  padding: rem(8) rem(16);
 }
 
 .page-header-inner {
-  max-width: 768px;
+  max-width: rem(768);
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: rem(20);
 }
 
 .page-header-left {
@@ -157,14 +167,14 @@ const goBack = () => {
 .header-icons {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: rem(4);
 }
 
 .header-icon-btn {
   color: #FFFFFF;
-  min-width: 44px;
-  width: 44px;
-  height: 44px;
+  min-width: rem(44);
+  width: rem(44);
+  height: rem(44);
 }
 
 .header-icon-btn:hover {
@@ -177,12 +187,15 @@ const goBack = () => {
 }
 
 .header-text-line {
-  font-size: 40px;
+  font-size: rem(32);
   font-weight: 300;
   color: #FFFFFF;
   line-height: 1.1;
-  letter-spacing: 0.2px;
-  font-family: 'Montserrat', 'Noto Sans KR', sans-serif;
+  letter-spacing: rem(0.2);
+}
+
+.header-text-line.english-text {
+  font-size: rem(40);
 }
 
 .page-container {
@@ -194,30 +207,32 @@ const goBack = () => {
 .page-row {
   height: 100vh;
   align-items: flex-start;
-  padding-top: calc(56px + 15vh);
+  padding-top: calc(#{rem(56)} + 7rem);
   margin: 0;
 }
 
 .page-col {
   display: flex;
   justify-content: center;
-  padding: 0 16px;
-  height: calc(100vh - 56px - 15vh);
+  padding: 0 rem(16);
+  height: calc(100vh - #{rem(56)} - 7rem);
   align-self: flex-end;
 }
 
 .page-card {
-  padding: 48px 40px;
-  max-width: 768px;
+  padding: rem(48) rem(40);
+  max-width: rem(768);
   width: 100%;
   margin: 0;
-  border-radius: 16px 16px 0 0;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  box-shadow: 0 rem(4) rem(20) rgba(0, 0, 0, 0.15);
   background-color: #FFFFFF;
   height: 100%;
   display: flex;
   flex-direction: column;
 }
+
 
 .page-card :deep(.v-card__content) {
   flex: 1;
@@ -229,39 +244,49 @@ const goBack = () => {
 /* 모바일 반응형 */
 @media (max-width: 768px) {
   .page-row {
-    padding-top: calc(56px + 10vh);
+    padding-top: calc(#{rem(56)} + 6rem);
   }
 
   .page-col {
-    height: calc(100vh - 56px - 10vh);
+    height: calc(100vh - #{rem(56)} - 6rem);
   }
 
   .page-card {
-    padding: 32px 24px;
-    border-radius: 12px 12px 0 0;
+    padding: rem(32) rem(24);
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
   }
 
   .header-text-line {
-    font-size: 28px;
+    font-size: rem(24);
+  }
+
+  .header-text-line.english-text {
+    font-size: rem(28);
   }
 }
 
 @media (max-width: 480px) {
   .page-row {
-    padding-top: calc(56px + 10vh);
+    padding-top: calc(#{rem(56)} + 5rem);
   }
 
   .page-col {
-    height: calc(100vh - 56px - 10vh);
+    height: calc(100vh - #{rem(56)} - 5rem);
   }
 
   .page-card {
-    padding: 24px 16px;
-    border-radius: 8px 8px 0 0;
+    padding: rem(24) rem(16);
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
   }
 
   .header-text-line {
-    font-size: 24px;
+    font-size: rem(20);
+  }
+
+  .header-text-line.english-text {
+    font-size: rem(24);
   }
 }
 </style>

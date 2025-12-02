@@ -1,6 +1,9 @@
 // 전역 SCSS 파일
 // Vuetify 스타일은 nuxt.config.ts에서 자동으로 로드됩니다.
 
+// 함수 import
+@use 'functions' as *;
+
 // 전역 변수 (필요시 사용)
 // $primary-color: #1976d2;
 // $secondary-color: #424242;
@@ -58,22 +61,22 @@ body {
 
 // 카드 스타일 개선 (브랜드 스타일)
 .v-application .v-card {
-  border-radius: 16px;
-  box-shadow: 0 2px 8px rgba(0, 44, 91, 0.08);
+  border-radius: rem(16);
+  box-shadow: 0 rem(2) rem(8) rgba(0, 44, 91, 0.08);
   background-color: #FFFFFF;
 }
 
 // 버튼 스타일 개선 (브랜드 스타일)
 .v-application .v-btn {
-  border-radius: 8px;
+  border-radius: rem(8);
   font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
-  box-shadow: 0 2px 4px rgba(0, 44, 91, 0.2);
+  box-shadow: 0 rem(2) rem(4) rgba(0, 44, 91, 0.2);
 }
 
 .v-application .v-btn--elevated {
-  box-shadow: 0 2px 8px rgba(0, 44, 91, 0.3);
+  box-shadow: 0 rem(2) rem(8) rgba(0, 44, 91, 0.3);
 }
 
 .v-application .v-btn--variant-elevated.v-theme--light {
@@ -84,17 +87,17 @@ body {
 // 입력 필드 스타일 개선
 .v-application .v-text-field {
   .v-field {
-    border-radius: 8px;
+    border-radius: rem(8);
   }
   
   .v-field__outline {
-    border-width: 1px;
+    border-width: rem(1);
   }
 }
 
 // 입력 필드 포커스 시
 .v-application .v-text-field .v-field--focused .v-field__outline {
-  border-width: 2px;
+  border-width: rem(2);
 }
 
 // 모바일 우선 레이아웃 (최대 너비 768px)
@@ -106,6 +109,11 @@ body {
 // v-main이 전체 너비를 차지하도록
 .v-application .v-main {
   width: 100%;
+}
+
+// 영문 텍스트용 폰트 클래스 (Montserrat)
+.english-text {
+  font-family: 'Montserrat', 'Noto Sans KR', sans-serif;
 }
 
 // 커스텀 스타일 추가 가능

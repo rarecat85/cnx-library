@@ -2,6 +2,7 @@
   <PageLayout
     :show-header-text="true"
     header-text="The world belongs to<br>those who read."
+    :use-english-font="true"
   >
     <div class="text-center mb-8">
       <h1 class="login-title mb-2">
@@ -226,40 +227,42 @@ useHead({
 })
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+@use '@/assets/scss/functions' as *;
+
 .logo-bottom {
-  margin-top: 24px;
+  margin-top: rem(24);
 }
 
 .logo-with-credit {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: rem(8);
 }
 
 .logo-with-credit :deep(.logo-svg) {
-  height: 16px;
+  height: rem(16);
   width: auto;
   color: #002C5B;
 }
 
 .credit-text {
-  font-size: 10px;
+  font-size: rem(10);
   color: #6b7280;
   font-weight: 400;
 }
 
 .error-alert,
 .success-alert {
-  min-height: 48px;
+  min-height: rem(48);
   display: flex;
   align-items: center;
-  margin-top: 16px;
+  margin-top: rem(16);
 }
 
 .login-title {
-  font-size: 32px;
+  font-size: rem(32);
   font-weight: 700;
   color: #002C5B;
   line-height: 1.2;
@@ -267,7 +270,7 @@ useHead({
 }
 
 .login-subtitle {
-  font-size: 16px;
+  font-size: rem(16);
   color: #6b7280;
   margin: 0;
   font-weight: 400;
@@ -275,15 +278,15 @@ useHead({
 
 /* 회원가입 버튼 스타일 */
 .signup-btn {
-  height: 48px;
-  font-size: 16px;
+  height: rem(48);
+  font-size: rem(16);
   font-weight: 500;
-  border-radius: 8px;
+  border-radius: rem(8);
 }
 
 /* 인증 링크 스타일 */
 .auth-links {
-  font-size: 14px;
+  font-size: rem(14);
 }
 
 .auth-link {
@@ -314,7 +317,7 @@ useHead({
 
 /* 메시지가 있을 때만 표시 */
 :deep(.v-input__details:has(.v-messages__message)) {
-  padding-bottom: 6px;
+  padding-bottom: rem(6);
 }
 
 /* 카드 내부 여백 조정 */

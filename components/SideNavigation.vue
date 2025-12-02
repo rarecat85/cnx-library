@@ -7,57 +7,102 @@
     <nav class="menu-list">
       <!-- 일반 사용자 메뉴 -->
       <div class="menu-section">
-        <NuxtLink to="/" class="menu-item" @click="closeDrawer">
+        <NuxtLink
+          to="/"
+          class="menu-item"
+          @click="closeDrawer"
+        >
           <v-icon>mdi-home</v-icon>
           <span>홈</span>
         </NuxtLink>
 
-        <NuxtLink to="/books/search" class="menu-item" @click="closeDrawer">
+        <NuxtLink
+          to="/books/search"
+          class="menu-item"
+          @click="closeDrawer"
+        >
           <v-icon>mdi-magnify</v-icon>
           <span>도서 검색</span>
         </NuxtLink>
 
-        <NuxtLink to="/books" class="menu-item" @click="closeDrawer">
+        <NuxtLink
+          to="/books"
+          class="menu-item"
+          @click="closeDrawer"
+        >
           <v-icon>mdi-book-open-variant</v-icon>
           <span>도서 목록</span>
         </NuxtLink>
 
-        <NuxtLink to="/rentals" class="menu-item" @click="closeDrawer">
+        <NuxtLink
+          to="/rentals"
+          class="menu-item"
+          @click="closeDrawer"
+        >
           <v-icon>mdi-book-account</v-icon>
           <span>대여 관리</span>
         </NuxtLink>
 
-        <NuxtLink to="/purchase-requests" class="menu-item" @click="closeDrawer">
+        <NuxtLink
+          to="/purchase-requests"
+          class="menu-item"
+          @click="closeDrawer"
+        >
           <v-icon>mdi-cart-plus</v-icon>
           <span>구매요청</span>
         </NuxtLink>
 
-        <NuxtLink to="/mypage" class="menu-item" @click="closeDrawer">
+        <NuxtLink
+          to="/mypage"
+          class="menu-item"
+          @click="closeDrawer"
+        >
           <v-icon>mdi-account</v-icon>
           <span>마이페이지</span>
         </NuxtLink>
       </div>
 
       <!-- 관리자 메뉴 (관리자 권한이 있는 경우에만 표시) -->
-      <div v-if="isAdmin" class="menu-section admin-section">
-        <div class="menu-section-title">관리자</div>
+      <div
+        v-if="isAdmin"
+        class="menu-section admin-section"
+      >
+        <div class="menu-section-title">
+          관리자
+        </div>
 
-        <NuxtLink to="/admin/books" class="menu-item" @click="closeDrawer">
+        <NuxtLink
+          to="/admin/books"
+          class="menu-item"
+          @click="closeDrawer"
+        >
           <v-icon>mdi-book-edit</v-icon>
           <span>도서 관리</span>
         </NuxtLink>
 
-        <NuxtLink to="/admin/rentals" class="menu-item" @click="closeDrawer">
+        <NuxtLink
+          to="/admin/rentals"
+          class="menu-item"
+          @click="closeDrawer"
+        >
           <v-icon>mdi-book-check</v-icon>
           <span>대여 관리</span>
         </NuxtLink>
 
-        <NuxtLink to="/admin/purchase-requests" class="menu-item" @click="closeDrawer">
+        <NuxtLink
+          to="/admin/purchase-requests"
+          class="menu-item"
+          @click="closeDrawer"
+        >
           <v-icon>mdi-cart-check</v-icon>
           <span>구매요청 관리</span>
         </NuxtLink>
 
-        <NuxtLink to="/admin/statistics" class="menu-item" @click="closeDrawer">
+        <NuxtLink
+          to="/admin/statistics"
+          class="menu-item"
+          @click="closeDrawer"
+        >
           <v-icon>mdi-chart-bar</v-icon>
           <span>통계</span>
         </NuxtLink>
@@ -65,7 +110,10 @@
 
       <!-- 공통 메뉴 -->
       <div class="menu-section">
-        <div class="menu-item logout-item" @click="handleLogout">
+        <div
+          class="menu-item logout-item"
+          @click="handleLogout"
+        >
           <v-icon>mdi-logout</v-icon>
           <span>로그아웃</span>
         </div>
@@ -126,7 +174,9 @@ const handleLogout = async () => {
 }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+@use '@/assets/scss/functions' as *;
+
 .side-navigation-menu {
   height: 100%;
   display: flex;
@@ -134,15 +184,15 @@ const handleLogout = async () => {
 }
 
 .menu-header {
-  padding: 20px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: rem(20) rem(16);
+  border-bottom: rem(1) solid rgba(255, 255, 255, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .menu-header :deep(.logo-svg) {
-  height: 24px;
+  height: rem(24);
   width: auto;
   color: #FFFFFF;
 }
@@ -150,36 +200,36 @@ const handleLogout = async () => {
 .menu-list {
   flex: 1;
   overflow-y: auto;
-  padding: 8px 0;
+  padding: rem(8) 0;
 }
 
 .menu-section {
-  padding: 8px 0;
+  padding: rem(8) 0;
 }
 
 .menu-section-title {
-  padding: 12px 16px 8px;
-  font-size: 12px;
+  padding: rem(12) rem(16) rem(8);
+  font-size: rem(12);
   font-weight: 600;
   color: rgba(255, 255, 255, 0.7);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: rem(0.5);
 }
 
 .admin-section {
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  margin-top: 8px;
-  padding-top: 16px;
+  border-top: rem(1) solid rgba(255, 255, 255, 0.1);
+  margin-top: rem(8);
+  padding-top: rem(16);
 }
 
 .menu-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: rem(12);
+  padding: rem(12) rem(16);
   color: #FFFFFF;
   text-decoration: none;
-  font-size: 15px;
+  font-size: rem(15);
   transition: background-color 0.2s;
   cursor: pointer;
 }
@@ -194,14 +244,14 @@ const handleLogout = async () => {
 }
 
 .menu-item .v-icon {
-  font-size: 20px;
+  font-size: rem(20);
   color: #FFFFFF;
 }
 
 .logout-item {
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  margin-top: 8px;
-  padding-top: 12px;
+  border-top: rem(1) solid rgba(255, 255, 255, 0.1);
+  margin-top: rem(8);
+  padding-top: rem(12);
 }
 
 .logout-item:hover {

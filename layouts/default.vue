@@ -41,7 +41,9 @@ onMounted(() => {
 })
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+@use '@/assets/scss/functions' as *;
+
 .main-content {
   display: flex;
   justify-content: center;
@@ -49,7 +51,7 @@ onMounted(() => {
 
 .content-wrapper {
   width: 100%;
-  max-width: 768px;
+  max-width: rem(768);
   margin: 0 auto;
 }
 
@@ -70,24 +72,24 @@ onMounted(() => {
 }
 
 .drawer-content {
-  padding: 16px;
+  padding: rem(16);
   color: #FFFFFF;
 }
 
 /* 768px 이하: 전체 화면 기준 우측에 붙어서 */
 @media (max-width: 768px) {
   .side-navigation :deep(.v-navigation-drawer) {
-    width: 280px;
+    width: rem(280);
   }
 }
 
 /* 769px 이상: 768px 이너 안쪽으로 들어오도록 */
 @media (min-width: 769px) {
   .side-navigation :deep(.v-navigation-drawer) {
-    width: 360px;
+    width: rem(360);
     left: auto;
-    right: calc((100vw - 768px) / 2);
-    max-width: 768px;
+    right: calc((100vw - #{rem(768)}) / 2);
+    max-width: rem(768);
   }
   
   /* 오버레이가 768px 컨테이너 영역만 덮도록 */

@@ -2,6 +2,7 @@
   <PageLayout
     :show-header-text="true"
     header-text="The world belongs to<br>those who read."
+    :use-english-font="true"
   >
     <div class="text-center mb-8">
       <h1 class="login-title mb-2">
@@ -273,34 +274,35 @@ useHead({
 })
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+@use '@/assets/scss/functions' as *;
 
 .logo-bottom {
-  margin-top: 24px;
+  margin-top: rem(24);
 }
 
 .logo-with-credit {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: rem(8);
 }
 
 .logo-with-credit :deep(.logo-svg) {
-  height: 16px;
+  height: rem(16);
   width: auto;
   color: #002C5B;
 }
 
 .credit-text {
-  font-size: 10px;
+  font-size: rem(10);
   color: #6b7280;
   font-weight: 400;
 }
 
 .error-alert {
-  min-height: 48px;
-  margin-top: 16px;
+  min-height: rem(48);
+  margin-top: rem(16);
   position: relative;
 }
 
@@ -310,8 +312,8 @@ useHead({
 
 .error-alert :deep(.v-btn--icon.v-alert__close) {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: rem(8);
+  right: rem(8);
 }
 
 .error-content {
@@ -324,10 +326,10 @@ useHead({
 
 .resend-link {
   display: block;
-  margin-top: 8px;
+  margin-top: rem(8);
   color: #002C5B;
   text-decoration: underline;
-  font-size: 14px;
+  font-size: rem(14);
   cursor: pointer;
   transition: color 0.2s;
 }
@@ -344,7 +346,7 @@ useHead({
 }
 
 .login-title {
-  font-size: 32px;
+  font-size: rem(32);
   font-weight: 700;
   color: #002C5B;
   line-height: 1.2;
@@ -352,7 +354,7 @@ useHead({
 }
 
 .login-subtitle {
-  font-size: 16px;
+  font-size: rem(16);
   color: #6b7280;
   margin: 0;
   font-weight: 400;
@@ -361,15 +363,15 @@ useHead({
 
 /* 로그인 버튼 스타일 */
 .login-btn {
-  height: 48px;
-  font-size: 16px;
+  height: rem(48);
+  font-size: rem(16);
   font-weight: 500;
-  border-radius: 8px;
+  border-radius: rem(8);
 }
 
 /* 인증 링크 스타일 */
 .auth-links {
-  font-size: 14px;
+  font-size: rem(14);
 }
 
 .auth-link {
@@ -385,9 +387,9 @@ useHead({
 
 .auth-link-divider {
   display: inline-block;
-  width: 1px;
-  height: 12px;
-  margin: 0 12px;
+  width: rem(1);
+  height: rem(12);
+  margin: 0 rem(12);
   background-color: #d1d5db;
   vertical-align: middle;
 }
@@ -408,7 +410,7 @@ useHead({
 
 /* 메시지가 있을 때만 표시 */
 :deep(.v-input__details:has(.v-messages__message)) {
-  padding-bottom: 6px;
+  padding-bottom: rem(6);
 }
 
 /* 카드 내부 여백 조정 */
@@ -420,7 +422,7 @@ useHead({
 .remember-me-container {
   display: flex;
   align-items: center;
-  margin-top: 8px;
+  margin-top: rem(8);
 }
 
 .remember-me-container :deep(.v-checkbox) {
@@ -428,7 +430,7 @@ useHead({
 }
 
 .remember-me-container :deep(.v-checkbox .v-label) {
-  font-size: 13px;
+  font-size: rem(13);
   line-height: 1.2;
 }
 
@@ -437,12 +439,12 @@ useHead({
 }
 
 .remember-me-container :deep(.v-checkbox .v-selection-control__input) {
-  width: 18px;
-  height: 18px;
+  width: rem(18);
+  height: rem(18);
 }
 
 .remember-me-container :deep(.v-checkbox .v-icon) {
-  font-size: 18px;
+  font-size: rem(18);
 }
 </style>
 

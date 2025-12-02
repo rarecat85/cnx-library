@@ -9,7 +9,7 @@
       class="side-navigation"
     >
       <div class="drawer-content">
-        <!-- 메뉴 내용은 추후 추가 -->
+        <SideNavigation />
       </div>
     </v-navigation-drawer>
     <v-main class="main-content">

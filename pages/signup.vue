@@ -273,12 +273,12 @@ useHead({
   top: 0;
   left: 0;
   width: 100%;
-  height: 25vh;
+  min-height: 25vh;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   z-index: 1;
-  padding: 24px 16px;
+  padding: 8px 16px;
 }
 
 .login-header-inner {

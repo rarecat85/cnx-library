@@ -1,8 +1,12 @@
 const { onCall } = require('firebase-functions/v2/https')
+const { defineString } = require('firebase-functions/params')
 const { initializeApp } = require('firebase-admin/app')
 const { getAuth } = require('firebase-admin/auth')
 const { getFirestore } = require('firebase-admin/firestore')
 const functions = require('firebase-functions')
+
+// 알라딘 API 키 (환경 변수)
+const aladinTtbKey = defineString('ALADIN_TTB_KEY', { default: '' })
 
 // Firebase Admin 초기화
 initializeApp()
@@ -10,23 +14,7 @@ initializeApp()
 const auth = getAuth()
 const firestore = getFirestore()
 
-// 네이버 API 인증 정보 (환경 변수에서 가져오기)
-const getNaverConfig = () => {
-  // 로컬 개발 환경
-  if (process.env.NAVER_CLIENT_ID && process.env.NAVER_CLIENT_SECRET) {
-    return {
-      clientId: process.env.NAVER_CLIENT_ID,
-      clientSecret: process.env.NAVER_CLIENT_SECRET
-    }
-  }
-  
-  // 배포 환경 (Firebase Functions config)
-  const config = functions.config()
-  return {
-    clientId: config?.naver?.client_id || '',
-    clientSecret: config?.naver?.client_secret || ''
-  }
-}
+// 알라딘 API 인증 정보는 aladinTtbKey를 직접 사용
 
 /**
  * 이메일 인증 완료 후 Firestore 업데이트
@@ -180,11 +168,11 @@ exports.resendVerificationEmailWithReset = onCall({
 })
 
 /**
- * 네이버 도서 검색 API 호출
+ * 알라딘 도서 검색 API 호출
  * 
- * 이 함수는 네이버 도서 검색 API를 호출하여 도서 정보를 검색합니다.
+ * 이 함수는 알라딘 Open API를 사용하여 도서를 검색합니다.
  */
-exports.searchNaverBooks = onCall({
+exports.searchAladinBooks = onCall({
   cors: true
 }, async (request) => {
   try {
@@ -197,61 +185,297 @@ exports.searchNaverBooks = onCall({
       }
     }
 
-    // display 최대값 제한 (네이버 API 최대 100)
-    const displayLimit = Math.min(display, 100)
+    // display 최대값 제한 (알라딘 API 최대 200)
+    const displayLimit = Math.min(display, 200)
     const startValue = Math.max(1, start)
 
-    // 네이버 API 인증 정보 가져오기
-    const naverConfig = getNaverConfig()
+    // 알라딘 API 인증 정보 가져오기
+    const ttbKey = aladinTtbKey.value()
     
-    if (!naverConfig.clientId || !naverConfig.clientSecret) {
+    if (!ttbKey) {
       return {
         success: false,
-        error: '네이버 API 인증 정보가 설정되지 않았습니다.'
+        error: '알라딘 API 인증 정보가 설정되지 않았습니다.'
       }
     }
 
-    // 네이버 도서 검색 API 호출
-    const apiUrl = 'https://openapi.naver.com/v1/search/book.json'
+    // 알라딘 도서 검색 API 호출
+    const apiUrl = 'https://www.aladin.co.kr/ttb/api/ItemSearch.aspx'
     const params = new URLSearchParams({
-      query: query.trim(),
-      display: displayLimit.toString(),
-      start: startValue.toString()
+      ttbkey: ttbKey,
+      Query: query.trim(),
+      QueryType: 'Title',
+      MaxResults: displayLimit.toString(),
+      start: startValue.toString(),
+      SearchTarget: 'Book',
+      output: 'js',
+      Version: '20131101'
     })
 
     const response = await fetch(`${apiUrl}?${params.toString()}`, {
-      method: 'GET',
-      headers: {
-        'X-Naver-Client-Id': naverConfig.clientId,
-        'X-Naver-Client-Secret': naverConfig.clientSecret
-      }
+      method: 'GET'
     })
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('네이버 API 오류:', response.status, errorText)
+      console.error('알라딘 API 오류:', response.status, errorText)
       return {
         success: false,
-        error: `네이버 API 호출 실패: ${response.status}`
+        error: `알라딘 API 호출 실패: ${response.status}`
       }
     }
 
-    const data = await response.json()
+    const responseText = await response.text()
+    
+    // JSONP 응답 처리 (callback 함수 제거)
+    let data
+    try {
+      // 알라딘 API는 JSONP 형식으로 응답 (예: callback({...}))
+      let cleanedText = responseText.trim()
+      
+      // callback 함수 호출 제거 (예: "callback({...})" -> "{...}")
+      if (cleanedText.includes('(') && cleanedText.includes(')')) {
+        // 함수명과 괄호 제거
+        const match = cleanedText.match(/^\w+\((.+)\);?\s*$/)
+        if (match) {
+          cleanedText = match[1]
+        } else {
+          // 다른 형식 시도
+          const jsonMatch = cleanedText.match(/\(({.*})\)/)
+          if (jsonMatch) {
+            cleanedText = jsonMatch[1]
+          }
+        }
+      }
+      
+      data = JSON.parse(cleanedText)
+    } catch (parseError) {
+      console.error('알라딘 API 응답 파싱 오류:', parseError)
+      console.error('응답 텍스트 (처음 500자):', responseText.substring(0, 500))
+      return {
+        success: false,
+        error: `알라딘 API 응답을 파싱할 수 없습니다: ${parseError.message}`
+      }
+    }
+
+    // 에러 체크
+    if (data.errorCode && data.errorCode !== '0') {
+      console.error('알라딘 API 오류:', data.errorCode, data.errorMessage)
+      return {
+        success: false,
+        error: data.errorMessage || `알라딘 API 오류가 발생했습니다. (코드: ${data.errorCode})`
+      }
+    }
+
+    // 세트 상품 필터링 함수
+    const isSetProduct = (item) => {
+      if (!item || !item.title) {
+        return false
+      }
+      
+      const title = item.title.toLowerCase()
+      const setKeywords = [
+        '세트',
+        '전집',
+        'box',
+        '박스',
+        '시리즈',
+        '전권',
+        '완전판',
+        '합본',
+        '모음',
+        '선집',
+        '문고판 세트',
+        '문고세트'
+      ]
+      
+      // 제목에 세트 관련 키워드가 포함되어 있는지 확인
+      for (const keyword of setKeywords) {
+        if (title.includes(keyword)) {
+          return true
+        }
+      }
+      
+      // 괄호 안에 "전N권", "N권 세트" 등의 패턴 확인
+      const bracketPattern = /\([^)]*(전\s*\d+권|\d+권\s*세트|전\s*\d+권\s*세트)[^)]*\)/i
+      if (bracketPattern.test(item.title)) {
+        return true
+      }
+      
+      return false
+    }
+
+    // 세트 상품 제외
+    const filteredItems = (data.item || []).filter(item => !isSetProduct(item))
 
     return {
       success: true,
       data: {
-        total: data.total || 0,
-        start: data.start || startValue,
-        display: data.display || displayLimit,
-        items: data.items || []
+        total: filteredItems.length,
+        start: startValue,
+        display: filteredItems.length,
+        items: filteredItems
       }
     }
   } catch (error) {
-    console.error('네이버 도서 검색 오류:', error)
+    console.error('알라딘 도서 검색 오류:', error)
     return {
       success: false,
       error: error.message || '도서 검색에 실패했습니다.'
+    }
+  }
+})
+
+/**
+ * 알라딘 베스트셀러 API 호출
+ * 
+ * 이 함수는 알라딘 Open API를 사용하여 베스트셀러 목록을 조회합니다.
+ * 알라딘 API는 QueryType='Bestseller'로 베스트셀러 목록을 제공합니다.
+ */
+exports.getAladinBestsellers = onCall({
+  cors: true
+}, async (request) => {
+  try {
+    const { display = 10 } = request.data
+
+    // display 최대값 제한 (알라딘 API 최대 200)
+    const displayLimit = Math.min(display, 200)
+
+    // 알라딘 API 인증 정보 가져오기
+    const ttbKey = aladinTtbKey.value()
+    
+    if (!ttbKey) {
+      return {
+        success: false,
+        error: '알라딘 API 인증 정보가 설정되지 않았습니다.'
+      }
+    }
+
+    // 알라딘 베스트셀러 API 호출
+    const apiUrl = 'https://www.aladin.co.kr/ttb/api/ItemList.aspx'
+    const params = new URLSearchParams({
+      ttbkey: ttbKey,
+      QueryType: 'Bestseller',
+      MaxResults: displayLimit.toString(),
+      start: '1',
+      SearchTarget: 'Book',
+      output: 'js',
+      Version: '20131101'
+    })
+
+    const response = await fetch(`${apiUrl}?${params.toString()}`, {
+      method: 'GET'
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('알라딘 API 오류:', response.status, errorText)
+      return {
+        success: false,
+        error: `알라딘 API 호출 실패: ${response.status}`
+      }
+    }
+
+    const responseText = await response.text()
+    
+    // JSONP 응답 처리 (callback 함수 제거)
+    let data
+    try {
+      // 알라딘 API는 JSONP 형식으로 응답 (예: callback({...}))
+      let cleanedText = responseText.trim()
+      
+      // callback 함수 호출 제거 (예: "callback({...})" -> "{...}")
+      if (cleanedText.includes('(') && cleanedText.includes(')')) {
+        // 함수명과 괄호 제거
+        const match = cleanedText.match(/^\w+\((.+)\);?\s*$/)
+        if (match) {
+          cleanedText = match[1]
+        } else {
+          // 다른 형식 시도
+          const jsonMatch = cleanedText.match(/\(({.*})\)/)
+          if (jsonMatch) {
+            cleanedText = jsonMatch[1]
+          }
+        }
+      }
+      
+      data = JSON.parse(cleanedText)
+    } catch (parseError) {
+      console.error('알라딘 API 응답 파싱 오류:', parseError)
+      console.error('응답 텍스트 (처음 500자):', responseText.substring(0, 500))
+      return {
+        success: false,
+        error: `알라딘 API 응답을 파싱할 수 없습니다: ${parseError.message}`
+      }
+    }
+
+    // 에러 체크
+    if (data.errorCode && data.errorCode !== '0') {
+      console.error('알라딘 API 오류:', data.errorCode, data.errorMessage)
+      return {
+        success: false,
+        error: data.errorMessage || `알라딘 API 오류가 발생했습니다. (코드: ${data.errorCode})`
+      }
+    }
+
+    // 세트 상품 필터링 함수
+    const isSetProduct = (item) => {
+      if (!item || !item.title) {
+        return false
+      }
+      
+      const title = item.title.toLowerCase()
+      const setKeywords = [
+        '세트',
+        '전집',
+        'box',
+        '박스',
+        '시리즈',
+        '전권',
+        '완전판',
+        '합본',
+        '모음',
+        '선집',
+        '문고판 세트',
+        '문고세트'
+      ]
+      
+      // 제목에 세트 관련 키워드가 포함되어 있는지 확인
+      for (const keyword of setKeywords) {
+        if (title.includes(keyword)) {
+          return true
+        }
+      }
+      
+      // 괄호 안에 "전N권", "N권 세트" 등의 패턴 확인
+      const bracketPattern = /\([^)]*(전\s*\d+권|\d+권\s*세트|전\s*\d+권\s*세트)[^)]*\)/i
+      if (bracketPattern.test(item.title)) {
+        return true
+      }
+      
+      return false
+    }
+
+    // 세트 상품 제외
+    const filteredItems = (data.item || []).filter(item => !isSetProduct(item))
+
+    // 요청한 개수만큼만 반환
+    const result = filteredItems.slice(0, displayLimit)
+
+    return {
+      success: true,
+      data: {
+        total: result.length,
+        start: 1,
+        display: result.length,
+        items: result
+      }
+    }
+  } catch (error) {
+    console.error('알라딘 베스트셀러 조회 오류:', error)
+    return {
+      success: false,
+      error: error.message || '베스트셀러 조회에 실패했습니다.'
     }
   }
 })

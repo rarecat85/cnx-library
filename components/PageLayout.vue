@@ -230,7 +230,7 @@ const goBack = () => {
 
 .page-background {
   min-height: 100vh;
-  background: linear-gradient(to bottom, #002C5B 0%, #002C5B 50%, #F2F2F2 50%, #F2F2F2 100%);
+  background: linear-gradient(to bottom, #002C5B 0%, #002C5B 50vh, #F2F2F2 50vh, #F2F2F2 100%);
   position: relative;
 }
 
@@ -332,12 +332,12 @@ const goBack = () => {
 
 .page-container {
   padding: 0;
-  height: 100vh;
+  min-height: 100vh;
   position: relative;
 }
 
 .page-row {
-  height: 100vh;
+  min-height: 100vh;
   align-items: flex-start;
   padding-top: calc(#{rem(56)} + 7rem);
   margin: 0;
@@ -347,7 +347,7 @@ const goBack = () => {
   display: flex;
   justify-content: center;
   padding: 0 rem(16);
-  height: calc(100vh - #{rem(56)} - 7rem);
+  min-height: calc(100vh - #{rem(56)} - 7rem);
   align-self: flex-end;
 }
 
@@ -360,7 +360,7 @@ const goBack = () => {
   border-bottom-right-radius: 0;
   box-shadow: 0 rem(4) rem(20) rgba(0, 0, 0, 0.15);
   background-color: #FFFFFF;
-  height: 100%;
+  min-height: calc(100vh - #{rem(56)} - 7rem);
   display: flex;
   flex-direction: column;
 }
@@ -380,13 +380,14 @@ const goBack = () => {
   }
 
   .page-col {
-    height: calc(100vh - #{rem(56)} - 6rem);
+    min-height: calc(100vh - #{rem(56)} - 6rem);
   }
 
   .page-card {
     padding: rem(32) rem(24);
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
+    min-height: calc(100vh - #{rem(56)} - 6rem);
   }
 
   .header-text-line {
@@ -404,13 +405,14 @@ const goBack = () => {
   }
 
   .page-col {
-    height: calc(100vh - #{rem(56)} - 5rem);
+    min-height: calc(100vh - #{rem(56)} - 5rem);
   }
 
   .page-card {
     padding: rem(24) rem(16);
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
+    min-height: calc(100vh - #{rem(56)} - 5rem);
   }
 
   .header-text-line {

@@ -1,0 +1,339 @@
+<template>
+  <v-card
+    class="book-card"
+    :class="{ 'book-card-selected': selectable && selected }"
+    elevation="0"
+    @click="selectable ? handleCardClick() : null"
+  >
+    <!-- 상태 플래그 영역 -->
+    <div
+      v-if="selectable && (statusText || isNewBook)"
+      class="book-card-header"
+    >
+      <v-chip
+        v-if="isNewBook"
+        color="primary"
+        size="x-small"
+        variant="flat"
+        class="status-chip"
+      >
+        NEW
+      </v-chip>
+      <v-chip
+        v-if="statusText"
+        :color="statusColor"
+        size="x-small"
+        variant="flat"
+        class="status-chip"
+      >
+        {{ statusText }}
+      </v-chip>
+    </div>
+    
+    <div class="book-card-inner">
+      <div class="book-image-wrapper">
+        <v-img
+          :src="bookImage"
+          :alt="book.title"
+          height="100%"
+          cover
+          class="book-image"
+        />
+      </div>
+      <div class="book-card-content">
+        <div class="book-title mb-2">
+          {{ book.title }}
+        </div>
+        <div class="book-info text-body-2 mb-1">
+          <strong>저자:</strong> {{ book.author }}
+        </div>
+        <div class="book-info book-info-publisher text-body-2">
+          <strong>출판사:</strong> {{ book.publisher }}
+        </div>
+      </div>
+    </div>
+    
+    <div
+      v-if="showAction"
+      class="book-action-area"
+    >
+      <div
+        v-if="isBookRegistered"
+        class="registered-text text-body-2"
+      >
+        {{ center }}에 등록된 도서입니다.
+      </div>
+      <v-btn
+        v-else
+        color="primary"
+        size="small"
+        :loading="isRegistering"
+        :disabled="isRegistering"
+        class="register-btn"
+        @click.stop="handleRegister"
+      >
+        {{ center }}에 등록하기
+      </v-btn>
+    </div>
+  </v-card>
+</template>
+
+<script setup>
+const props = defineProps({
+  book: {
+    type: Object,
+    required: true
+  },
+  center: {
+    type: String,
+    required: true
+  },
+  registeredBooks: {
+    type: Array,
+    default: () => []
+  },
+  isRegistered: {
+    type: Boolean,
+    default: false
+  },
+  showAction: {
+    type: Boolean,
+    default: true
+  },
+  selectable: { // 도서 관리 페이지에서 선택 가능 여부
+    type: Boolean,
+    default: false
+  },
+  selected: { // 선택 상태
+    type: Boolean,
+    default: false
+  },
+  status: { // 도서 상태 (임시 테스트용: 'new', 'rented', 'overdue')
+    type: String,
+    default: null
+  }
+})
+
+const emit = defineEmits(['register', 'select'])
+
+// 도서 이미지 (알라딘 API는 cover 필드 사용)
+const bookImage = computed(() => {
+  return props.book.cover || props.book.image || '/placeholder-book.png'
+})
+
+// 등록 상태 확인
+const isBookRegistered = computed(() => {
+  if (props.isRegistered) {
+    return true
+  }
+  
+  const isbn = props.book.isbn13 || props.book.isbn || ''
+  if (!isbn) {
+    return false
+  }
+  
+  return props.registeredBooks.some(registeredBook => {
+    const registeredIsbn = registeredBook.isbn13 || registeredBook.isbn || registeredBook.id || ''
+    // ISBN 비교 (앞뒤 공백 제거 및 대소문자 무시)
+    const normalizedIsbn = isbn.toString().trim()
+    const normalizedRegisteredIsbn = registeredIsbn.toString().trim()
+    return normalizedIsbn === normalizedRegisteredIsbn && registeredBook.center === props.center
+  })
+})
+
+// 등록 중 상태
+const isRegistering = ref(false)
+
+// 등록 처리
+const handleRegister = async () => {
+  if (isRegistering.value) {
+    return
+  }
+
+  try {
+    isRegistering.value = true
+    emit('register', props.book)
+  } finally {
+  // 등록 완료 후 약간의 딜레이를 두고 상태 초기화
+  setTimeout(() => {
+    isRegistering.value = false
+  }, 1000)
+}
+}
+
+// 등록일 기준 한 달 이내인지 확인
+const isNewBook = computed(() => {
+  if (props.book.registeredAt) {
+    const registeredDate = props.book.registeredAt?.toDate?.() || new Date(props.book.registeredAt)
+    const oneMonthAgo = new Date()
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
+    
+    return registeredDate >= oneMonthAgo
+  }
+  return false
+})
+
+// 도서 상태 (대여중, 연체중 등)
+const bookStatus = computed(() => {
+  // props로 상태가 전달된 경우 우선 사용
+  if (props.status) {
+    return props.status
+  }
+  return null
+})
+
+const statusText = computed(() => {
+  const statusMap = {
+    new: 'NEW',
+    rented: '대여중',
+    overdue: '연체중'
+  }
+  return statusMap[bookStatus.value] || ''
+})
+
+const statusColor = computed(() => {
+  const colorMap = {
+    new: 'primary',
+    rented: 'info',
+    overdue: 'error'
+  }
+  return colorMap[bookStatus.value] || 'primary'
+})
+
+// 카드 클릭 처리
+const handleCardClick = () => {
+  if (props.selectable) {
+    emit('select', props.book, !props.selected)
+  }
+}
+
+</script>
+
+<style lang="scss" scoped>
+@use '@/assets/scss/functions' as *;
+
+.book-card {
+  height: 100%;
+  background-color: #F5F5F5;
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  border: rem(2) solid transparent;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  padding: rem(24) rem(20);
+}
+
+.book-card:hover {
+  transform: translateY(rem(-2));
+  box-shadow: 0 rem(4) rem(12) rgba(0, 0, 0, 0.15);
+}
+
+.book-card-selected {
+  border-color: #002C5B;
+}
+
+.book-card-header {
+  display: flex;
+  align-items: center;
+  gap: rem(5);
+  margin-bottom: rem(10);
+}
+
+.status-chip {
+  flex: 0 0 auto;
+  font-size: rem(9) !important;
+  height: rem(16) !important;
+  padding: 0 rem(6) !important;
+  min-width: auto !important;
+  
+  :deep(.v-chip__content) {
+    font-size: rem(9);
+    line-height: 1;
+    padding: 0;
+  }
+}
+
+.book-card-inner {
+  display: flex;
+  gap: rem(16);
+  margin-bottom: rem(10);
+  min-height: rem(115);
+}
+
+.book-image-wrapper {
+  flex: 0 0 auto;
+  width: rem(80);
+  height: rem(110);
+}
+
+.book-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: rem(4);
+}
+
+.book-card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  color: #000000;
+  min-width: 0;
+}
+
+.book-title {
+  font-size: rem(16);
+  font-weight: 600;
+  color: #002C5B;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.book-info {
+  color: #6b7280;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.book-info-publisher {
+  -webkit-line-clamp: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+
+.book-action-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: rem(10);
+}
+
+.register-btn {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.registered-text {
+  color: #10b981;
+  font-weight: 500;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: rem(28);
+  box-sizing: border-box;
+}
+</style>
+

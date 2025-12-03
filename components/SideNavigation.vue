@@ -81,6 +81,15 @@
         </NuxtLink>
 
         <NuxtLink
+          to="/admin/books/register"
+          class="menu-item"
+          @click="closeDrawer"
+        >
+          <v-icon>mdi-book-plus</v-icon>
+          <span>도서 등록</span>
+        </NuxtLink>
+
+        <NuxtLink
           to="/admin/rentals"
           class="menu-item"
           @click="closeDrawer"

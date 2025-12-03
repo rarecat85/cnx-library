@@ -16,50 +16,30 @@
           <span>홈</span>
         </NuxtLink>
 
-        <NuxtLink
-          to="/books/search"
-          class="menu-item"
-          @click="closeDrawer"
-        >
+        <div class="menu-item menu-item-disabled">
           <v-icon>mdi-magnify</v-icon>
           <span>도서 검색</span>
-        </NuxtLink>
+        </div>
 
-        <NuxtLink
-          to="/books"
-          class="menu-item"
-          @click="closeDrawer"
-        >
+        <div class="menu-item menu-item-disabled">
           <v-icon>mdi-book-open-variant</v-icon>
           <span>도서 목록</span>
-        </NuxtLink>
+        </div>
 
-        <NuxtLink
-          to="/rentals"
-          class="menu-item"
-          @click="closeDrawer"
-        >
+        <div class="menu-item menu-item-disabled">
           <v-icon>mdi-book-account</v-icon>
           <span>대여 관리</span>
-        </NuxtLink>
+        </div>
 
-        <NuxtLink
-          to="/purchase-requests"
-          class="menu-item"
-          @click="closeDrawer"
-        >
+        <div class="menu-item menu-item-disabled">
           <v-icon>mdi-cart-plus</v-icon>
           <span>구매요청</span>
-        </NuxtLink>
+        </div>
 
-        <NuxtLink
-          to="/mypage"
-          class="menu-item"
-          @click="closeDrawer"
-        >
+        <div class="menu-item menu-item-disabled">
           <v-icon>mdi-account</v-icon>
           <span>마이페이지</span>
-        </NuxtLink>
+        </div>
       </div>
 
       <!-- 관리자 메뉴 (관리자 권한이 있는 경우에만 표시) -->
@@ -89,32 +69,20 @@
           <span>도서 등록</span>
         </NuxtLink>
 
-        <NuxtLink
-          to="/admin/rentals"
-          class="menu-item"
-          @click="closeDrawer"
-        >
+        <div class="menu-item menu-item-disabled">
           <v-icon>mdi-book-check</v-icon>
           <span>대여 관리</span>
-        </NuxtLink>
+        </div>
 
-        <NuxtLink
-          to="/admin/purchase-requests"
-          class="menu-item"
-          @click="closeDrawer"
-        >
+        <div class="menu-item menu-item-disabled">
           <v-icon>mdi-cart-check</v-icon>
           <span>구매요청 관리</span>
-        </NuxtLink>
+        </div>
 
-        <NuxtLink
-          to="/admin/statistics"
-          class="menu-item"
-          @click="closeDrawer"
-        >
+        <div class="menu-item menu-item-disabled">
           <v-icon>mdi-chart-bar</v-icon>
           <span>통계</span>
-        </NuxtLink>
+        </div>
       </div>
 
       <!-- 공통 메뉴 -->
@@ -250,6 +218,18 @@ const handleLogout = async () => {
 .menu-item.router-link-active {
   background-color: rgba(255, 255, 255, 0.15);
   font-weight: 500;
+}
+
+.menu-item-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.menu-item-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .menu-item .v-icon {

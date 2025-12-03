@@ -1,5 +1,6 @@
 <template>
-  <PageLayout>
+  <v-app>
+    <PageLayout>
     <div class="text-center mb-8">
       <h1 class="login-title mb-2">
         CNX Library
@@ -113,6 +114,7 @@
       </div>
     </div>
   </PageLayout>
+  </v-app>
 </template>
 
 <script setup>

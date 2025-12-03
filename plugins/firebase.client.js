@@ -1,7 +1,7 @@
 import { defineNuxtPlugin } from '#app'
 import { initializeApp, getApps } from 'firebase/app'
 import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth'
-import { getFirestore } from 'firebase/firestore'
+import { initializeFirestore } from 'firebase/firestore'
 
 export default defineNuxtPlugin(async (nuxtApp) => {
   const config = useRuntimeConfig()
@@ -26,7 +26,22 @@ export default defineNuxtPlugin(async (nuxtApp) => {
 
   // Firebase 서비스 초기화
   const auth = getAuth(app)
-  const firestore = getFirestore(app)
+  // Firestore 초기화 시 QUIC 프로토콜 에러 방지를 위해 long polling 사용
+  let firestore
+  if (process.client) {
+    try {
+      firestore = initializeFirestore(app, {
+        experimentalForceLongPolling: true
+      })
+    } catch (error) {
+      // 이미 초기화된 경우 에러 무시
+      const { getFirestore } = await import('firebase/firestore')
+      firestore = getFirestore(app)
+    }
+  } else {
+    const { getFirestore } = await import('firebase/firestore')
+    firestore = getFirestore(app)
+  }
   
   // Firebase Auth persistence 설정 (브라우저를 닫아도 로그인 상태 유지)
   // 기본값이 browserLocalPersistence이지만 명시적으로 설정

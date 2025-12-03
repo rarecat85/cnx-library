@@ -1,9 +1,5 @@
 <template>
-  <PageLayout
-    :show-header-text="true"
-    header-text="The world belongs to<br>those who read."
-    :use-english-font="true"
-  >
+  <PageLayout>
     <div class="text-center mb-8">
       <h1 class="login-title mb-2">
         CNX Library

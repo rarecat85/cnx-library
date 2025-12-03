@@ -89,13 +89,13 @@
           </div>
           
           <div
-            v-if="showHeaderText"
+            v-if="displayHeaderText"
             class="header-text-content"
           >
             <div
               class="header-text-line"
-              :class="{ 'english-text': useEnglishFont }"
-              v-html="headerText"
+              :class="{ 'english-text': isEnglishText }"
+              v-html="computedHeaderText"
             />
           </div>
         </div>
@@ -128,24 +128,15 @@
 
 <script setup>
 const router = useRouter()
+const { user, isAuthenticated } = useAuth()
+const { $firebaseFirestore } = useNuxtApp()
+const firestore = $firebaseFirestore
 
 defineProps({
-  showHeaderText: {
-    type: Boolean,
-    default: false
-  },
-  headerText: {
-    type: String,
-    default: 'The world belongs to<br>those who read.'
-  },
   headerType: {
     type: String,
     default: 'icon', // 'icon' | 'home' | 'back-home'
     validator: (value) => ['icon', 'home', 'back-home'].includes(value)
-  },
-  useEnglishFont: {
-    type: Boolean,
-    default: false // true일 때 Montserrat, false일 때 Noto Sans KR
   },
   showHeaderActions: {
     type: Boolean,
@@ -154,6 +145,70 @@ defineProps({
 })
 
 defineEmits(['toggle-drawer'])
+
+// 사용자 데이터
+const userData = ref(null)
+
+// 로그인 상태에 따른 헤더 텍스트 계산
+const computedHeaderText = computed(() => {
+  if (isAuthenticated.value && userData.value) {
+    // 로그인 후: 한글 텍스트
+    const center = userData.value.center || ''
+    const name = userData.value.name || ''
+    return `안녕하세요,<br>${center} ${name} 님`
+  } else {
+    // 로그인 전: 영문 텍스트
+    return 'The world belongs to<br>those who read.'
+  }
+})
+
+// 영문 텍스트 여부 (로그인 전에만 true)
+const isEnglishText = computed(() => {
+  return !isAuthenticated.value
+})
+
+// 헤더 텍스트 표시 여부 (항상 표시)
+const displayHeaderText = computed(() => {
+  return true
+})
+
+// Firestore에서 사용자 정보 가져오기
+onMounted(async () => {
+  if (!process.client || !isAuthenticated.value || !user.value || !firestore) {
+    return
+  }
+
+  try {
+    const { doc, getDoc } = await import('firebase/firestore')
+    const userRef = doc(firestore, 'users', user.value.uid)
+    const userDoc = await getDoc(userRef)
+    
+    if (userDoc.exists()) {
+      userData.value = userDoc.data()
+    }
+  } catch (error) {
+    console.error('사용자 정보 조회 실패:', error)
+  }
+})
+
+// 사용자 상태 변경 감지
+watch([isAuthenticated, user], async ([authenticated, currentUser]) => {
+  if (authenticated && currentUser && firestore) {
+    try {
+      const { doc, getDoc } = await import('firebase/firestore')
+      const userRef = doc(firestore, 'users', currentUser.uid)
+      const userDoc = await getDoc(userRef)
+      
+      if (userDoc.exists()) {
+        userData.value = userDoc.data()
+      }
+    } catch (error) {
+      console.error('사용자 정보 조회 실패:', error)
+    }
+  } else {
+    userData.value = null
+  }
+})
 
 const goHome = () => {
   router.push('/')

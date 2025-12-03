@@ -1,53 +1,62 @@
 <template>
-  <v-container>
-    <v-row>
-      <v-col cols="12">
-        <v-card>
-          <v-card-title class="text-h5 pa-4">
-            도서 관리
-          </v-card-title>
+  <v-app>
+    <PageLayout
+      header-type="back-home"
+      :show-header-actions="true"
+      @toggle-drawer="drawer = !drawer"
+    >
+      <div>
+        <h1 class="page-title mb-6">
+          도서 관리
+        </h1>
 
-          <v-tabs v-model="tab" bg-color="primary">
-            <v-tab value="search">검색/등록</v-tab>
-            <v-tab value="list">등록된 도서 목록</v-tab>
-          </v-tabs>
+        <v-tabs
+          v-model="tab"
+          bg-color="primary"
+          class="mb-4"
+        >
+          <v-tab value="search">검색/등록</v-tab>
+          <v-tab value="list">등록된 도서 목록</v-tab>
+        </v-tabs>
 
-          <v-window v-model="tab">
-            <!-- 검색/등록 탭 -->
-            <v-window-item value="search">
-              <v-card-text>
+        <v-window v-model="tab">
+          <!-- 검색/등록 탭 -->
+          <v-window-item value="search">
+            <div class="search-section">
+              <v-text-field
+                v-model="searchQuery"
+                label="도서 검색"
+                prepend-inner-icon="mdi-magnify"
+                variant="outlined"
+                density="comfortable"
+                :loading="searchLoading"
+                class="mb-4"
+                @keyup.enter="handleSearch"
+              />
+              <v-btn
+                color="primary"
+                block
+                size="large"
+                :loading="searchLoading"
+                class="mb-4"
+                @click="handleSearch"
+              >
+                검색
+              </v-btn>
+
+              <!-- 검색 결과 -->
+              <div
+                v-if="searchResults.length > 0"
+                class="search-results"
+              >
                 <v-row>
-                  <v-col cols="12">
-                    <v-text-field
-                      v-model="searchQuery"
-                      label="도서 검색"
-                      prepend-inner-icon="mdi-magnify"
-                      variant="outlined"
-                      density="comfortable"
-                      :loading="searchLoading"
-                      @keyup.enter="handleSearch"
-                    />
-                  </v-col>
-                  <v-col cols="12" class="text-right">
-                    <v-btn
-                      color="primary"
-                      :loading="searchLoading"
-                      @click="handleSearch"
-                    >
-                      검색
-                    </v-btn>
-                  </v-col>
-                </v-row>
-
-                <!-- 검색 결과 -->
-                <v-row v-if="searchResults.length > 0" class="mt-4">
                   <v-col
                     v-for="(book, index) in searchResults"
                     :key="index"
                     cols="12"
                     md="6"
                   >
-                    <v-card>
+                    <v-card class="book-card">
                       <v-row no-gutters>
                         <v-col cols="4">
                           <v-img
@@ -60,7 +69,9 @@
                         </v-col>
                         <v-col cols="8">
                           <v-card-text>
-                            <div class="text-h6 mb-2">{{ book.title }}</div>
+                            <div class="text-h6 mb-2">
+                              {{ book.title }}
+                            </div>
                             <div class="text-body-2 mb-1">
                               <strong>저자:</strong> {{ book.author }}
                             </div>
@@ -84,59 +95,60 @@
                     </v-card>
                   </v-col>
                 </v-row>
+              </div>
 
-                <!-- 검색 결과 없음 -->
-                <v-alert
-                  v-if="searchQuery && !searchLoading && searchResults.length === 0 && !searchError"
-                  type="info"
-                  variant="tonal"
-                  class="mt-4"
-                >
-                  검색 결과가 없습니다.
-                </v-alert>
+              <!-- 검색 결과 없음 -->
+              <v-alert
+                v-if="searchQuery && !searchLoading && searchResults.length === 0 && !searchError"
+                type="info"
+                variant="tonal"
+                class="mt-4"
+              >
+                검색 결과가 없습니다.
+              </v-alert>
 
-                <!-- 검색 오류 -->
-                <v-alert
-                  v-if="searchError"
-                  type="error"
-                  variant="tonal"
-                  class="mt-4"
-                  closable
-                  @click:close="searchError = null"
-                >
-                  {{ searchError }}
-                </v-alert>
-              </v-card-text>
-            </v-window-item>
+              <!-- 검색 오류 -->
+              <v-alert
+                v-if="searchError"
+                type="error"
+                variant="tonal"
+                class="mt-4"
+                closable
+                @click:close="searchError = null"
+              >
+                {{ searchError }}
+              </v-alert>
+            </div>
+          </v-window-item>
 
-            <!-- 등록된 도서 목록 탭 -->
-            <v-window-item value="list">
-              <v-card-text>
-                <v-data-table
-                  :headers="tableHeaders"
-                  :items="registeredBooks"
-                  :loading="booksLoading"
-                  item-key="id"
-                  class="elevation-1"
+          <!-- 등록된 도서 목록 탭 -->
+          <v-window-item value="list">
+            <v-data-table
+              :headers="tableHeaders"
+              :items="registeredBooks"
+              :loading="booksLoading"
+              item-key="id"
+              class="elevation-1"
+            >
+              <template #item.status="{ item }">
+                <v-chip
+                  :color="getStatusColor(item.status)"
+                  size="small"
                 >
-                  <template #item.status="{ item }">
-                    <v-chip
-                      :color="getStatusColor(item.status)"
-                      size="small"
-                    >
-                      {{ getStatusText(item.status) }}
-                    </v-chip>
-                  </template>
-                </v-data-table>
-              </v-card-text>
-            </v-window-item>
-          </v-window>
-        </v-card>
-      </v-col>
-    </v-row>
+                  {{ getStatusText(item.status) }}
+                </v-chip>
+              </template>
+            </v-data-table>
+          </v-window-item>
+        </v-window>
+      </div>
+    </PageLayout>
 
     <!-- 등록 다이얼로그 -->
-    <v-dialog v-model="registerDialog" max-width="500">
+    <v-dialog
+      v-model="registerDialog"
+      max-width="500"
+    >
       <v-card>
         <v-card-title>도서 등록</v-card-title>
         <v-card-text>
@@ -173,11 +185,24 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
-  </v-container>
+
+    <v-navigation-drawer
+      v-model="drawer"
+      location="right"
+      temporary
+      :width="drawerWidth"
+      class="side-navigation"
+    >
+      <div class="drawer-content">
+        <SideNavigation />
+      </div>
+    </v-navigation-drawer>
+  </v-app>
 </template>
 
 <script setup>
 definePageMeta({
+  layout: false,
   middleware: 'admin'
 })
 
@@ -185,6 +210,24 @@ const { user } = useAuth()
 const { searchBooks, registerBook, getBooksByCenter, loading: booksLoading } = useNaverBooks()
 const { $firebaseFirestore } = useNuxtApp()
 const firestore = $firebaseFirestore
+
+const drawer = useState('navigationDrawer', () => false)
+
+// 반응형 drawer 너비 계산
+const drawerWidth = ref(280)
+
+onMounted(() => {
+  const updateWidth = () => {
+    drawerWidth.value = window.innerWidth >= 769 ? 360 : 280
+  }
+  
+  updateWidth()
+  window.addEventListener('resize', updateWidth)
+  
+  onBeforeUnmount(() => {
+    window.removeEventListener('resize', updateWidth)
+  })
+})
 
 const tab = ref('search')
 const searchQuery = ref('')
@@ -274,7 +317,7 @@ const handleRegister = async () => {
 
   try {
     registerLoading.value = true
-    await registerBook(selectedBook.value, selectedCenter.value, user.value.uid)
+    await registerBook(selectedBook.value, selectedCenter.value)
     
     // 성공 메시지 표시 (간단한 알림)
     alert('도서가 성공적으로 등록되었습니다.')
@@ -347,9 +390,69 @@ useHead({
 })
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+@use '@/assets/scss/functions' as *;
+
+.page-title {
+  font-size: rem(32);
+  font-weight: 700;
+  color: #002C5B;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.search-section {
+  margin-top: rem(16);
+}
+
+.book-card {
+  margin-bottom: rem(16);
+}
+
 .book-image {
   object-fit: cover;
 }
-</style>
 
+.side-navigation {
+  z-index: 1000;
+}
+
+.side-navigation :deep(.v-navigation-drawer__content) {
+  background-color: #002C5B;
+}
+
+.side-navigation :deep(.v-navigation-drawer) {
+  border: none;
+}
+
+.side-navigation :deep(.v-navigation-drawer__border) {
+  display: none;
+}
+
+.drawer-content {
+  padding: rem(16);
+  color: #FFFFFF;
+}
+
+/* 768px 이하: 전체 화면 기준 우측에 붙어서 */
+@media (max-width: 768px) {
+  .side-navigation :deep(.v-navigation-drawer) {
+    width: rem(280);
+  }
+}
+
+/* 769px 이상: 768px 이너 안쪽으로 들어오도록 */
+@media (min-width: 769px) {
+  .side-navigation :deep(.v-navigation-drawer) {
+    width: rem(360);
+    left: auto;
+    right: calc((100vw - #{rem(768)}) / 2);
+    max-width: rem(768);
+  }
+  
+  /* 오버레이가 768px 컨테이너 영역만 덮도록 */
+  .side-navigation :deep(.v-overlay__scrim) {
+    display: none;
+  }
+}
+</style>

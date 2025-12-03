@@ -2,8 +2,6 @@
   <v-app>
     <PageLayout
       header-type="home"
-      :show-header-text="true"
-      :header-text="headerText"
       :show-header-actions="true"
       @toggle-drawer="drawer = !drawer"
     >
@@ -66,34 +64,6 @@ onMounted(() => {
   })
 })
 
-const userData = ref(null)
-const headerText = computed(() => {
-  if (!userData.value) {
-    return ''
-  }
-  const center = userData.value.center || ''
-  const name = userData.value.name || ''
-  return `안녕하세요,<br>${center} ${name} 님`
-})
-
-// Firestore에서 사용자 정보 가져오기
-onMounted(async () => {
-  if (!process.client || !user.value || !firestore) {
-    return
-  }
-
-  try {
-    const { doc, getDoc } = await import('firebase/firestore')
-    const userRef = doc(firestore, 'users', user.value.uid)
-    const userDoc = await getDoc(userRef)
-    
-    if (userDoc.exists()) {
-      userData.value = userDoc.data()
-    }
-  } catch (error) {
-    console.error('사용자 정보 조회 실패:', error)
-  }
-})
 
 const handleLogout = async () => {
   await logout()

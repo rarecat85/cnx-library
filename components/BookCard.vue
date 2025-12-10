@@ -56,8 +56,58 @@
       </div>
     </div>
     
+    <!-- 반납예정일 및 반납하기 버튼 (마이페이지용) -->
     <div
-      v-if="showAction"
+      v-if="showReturnDate && returnDate"
+      class="book-action-area book-action-area-mypage"
+    >
+      <v-btn
+        color="primary"
+        size="small"
+        class="return-btn"
+        @click.stop="handleReturn"
+      >
+        반납하기
+      </v-btn>
+      <div
+        class="return-date-text text-body-2"
+        :class="{ 'return-date-overdue': isOverdue }"
+      >
+        <v-icon
+          size="small"
+          class="mr-1"
+        >
+          mdi-calendar-clock
+        </v-icon>
+        반납예정일: {{ formattedReturnDate }}
+      </div>
+    </div>
+    
+    <!-- 대여 신청 버튼 (도서 대여 페이지용) -->
+    <div
+      v-else-if="showRentButton"
+      class="book-action-area"
+    >
+      <div
+        v-if="isRented"
+        class="rented-text text-body-2"
+      >
+        대여중인 도서입니다.
+      </div>
+      <v-btn
+        v-else
+        color="primary"
+        size="small"
+        class="rent-btn"
+        @click.stop="handleRent"
+      >
+        대여 신청
+      </v-btn>
+    </div>
+    
+    <!-- 기본 액션 영역 (등록/신청) -->
+    <div
+      v-else-if="showAction"
       class="book-action-area"
     >
       <div
@@ -148,10 +198,22 @@ const props = defineProps({
   hideOverdueStatus: { // 연체중을 대여중으로 표시 (일반 사용자용)
     type: Boolean,
     default: false
+  },
+  showReturnDate: { // 반납예정일 표시 여부 (마이페이지용)
+    type: Boolean,
+    default: false
+  },
+  returnDate: { // 반납예정일
+    type: [Date, Object, String],
+    default: null
+  },
+  showRentButton: { // 대여 신청 버튼 표시 여부 (도서 대여 페이지용)
+    type: Boolean,
+    default: false
   }
 })
 
-const emit = defineEmits(['register', 'select'])
+const emit = defineEmits(['register', 'select', 'return', 'rent'])
 
 // 도서 이미지 (알라딘 API는 cover 필드 사용)
 const bookImage = computed(() => {
@@ -277,6 +339,36 @@ const handleCardClick = () => {
     emit('select', props.book, !props.selected)
   }
 }
+
+// 반납 처리
+const handleReturn = () => {
+  emit('return', props.book)
+}
+
+// 대여 신청 처리
+const handleRent = () => {
+  emit('rent', props.book)
+}
+
+// 반납예정일 포맷
+const formattedReturnDate = computed(() => {
+  if (!props.returnDate) return ''
+  
+  const date = props.returnDate?.toDate?.() || new Date(props.returnDate)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  
+  return `${year}.${month}.${day}`
+})
+
+// 반납예정일이 지났는지 확인
+const isOverdue = computed(() => {
+  if (!props.returnDate) return false
+  
+  const date = props.returnDate?.toDate?.() || new Date(props.returnDate)
+  return date < new Date()
+})
 
 </script>
 
@@ -426,6 +518,43 @@ const handleCardClick = () => {
   justify-content: center;
   min-height: rem(28);
   box-sizing: border-box;
+}
+
+.book-action-area-mypage {
+  flex-direction: column;
+  gap: rem(8);
+}
+
+.return-btn,
+.rent-btn {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.rented-text {
+  color: #3b82f6;
+  font-weight: 500;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: rem(28);
+  box-sizing: border-box;
+}
+
+.return-date-text {
+  color: #6b7280;
+  font-weight: 500;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: rem(28);
+  box-sizing: border-box;
+}
+
+.return-date-overdue {
+  color: #ef4444;
 }
 </style>
 

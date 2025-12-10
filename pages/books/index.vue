@@ -58,13 +58,21 @@
             <!-- 대여 신청 영역 -->
             <div class="d-flex align-center justify-space-between flex-wrap gap-4 mt-4">
               <div class="text-body-2 text-medium-emphasis">
-                {{ selectedBooks.length > 0 ? `${selectedBooks.length}권 선택됨 (최대 5권)` : '대여할 도서를 선택하세요 (최대 5권)' }}
+                <template v-if="currentRentedCount >= MAX_RENT_COUNT">
+                  {{ MAX_RENT_COUNT }}권 대여중 (반납 후 대여 가능)
+                </template>
+                <template v-else-if="selectedBooks.length > 0">
+                  {{ selectedBooks.length }}권 선택됨 ({{ currentRentedCount }}권 대여중, {{ remainingRentCount }}권 추가 가능)
+                </template>
+                <template v-else>
+                  대여할 도서를 선택하세요 ({{ currentRentedCount }}권 대여중, {{ remainingRentCount }}권 추가 가능)
+                </template>
               </div>
               <v-btn
                 class="rent-request-btn"
                 variant="flat"
                 size="small"
-                :disabled="selectedBooks.length === 0"
+                :disabled="selectedBooks.length === 0 || !canRentMore"
                 :loading="rentRequestLoading"
                 @click="handleRentRequest"
               >
@@ -106,7 +114,9 @@
                   :show-status-flags="true"
                   :disabled="isBookRentedOrOverdue(book)"
                   :hide-overdue-status="true"
+                  :show-rent-button="true"
                   @select="handleBookSelect"
+                  @rent="handleSingleRent"
                 />
               </v-col>
             </v-row>
@@ -177,7 +187,10 @@ const sortOptions = [
 // 도서 선택 관련
 const selectedBooks = ref([])
 const rentRequestLoading = ref(false)
-const MAX_SELECT_COUNT = 5
+const MAX_RENT_COUNT = 5
+
+// 현재 대여중인 도서 수
+const currentRentedCount = ref(0)
 
 // 반응형 drawer 너비 계산
 onMounted(() => {
@@ -221,7 +234,43 @@ onMounted(async () => {
   userCenter.value = center
   currentCenter.value = center || centerOptions[0]
   
-  await loadRegisteredBooks()
+  await Promise.all([
+    loadRegisteredBooks(),
+    loadCurrentRentedCount()
+  ])
+})
+
+// 현재 대여중인 도서 수 로드
+const loadCurrentRentedCount = async () => {
+  if (!user.value || !firestore) {
+    currentRentedCount.value = 0
+    return
+  }
+
+  try {
+    const { collection, query, where, getDocs } = await import('firebase/firestore')
+    const booksRef = collection(firestore, 'books')
+    const q = query(
+      booksRef,
+      where('rentedBy', '==', user.value.uid)
+    )
+    
+    const snapshot = await getDocs(q)
+    currentRentedCount.value = snapshot.size
+  } catch (error) {
+    console.error('대여중인 도서 수 로드 오류:', error)
+    currentRentedCount.value = 0
+  }
+}
+
+// 추가 대여 가능 여부
+const canRentMore = computed(() => {
+  return currentRentedCount.value < MAX_RENT_COUNT
+})
+
+// 남은 대여 가능 권수
+const remainingRentCount = computed(() => {
+  return MAX_RENT_COUNT - currentRentedCount.value
 })
 
 // 센터 변경 처리
@@ -313,9 +362,15 @@ const handleBookSelect = (book, selected) => {
   }
   
   if (selected) {
-    // 최대 선택 개수 체크
-    if (selectedBooks.value.length >= MAX_SELECT_COUNT) {
-      alert(`최대 ${MAX_SELECT_COUNT}권까지만 선택 가능합니다.`)
+    // 대여 가능 여부 체크
+    if (!canRentMore.value) {
+      alert(`${MAX_RENT_COUNT}권을 대여중입니다. 대여중인 도서를 반납 후 대여해주세요.`)
+      return
+    }
+    
+    // 최대 선택 개수 체크 (남은 대여 가능 권수까지만)
+    if (selectedBooks.value.length >= remainingRentCount.value) {
+      alert(`현재 ${remainingRentCount.value}권까지 추가 대여 가능합니다.`)
       return
     }
     
@@ -334,6 +389,18 @@ const handleBookSelect = (book, selected) => {
 const handleRentRequest = async () => {
   if (selectedBooks.value.length === 0 || !user.value) return
 
+  // 대여 가능 여부 체크
+  if (!canRentMore.value) {
+    alert(`${MAX_RENT_COUNT}권을 대여중입니다. 대여중인 도서를 반납 후 대여해주세요.`)
+    return
+  }
+
+  // 선택한 도서 수가 남은 대여 가능 권수를 초과하는지 체크
+  if (selectedBooks.value.length > remainingRentCount.value) {
+    alert(`현재 ${remainingRentCount.value}권까지 추가 대여 가능합니다.`)
+    return
+  }
+
   const bookTitles = selectedBooks.value.map(book => book.title).join(', ')
   if (!confirm(`다음 도서들을 대여 신청하시겠습니까?\n\n${bookTitles}`)) {
     return
@@ -344,19 +411,62 @@ const handleRentRequest = async () => {
     
     // 선택된 도서들 대여 처리
     const promises = selectedBooks.value.map(book => {
-      const isbn = book.isbn13 || book.isbn || book.id
-      return rentBook(isbn, user.value.uid)
+      // book.id가 Firestore 문서 ID이므로 이것을 우선 사용
+      const bookId = book.id || book.isbn13 || book.isbn
+      return rentBook(bookId, user.value.uid)
     })
     await Promise.all(promises)
     
-    // 도서 목록 새로고침
-    await loadRegisteredBooks()
+    // 도서 목록 및 대여중 도서 수 새로고침
+    await Promise.all([
+      loadRegisteredBooks(),
+      loadCurrentRentedCount()
+    ])
     
     alert(`${selectedBooks.value.length}권의 도서 대여가 완료되었습니다.`)
     selectedBooks.value = []
-  } catch (error) {
-    console.error('대여 신청 오류:', error)
-    alert('대여 신청에 실패했습니다.')
+  } catch (err) {
+    console.error('대여 신청 오류:', err)
+    alert(err.message || '대여 신청에 실패했습니다.')
+  } finally {
+    rentRequestLoading.value = false
+  }
+}
+
+// 개별 도서 대여 신청 처리
+const handleSingleRent = async (book) => {
+  if (!user.value || !book) return
+
+  // 대여 가능 여부 체크
+  if (!canRentMore.value) {
+    alert(`${MAX_RENT_COUNT}권을 대여중입니다. 대여중인 도서를 반납 후 대여해주세요.`)
+    return
+  }
+
+  if (!confirm(`"${book.title}"을(를) 대여 신청하시겠습니까?`)) {
+    return
+  }
+
+  try {
+    rentRequestLoading.value = true
+    
+    // book.id가 Firestore 문서 ID이므로 이것을 우선 사용
+    const bookId = book.id || book.isbn13 || book.isbn
+    await rentBook(bookId, user.value.uid)
+    
+    // 도서 목록 및 대여중 도서 수 새로고침
+    await Promise.all([
+      loadRegisteredBooks(),
+      loadCurrentRentedCount()
+    ])
+    
+    // 선택 목록에서도 제거
+    selectedBooks.value = selectedBooks.value.filter(b => b.id !== book.id)
+    
+    alert('도서 대여가 완료되었습니다.')
+  } catch (err) {
+    console.error('대여 신청 오류:', err)
+    alert(err.message || '대여 신청에 실패했습니다.')
   } finally {
     rentRequestLoading.value = false
   }

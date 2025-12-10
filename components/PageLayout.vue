@@ -58,6 +58,7 @@
                 icon
                 variant="text"
                 class="header-action-btn"
+                to="/mypage"
               >
                 <v-icon size="24">mdi-account-circle-outline</v-icon>
               </v-btn>

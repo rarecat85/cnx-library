@@ -236,7 +236,8 @@ export const useNaverBooks = () => {
       }
 
       const bookData = bookDoc.data()
-      if (bookData.status === 'rented') {
+      // 실제로 대여중인지 확인 (status와 rentedBy 모두 확인)
+      if (bookData.status === 'rented' && bookData.rentedBy) {
         throw new Error('이미 대여 중인 도서입니다.')
       }
 

@@ -34,10 +34,14 @@
           <span>도서 신청</span>
         </NuxtLink>
 
-        <div class="menu-item menu-item-disabled">
+        <NuxtLink
+          to="/mypage"
+          class="menu-item"
+          @click="closeDrawer"
+        >
           <v-icon>mdi-account</v-icon>
           <span>마이페이지</span>
-        </div>
+        </NuxtLink>
       </div>
 
       <!-- 관리자 메뉴 (관리자 권한이 있는 경우에만 표시) -->

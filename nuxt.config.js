@@ -1,6 +1,13 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+
+// GitHub Pages 배포 시 baseURL 설정 (로컬에서는 '/', 프로덕션에서는 '/cnx-library/')
+const isGitHubPages = process.env.GITHUB_ACTIONS === 'true'
+
 export default defineNuxtConfig({
   devtools: { enabled: true },
+  
+  // SPA 모드 (Firebase 클라이언트 사용)
+  ssr: false,
   
   // Runtime Config (환경 변수)
   runtimeConfig: {
@@ -35,8 +42,12 @@ export default defineNuxtConfig({
     }
   },
 
-  // 앱 헤드 설정 (구글 폰트)
+  // 앱 설정
   app: {
+    // GitHub Pages 배포 시 baseURL 설정
+    baseURL: isGitHubPages ? '/cnx-library/' : '/',
+    
+    // 헤드 설정 (구글 폰트)
     head: {
       link: [
         {

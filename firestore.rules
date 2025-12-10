@@ -26,6 +26,20 @@ service cloud.firestore {
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'manager');
     }
     
+    // bookRequests 컬렉션 규칙 (도서 신청)
+    match /bookRequests/{requestId} {
+      // 읽기: 모든 인증된 사용자 (신청된 도서 확인용)
+      allow read: if request.auth != null;
+      
+      // 생성: 모든 인증된 사용자 (도서 신청)
+      allow create: if request.auth != null;
+      
+      // 업데이트/삭제: 관리자만 가능 (승인/거절 처리)
+      allow update, delete: if request.auth != null && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'manager');
+    }
+    
     // 다른 컬렉션은 기본적으로 거부
     match /{document=**} {
       allow read, write: if false;

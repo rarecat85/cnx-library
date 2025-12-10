@@ -5,12 +5,12 @@
       :show-header-actions="true"
       @toggle-drawer="drawer = !drawer"
     >
-      <div class="books-admin-page">
+      <div class="books-page">
         <!-- 센터 정보 헤더 -->
         <div class="center-header mb-6">
           <div class="center-header-inner">
             <h1 class="page-title mb-0">
-              {{ currentCenter }} 도서 관리
+              {{ currentCenter }} 도서 대여
             </h1>
             <v-select
               v-model="currentCenter"
@@ -31,14 +31,11 @@
               <div class="text-body-1">
                 총 <strong>{{ filteredRegisteredBooks.length }}</strong>권
               </div>
-              <div class="text-body-2 text-medium-emphasis">
-                대여중 <strong>{{ rentedCount }}</strong>권, 연체중 <strong>{{ overdueCount }}</strong>권
-              </div>
             </div>
             <div class="d-flex align-center registered-search-group">
               <v-text-field
                 v-model="registeredBooksSearchQuery"
-                label="등록도서 검색"
+                label="도서 검색"
                 prepend-inner-icon="mdi-magnify"
                 variant="outlined"
                 density="comfortable"
@@ -58,53 +55,27 @@
               />
             </div>
             
-            <!-- 도서 선택 및 액션 영역 -->
+            <!-- 대여 신청 영역 -->
             <div class="d-flex align-center justify-space-between flex-wrap gap-4 mt-4">
-              <v-checkbox
-                v-model="selectAll"
-                label="전체선택"
-                hide-details
-                class="select-all-checkbox"
-                @update:model-value="handleSelectAll"
-              />
-              <div class="d-flex action-buttons">
-                <v-btn
-                  class="action-btn"
-                  variant="flat"
-                  size="small"
-                  :disabled="selectedBooks.length === 0"
-                  :loading="actionLoading"
-                  @click="handleDeleteBooks"
-                >
-                  도서 삭제
-                </v-btn>
-                <v-btn
-                  class="action-btn"
-                  variant="flat"
-                  size="small"
-                  :disabled="selectedBooks.length === 0"
-                  :loading="actionLoading"
-                  @click="handleRentBooks"
-                >
-                  대여 처리
-                </v-btn>
-                <v-btn
-                  class="action-btn"
-                  variant="flat"
-                  size="small"
-                  :disabled="selectedBooks.length === 0"
-                  :loading="actionLoading"
-                  @click="handleReturnBooks"
-                >
-                  반납 처리
-                </v-btn>
+              <div class="text-body-2 text-medium-emphasis">
+                {{ selectedBooks.length > 0 ? `${selectedBooks.length}권 선택됨 (최대 5권)` : '대여할 도서를 선택하세요 (최대 5권)' }}
               </div>
+              <v-btn
+                class="rent-request-btn"
+                variant="flat"
+                size="small"
+                :disabled="selectedBooks.length === 0"
+                :loading="rentRequestLoading"
+                @click="handleRentRequest"
+              >
+                대여 신청
+              </v-btn>
             </div>
           </div>
 
           <div
             v-if="registeredBooksLoading"
-            class="text-center py-8"
+            class="text-center py-8 mt-6"
           >
             <v-progress-circular
               indeterminate
@@ -113,7 +84,7 @@
           </div>
           <div
             v-else-if="filteredRegisteredBooks.length > 0"
-            class="registered-books-grid"
+            class="registered-books-grid mt-6"
           >
             <v-row class="book-list-row">
               <v-col
@@ -133,6 +104,8 @@
                   :selected="isBookSelected(book)"
                   :status="getBookStatus(book)"
                   :show-status-flags="true"
+                  :disabled="isBookRentedOrOverdue(book)"
+                  :hide-overdue-status="true"
                   @select="handleBookSelect"
                 />
               </v-col>
@@ -140,7 +113,7 @@
           </div>
           <div
             v-else
-            class="text-center py-8 text-medium-emphasis"
+            class="text-center py-8 mt-6 text-medium-emphasis"
           >
             등록된 도서가 없습니다.
           </div>
@@ -166,16 +139,14 @@
 
 definePageMeta({
   layout: false,
-  middleware: 'admin'
+  middleware: 'auth'
 })
 
 const { user } = useAuth()
 const { 
   getBooksByCenter,
-  rentBook,
-  returnBook,
-  deleteBook,
   calculateBookStatus,
+  rentBook,
   loading: booksLoading 
 } = useNaverBooks()
 const { $firebaseFirestore } = useNuxtApp()
@@ -197,19 +168,16 @@ const userCenter = ref('')
 const registeredBooks = ref([])
 const registeredBooksLoading = ref(false)
 const registeredBooksSearchQuery = ref('')
-const sortBy = ref('title')
+const sortBy = ref('date')
 const sortOptions = [
-  { title: '제목순', value: 'title' },
   { title: '등록일순', value: 'date' },
-  { title: '대여중도서', value: 'rented' },
-  { title: '연체중도서', value: 'overdue' },
-  { title: '신규등록도서', value: 'new' }
+  { title: '제목순', value: 'title' }
 ]
 
 // 도서 선택 관련
 const selectedBooks = ref([])
-const selectAll = ref(false)
-const actionLoading = ref(false)
+const rentRequestLoading = ref(false)
+const MAX_SELECT_COUNT = 5
 
 // 반응형 drawer 너비 계산
 onMounted(() => {
@@ -309,70 +277,23 @@ const filteredRegisteredBooks = computed(() => {
       const dateB = b.registeredAt?.toDate?.() || new Date(0)
       return dateB - dateA
     })
-  } else if (sortBy.value === 'rented') {
-    // 대여중 도서만 필터링
-    books = books.filter(book => {
-      const status = calculateBookStatus(book)
-      return status === 'rented'
-    })
-  } else if (sortBy.value === 'overdue') {
-    // 연체중 도서만 필터링
-    books = books.filter(book => {
-      const status = calculateBookStatus(book)
-      return status === 'overdue'
-    })
-  } else if (sortBy.value === 'new') {
-    // 신규등록 도서만 필터링 (등록일 기준 한 달 이내)
-    books = books.filter(book => {
-      if (book.registeredAt) {
-        const registeredDate = book.registeredAt?.toDate?.() || new Date(book.registeredAt)
-        const oneMonthAgo = new Date()
-        oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
-        return registeredDate >= oneMonthAgo
-      }
-      return false
-    })
   }
 
   return books
 })
-
-// 대여중 및 연체중 도서 수 계산
-const rentedCount = computed(() => {
-  return filteredRegisteredBooks.value.filter(book => {
-    const status = calculateBookStatus(book)
-    return status === 'rented'
-  }).length
-})
-
-const overdueCount = computed(() => {
-  return filteredRegisteredBooks.value.filter(book => {
-    const status = calculateBookStatus(book)
-    return status === 'overdue'
-  }).length
-})
-
-// 관련도 점수 계산
-const getRelevanceScore = (book, query) => {
-  let score = 0
-  const title = (book.title || '').toLowerCase()
-  const author = (book.author || '').toLowerCase()
-  const publisher = (book.publisher || '').toLowerCase()
-
-  if (title.includes(query)) score += 10
-  if (title.startsWith(query)) score += 5
-  if (author.includes(query)) score += 3
-  if (publisher.includes(query)) score += 1
-
-  return score
-}
 
 // 도서 상태 계산
 const getBookStatus = (book) => {
   return calculateBookStatus(book)
 }
 
-// 도서 선택 관련 함수
+// 대여중 또는 연체중 여부 확인 (일반 사용자는 선택 불가)
+const isBookRentedOrOverdue = (book) => {
+  const status = getBookStatus(book)
+  return status === 'rented' || status === 'overdue'
+}
+
+// 도서 선택 여부 확인
 const isBookSelected = (book) => {
   const isbn = book.isbn13 || book.isbn || book.id || ''
   return selectedBooks.value.some(selected => {
@@ -381,10 +302,23 @@ const isBookSelected = (book) => {
   })
 }
 
+// 도서 선택 처리
 const handleBookSelect = (book, selected) => {
   const isbn = book.isbn13 || book.isbn || book.id || ''
+  const status = getBookStatus(book)
+  
+  // 대여중이거나 연체중인 도서는 선택 불가
+  if (status === 'rented' || status === 'overdue') {
+    return
+  }
   
   if (selected) {
+    // 최대 선택 개수 체크
+    if (selectedBooks.value.length >= MAX_SELECT_COUNT) {
+      alert(`최대 ${MAX_SELECT_COUNT}권까지만 선택 가능합니다.`)
+      return
+    }
+    
     if (!isBookSelected(book)) {
       selectedBooks.value.push(book)
     }
@@ -394,104 +328,45 @@ const handleBookSelect = (book, selected) => {
       return isbn !== selectedIsbn
     })
   }
-  
-  // 전체선택 체크박스 상태 업데이트
-  selectAll.value = selectedBooks.value.length === filteredRegisteredBooks.value.length && filteredRegisteredBooks.value.length > 0
 }
 
-const handleSelectAll = (value) => {
-  if (value) {
-    selectedBooks.value = [...filteredRegisteredBooks.value]
-  } else {
-    selectedBooks.value = []
-  }
-}
-
-// 필터링된 도서 목록이 변경될 때 전체선택 상태 업데이트
-watch(() => filteredRegisteredBooks.value, () => {
-  selectAll.value = selectedBooks.value.length === filteredRegisteredBooks.value.length && filteredRegisteredBooks.value.length > 0
-})
-
-// 도서 삭제 처리
-const handleDeleteBooks = async () => {
-  if (selectedBooks.value.length === 0) return
-
-  if (!confirm(`선택한 ${selectedBooks.value.length}권의 도서를 삭제하시겠습니까?`)) {
-    return
-  }
-
-  try {
-    actionLoading.value = true
-    const promises = selectedBooks.value.map(book => {
-      const isbn = book.isbn13 || book.isbn || book.id
-      return deleteBook(isbn)
-    })
-    await Promise.all(promises)
-    selectedBooks.value = []
-    await loadRegisteredBooks()
-  } catch (error) {
-    console.error('도서 삭제 오류:', error)
-    alert('도서 삭제에 실패했습니다.')
-  } finally {
-    actionLoading.value = false
-  }
-}
-
-// 도서 대여 처리
-const handleRentBooks = async () => {
+// 대여 신청 처리
+const handleRentRequest = async () => {
   if (selectedBooks.value.length === 0 || !user.value) return
 
-  if (!confirm(`선택한 ${selectedBooks.value.length}권의 도서를 대여 처리하시겠습니까?`)) {
+  const bookTitles = selectedBooks.value.map(book => book.title).join(', ')
+  if (!confirm(`다음 도서들을 대여 신청하시겠습니까?\n\n${bookTitles}`)) {
     return
   }
 
   try {
-    actionLoading.value = true
+    rentRequestLoading.value = true
+    
+    // 선택된 도서들 대여 처리
     const promises = selectedBooks.value.map(book => {
       const isbn = book.isbn13 || book.isbn || book.id
       return rentBook(isbn, user.value.uid)
     })
     await Promise.all(promises)
-    selectedBooks.value = []
+    
+    // 도서 목록 새로고침
     await loadRegisteredBooks()
-  } catch (error) {
-    console.error('도서 대여 오류:', error)
-    alert('도서 대여에 실패했습니다.')
-  } finally {
-    actionLoading.value = false
-  }
-}
-
-// 도서 반납 처리
-const handleReturnBooks = async () => {
-  if (selectedBooks.value.length === 0) return
-
-  if (!confirm(`선택한 ${selectedBooks.value.length}권의 도서를 반납 처리하시겠습니까?`)) {
-    return
-  }
-
-  try {
-    actionLoading.value = true
-    const promises = selectedBooks.value.map(book => {
-      const isbn = book.isbn13 || book.isbn || book.id
-      return returnBook(isbn)
-    })
-    await Promise.all(promises)
+    
+    alert(`${selectedBooks.value.length}권의 도서 대여가 완료되었습니다.`)
     selectedBooks.value = []
-    await loadRegisteredBooks()
   } catch (error) {
-    console.error('도서 반납 오류:', error)
-    alert('도서 반납에 실패했습니다.')
+    console.error('대여 신청 오류:', error)
+    alert('대여 신청에 실패했습니다.')
   } finally {
-    actionLoading.value = false
+    rentRequestLoading.value = false
   }
 }
 
 // 페이지 메타데이터
 useHead({
-  title: '도서 관리 - CNX Library',
+  title: '도서 대여 - CNX Library',
   meta: [
-    { name: 'description', content: '도서 검색 및 등록 관리' }
+    { name: 'description', content: '센터별 도서 대여 신청' }
   ]
 })
 </script>
@@ -499,21 +374,13 @@ useHead({
 <style lang="scss" scoped>
 @use '@/assets/scss/functions' as *;
 
-.books-admin-page {
+.books-page {
   width: 100%;
 }
 
 .page-title {
   font-size: rem(32);
   font-weight: 700;
-  color: #002C5B;
-  line-height: 1.2;
-  margin: 0;
-}
-
-.section-title {
-  font-size: rem(24);
-  font-weight: 600;
   color: #002C5B;
   line-height: 1.2;
   margin: 0;
@@ -569,9 +436,6 @@ useHead({
   }
 }
 
-
-
-
 .registered-books-header {
   margin-bottom: rem(24);
 }
@@ -612,11 +476,7 @@ useHead({
   }
 }
 
-.action-buttons {
-  gap: rem(5);
-}
-
-.action-btn {
+.rent-request-btn {
   background-color: #002C5B;
   color: #FFFFFF;
   
@@ -697,3 +557,4 @@ useHead({
   }
 }
 </style>
+

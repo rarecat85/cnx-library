@@ -5,12 +5,12 @@
       :show-header-actions="true"
       @toggle-drawer="drawer = !drawer"
     >
-      <div class="books-register-page">
+      <div class="books-request-page">
         <!-- 센터 정보 헤더 -->
         <div class="center-header mb-6">
           <div class="center-header-inner">
             <h1 class="page-title mb-0">
-              {{ currentCenter }} 도서 등록
+              {{ currentCenter }} 도서 신청
             </h1>
             <v-select
               v-model="currentCenter"
@@ -69,9 +69,13 @@
                 :book="book"
                 :center="currentCenter"
                 :registered-books="registeredBooks"
+                :requested-books="requestedBooks"
                 :selectable="false"
                 :show-action="true"
-                @register="handleBookRegister"
+                :action-button-text="`${currentCenter}에 신청하기`"
+                :registered-message="`${currentCenter}에 등록된 도서입니다.`"
+                :requested-message="`${currentCenter}에 이미 신청된 도서입니다.`"
+                @register="handleBookRequest"
               />
             </v-col>
           </v-row>
@@ -94,79 +98,17 @@
           :books="bestsellers"
           :center="currentCenter"
           :registered-books="registeredBooks"
+          :requested-books="requestedBooks"
           :title="'베스트셀러'"
           :loading="bestsellersLoading"
           :empty-message="'베스트셀러를 불러올 수 없습니다.'"
+          :action-button-text="`${currentCenter}에 신청하기`"
+          :registered-message="`${currentCenter}에 등록된 도서입니다.`"
+          :requested-message="`${currentCenter}에 이미 신청된 도서입니다.`"
           nav-id="bestseller"
           class="mb-8"
-          @register="handleBookRegister"
+          @register="handleBookRequest"
         />
-
-        <!-- 도서 신청 목록 영역 -->
-        <div class="book-requests-section">
-          <div class="book-requests-header mb-4">
-            <h2 class="section-title mb-0">
-              도서 신청 목록
-            </h2>
-            <div
-              v-if="bookRequests.length > 0"
-              class="text-body-2 text-medium-emphasis mt-2"
-            >
-              총 <strong>{{ bookRequestsTotal }}</strong>건의 신청
-            </div>
-          </div>
-
-          <div
-            v-if="bookRequestsLoading"
-            class="text-center py-8"
-          >
-            <v-progress-circular
-              indeterminate
-              color="primary"
-            />
-          </div>
-          <div
-            v-else-if="paginatedBookRequests.length > 0"
-            class="book-requests-grid"
-          >
-            <v-row class="book-list-row">
-              <v-col
-                v-for="(request, index) in paginatedBookRequests"
-                :key="`request-${index}`"
-                cols="12"
-                sm="6"
-                class="book-list-col"
-              >
-                <BookCard
-                  :book="request"
-                  :center="currentCenter"
-                  :registered-books="registeredBooks"
-                  :selectable="false"
-                  :show-action="true"
-                  :action-button-text="`${currentCenter}에 등록하기`"
-                  @register="handleBookRegisterFromRequest"
-                />
-              </v-col>
-            </v-row>
-            
-            <div
-              v-if="bookRequestsTotalPages > 1"
-              class="d-flex justify-center mt-6"
-            >
-              <v-pagination
-                v-model="currentBookRequestsPage"
-                :length="bookRequestsTotalPages"
-                :total-visible="7"
-              />
-            </div>
-          </div>
-          <div
-            v-else
-            class="text-center py-8 text-medium-emphasis"
-          >
-            신청된 도서가 없습니다.
-          </div>
-        </div>
       </div>
     </PageLayout>
 
@@ -187,13 +129,12 @@
 <script setup>
 definePageMeta({
   layout: false,
-  middleware: 'admin'
+  middleware: 'auth'
 })
 
 const { user } = useAuth()
 const { 
   searchBooks, 
-  registerBook, 
   getBooksByCenter, 
   getBestsellers,
   loading: booksLoading 
@@ -229,21 +170,11 @@ const bestsellersLoading = ref(false)
 // 등록된 도서 관련 (등록 상태 확인용)
 const registeredBooks = ref([])
 
-// 등록 처리 중인 도서
-const registeringBooks = ref(new Set())
+// 신청된 도서 관련 (신청 상태 확인용)
+const requestedBooks = ref([])
 
-// 도서 신청 목록 관련
-const bookRequests = ref([])
-const bookRequestsLoading = ref(false)
-const currentBookRequestsPage = ref(1)
-const REQUESTS_PER_PAGE = 4
-const bookRequestsTotal = computed(() => bookRequests.value.length)
-const bookRequestsTotalPages = computed(() => Math.ceil(bookRequestsTotal.value / REQUESTS_PER_PAGE))
-const paginatedBookRequests = computed(() => {
-  const start = (currentBookRequestsPage.value - 1) * REQUESTS_PER_PAGE
-  const end = start + REQUESTS_PER_PAGE
-  return bookRequests.value.slice(start, end)
-})
+// 신청 처리 중인 도서
+const requestingBooks = ref(new Set())
 
 // 반응형 drawer 너비 계산
 onMounted(() => {
@@ -290,17 +221,16 @@ onMounted(async () => {
   await Promise.all([
     loadBestsellers(),
     loadRegisteredBooks(),
-    loadBookRequests()
+    loadRequestedBooks()
   ])
 })
 
 // 센터 변경 처리
 const handleCenterChange = async () => {
-  currentBookRequestsPage.value = 1
   await Promise.all([
     loadBestsellers(),
     loadRegisteredBooks(),
-    loadBookRequests()
+    loadRequestedBooks()
   ])
   // 검색 결과는 센터 변경 시 유지 (등록 상태만 업데이트됨)
 }
@@ -389,13 +319,11 @@ const loadRegisteredBooks = async () => {
   }
 }
 
-// 도서 신청 목록 로드
-const loadBookRequests = async () => {
+// 신청된 도서 로드 (신청 상태 확인용)
+const loadRequestedBooks = async () => {
   try {
-    bookRequestsLoading.value = true
-    
     if (!firestore) {
-      bookRequests.value = []
+      requestedBooks.value = []
       return
     }
     
@@ -417,122 +345,72 @@ const loadBookRequests = async () => {
       })
     })
     
-    // 클라이언트에서 requestedAt 기준 내림차순 정렬
-    requests.sort((a, b) => {
-      const dateA = a.requestedAt?.toDate?.() || new Date(0)
-      const dateB = b.requestedAt?.toDate?.() || new Date(0)
-      return dateB - dateA
-    })
-    
-    bookRequests.value = requests
+    requestedBooks.value = requests
   } catch (error) {
-    console.error('도서 신청 목록 로드 오류:', error)
-    bookRequests.value = []
-  } finally {
-    bookRequestsLoading.value = false
+    console.error('신청된 도서 로드 오류:', error)
+    requestedBooks.value = []
   }
 }
 
-// 도서 등록
-const handleBookRegister = async (book) => {
+// 도서 신청
+const handleBookRequest = async (book) => {
   const isbn = book.isbn13 || book.isbn || ''
   if (!isbn) {
-    alert('ISBN 정보가 없어 등록할 수 없습니다.')
+    alert('ISBN 정보가 없어 신청할 수 없습니다.')
     return
   }
 
-  if (registeringBooks.value.has(isbn)) {
+  if (requestingBooks.value.has(isbn)) {
     return
   }
 
   try {
-    registeringBooks.value.add(isbn)
-    await registerBook(book, currentCenter.value, user.value.uid)
+    requestingBooks.value.add(isbn)
     
-    // 등록된 도서 목록 새로고침
-    await loadRegisteredBooks()
-    
-    // 성공 메시지
-    alert('도서가 성공적으로 등록되었습니다.')
-  } catch (error) {
-    console.error('도서 등록 오류:', error)
-    alert(error.message || '도서 등록에 실패했습니다.')
-  } finally {
-    registeringBooks.value.delete(isbn)
-  }
-}
-
-// 도서 신청에서 등록 처리
-const handleBookRegisterFromRequest = async (book) => {
-  const isbn = book.isbn13 || book.isbn || ''
-  if (!isbn) {
-    alert('ISBN 정보가 없어 등록할 수 없습니다.')
-    return
-  }
-
-  if (registeringBooks.value.has(isbn)) {
-    return
-  }
-
-  try {
-    registeringBooks.value.add(isbn)
-    await registerBook(book, currentCenter.value, user.value.uid)
-    
-    // 신청 상태 업데이트 (approved로 변경)
-    if (firestore) {
-      const { doc, updateDoc, serverTimestamp, collection, query, where, getDocs } = await import('firebase/firestore')
-      
-      let requestId = book.id
-      
-      // book.id가 없으면 isbn으로 찾기
-      if (!requestId) {
-        const requestsRef = collection(firestore, 'bookRequests')
-        const q = query(
-          requestsRef,
-          where('center', '==', currentCenter.value),
-          where('status', '==', 'pending'),
-          where('isbn13', '==', isbn)
-        )
-        const snapshot = await getDocs(q)
-        if (!snapshot.empty) {
-          requestId = snapshot.docs[0].id
-        }
-      }
-      
-      if (requestId) {
-        const requestRef = doc(firestore, 'bookRequests', requestId)
-        await updateDoc(requestRef, {
-          status: 'approved',
-          approvedAt: serverTimestamp(),
-          approvedBy: user.value.uid
-        })
-      }
+    if (!firestore || !user.value) {
+      alert('로그인이 필요합니다.')
+      return
     }
     
-    // 로컬 상태에서 즉시 제거 (UI 반응성 향상)
-    bookRequests.value = bookRequests.value.filter(req => {
-      const reqIsbn = req.isbn13 || req.isbn || ''
-      return reqIsbn !== isbn
+    const { collection, addDoc, serverTimestamp } = await import('firebase/firestore')
+    
+    // Firestore에 신청 데이터 저장
+    await addDoc(collection(firestore, 'bookRequests'), {
+      // 도서 정보
+      isbn13: book.isbn13 || '',
+      isbn: book.isbn || '',
+      title: book.title || '',
+      author: book.author || '',
+      publisher: book.publisher || '',
+      cover: book.cover || book.image || '',
+      description: book.description || '',
+      pubDate: book.pubDate || '',
+      // 신청 정보
+      center: currentCenter.value,
+      status: 'pending', // pending, approved, rejected
+      requestedBy: user.value.uid,
+      requestedAt: serverTimestamp()
     })
     
-    // 등록된 도서 목록 새로고침
-    await loadRegisteredBooks()
+    // 신청된 도서 목록 새로고침
+    await loadRequestedBooks()
     
-    // 성공 메시지
-    alert('도서가 성공적으로 등록되었습니다.')
+    const bookTitle = book.title || '도서'
+    alert(`"${bookTitle}"이(가) ${currentCenter.value}에 신청되었습니다.\n\n관리자 승인 후 등록됩니다.`)
+    
   } catch (error) {
-    console.error('도서 등록 오류:', error)
-    alert(error.message || '도서 등록에 실패했습니다.')
+    console.error('도서 신청 오류:', error)
+    alert(error.message || '도서 신청에 실패했습니다.')
   } finally {
-    registeringBooks.value.delete(isbn)
+    requestingBooks.value.delete(isbn)
   }
 }
 
 // 페이지 메타데이터
 useHead({
-  title: '도서 등록 - CNX Library',
+  title: '도서 신청 - CNX Library',
   meta: [
-    { name: 'description', content: '도서 검색 및 등록' }
+    { name: 'description', content: '센터별 도서 신청' }
   ]
 })
 </script>
@@ -540,7 +418,7 @@ useHead({
 <style lang="scss" scoped>
 @use '@/assets/scss/functions' as *;
 
-.books-register-page {
+.books-request-page {
   width: 100%;
 }
 
@@ -616,23 +494,6 @@ useHead({
 }
 
 .search-results-header {
-  margin-bottom: rem(16);
-}
-
-.section-title {
-  font-size: rem(24);
-  font-weight: 600;
-  color: #002C5B;
-  line-height: 1.2;
-  margin: 0;
-}
-
-.book-requests-section {
-  padding-top: rem(24);
-  border-top: rem(1) solid #e0e0e0;
-}
-
-.book-requests-header {
   margin-bottom: rem(16);
 }
 

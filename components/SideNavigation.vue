@@ -16,25 +16,23 @@
           <span>홈</span>
         </NuxtLink>
 
-        <div class="menu-item menu-item-disabled">
-          <v-icon>mdi-magnify</v-icon>
-          <span>도서 검색</span>
-        </div>
-
-        <div class="menu-item menu-item-disabled">
+        <NuxtLink
+          to="/books"
+          class="menu-item"
+          @click="closeDrawer"
+        >
           <v-icon>mdi-book-open-variant</v-icon>
-          <span>도서 목록</span>
-        </div>
+          <span>도서 대여</span>
+        </NuxtLink>
 
-        <div class="menu-item menu-item-disabled">
-          <v-icon>mdi-book-account</v-icon>
-          <span>대여 관리</span>
-        </div>
-
-        <div class="menu-item menu-item-disabled">
-          <v-icon>mdi-cart-plus</v-icon>
-          <span>구매요청</span>
-        </div>
+        <NuxtLink
+          to="/books/request"
+          class="menu-item"
+          @click="closeDrawer"
+        >
+          <v-icon>mdi-book-plus</v-icon>
+          <span>도서 신청</span>
+        </NuxtLink>
 
         <div class="menu-item menu-item-disabled">
           <v-icon>mdi-account</v-icon>
@@ -68,21 +66,6 @@
           <v-icon>mdi-book-plus</v-icon>
           <span>도서 등록</span>
         </NuxtLink>
-
-        <div class="menu-item menu-item-disabled">
-          <v-icon>mdi-book-check</v-icon>
-          <span>대여 관리</span>
-        </div>
-
-        <div class="menu-item menu-item-disabled">
-          <v-icon>mdi-cart-check</v-icon>
-          <span>구매요청 관리</span>
-        </div>
-
-        <div class="menu-item menu-item-disabled">
-          <v-icon>mdi-chart-bar</v-icon>
-          <span>통계</span>
-        </div>
       </div>
 
       <!-- 공통 메뉴 -->

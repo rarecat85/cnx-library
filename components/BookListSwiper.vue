@@ -77,6 +77,10 @@
             :book="book"
             :center="center"
             :registered-books="registeredBooks"
+            :requested-books="requestedBooks"
+            :action-button-text="actionButtonText"
+            :registered-message="registeredMessage"
+            :requested-message="requestedMessage"
             @register="handleRegister"
           />
         </SwiperSlide>
@@ -154,6 +158,26 @@ const props = defineProps({
   navId: {
     type: String,
     required: true
+  },
+  // 액션 버튼 텍스트 (BookCard에 전달)
+  actionButtonText: {
+    type: String,
+    default: ''
+  },
+  // 등록됨 메시지 (BookCard에 전달)
+  registeredMessage: {
+    type: String,
+    default: ''
+  },
+  // 신청된 도서 목록 (BookCard에 전달)
+  requestedBooks: {
+    type: Array,
+    default: () => []
+  },
+  // 신청됨 메시지 (BookCard에 전달)
+  requestedMessage: {
+    type: String,
+    default: ''
   }
 })
 

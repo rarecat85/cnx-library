@@ -1,13 +1,16 @@
 <template>
   <v-card
     class="book-card"
-    :class="{ 'book-card-selected': selectable && selected }"
+    :class="{ 
+      'book-card-selected': selectable && selected,
+      'book-card-disabled': selectable && disabled
+    }"
     elevation="0"
     @click="selectable ? handleCardClick() : null"
   >
     <!-- 상태 플래그 영역 -->
     <div
-      v-if="selectable && (statusText || isNewBook)"
+      v-if="showStatusFlags && (statusText || isNewBook)"
       class="book-card-header"
     >
       <v-chip
@@ -61,7 +64,13 @@
         v-if="isBookRegistered"
         class="registered-text text-body-2"
       >
-        {{ center }}에 등록된 도서입니다.
+        {{ registeredMessage || `${center}에 등록된 도서입니다.` }}
+      </div>
+      <div
+        v-else-if="isBookRequested"
+        class="requested-text text-body-2"
+      >
+        {{ requestedMessage || `${center}에 이미 신청된 도서입니다.` }}
       </div>
       <v-btn
         v-else
@@ -72,7 +81,7 @@
         class="register-btn"
         @click.stop="handleRegister"
       >
-        {{ center }}에 등록하기
+        {{ actionButtonText || `${center}에 등록하기` }}
       </v-btn>
     </div>
   </v-card>
@@ -111,6 +120,34 @@ const props = defineProps({
   status: { // 도서 상태 (임시 테스트용: 'new', 'rented', 'overdue')
     type: String,
     default: null
+  },
+  showStatusFlags: { // 상태 플래그 표시 여부
+    type: Boolean,
+    default: false
+  },
+  disabled: { // 선택 불가 상태
+    type: Boolean,
+    default: false
+  },
+  actionButtonText: { // 액션 버튼 텍스트 (기본: "[센터]에 등록하기")
+    type: String,
+    default: ''
+  },
+  registeredMessage: { // 등록됨 메시지 (기본: "[센터]에 등록된 도서입니다.")
+    type: String,
+    default: ''
+  },
+  requestedBooks: { // 신청된 도서 목록
+    type: Array,
+    default: () => []
+  },
+  requestedMessage: { // 신청됨 메시지 (기본: "[센터]에 이미 신청된 도서입니다.")
+    type: String,
+    default: ''
+  },
+  hideOverdueStatus: { // 연체중을 대여중으로 표시 (일반 사용자용)
+    type: Boolean,
+    default: false
   }
 })
 
@@ -138,6 +175,21 @@ const isBookRegistered = computed(() => {
     const normalizedIsbn = isbn.toString().trim()
     const normalizedRegisteredIsbn = registeredIsbn.toString().trim()
     return normalizedIsbn === normalizedRegisteredIsbn && registeredBook.center === props.center
+  })
+})
+
+// 신청 상태 확인
+const isBookRequested = computed(() => {
+  const isbn = props.book.isbn13 || props.book.isbn || ''
+  if (!isbn) {
+    return false
+  }
+  
+  return props.requestedBooks.some(requestedBook => {
+    const requestedIsbn = requestedBook.isbn13 || requestedBook.isbn || ''
+    const normalizedIsbn = isbn.toString().trim()
+    const normalizedRequestedIsbn = requestedIsbn.toString().trim()
+    return normalizedIsbn === normalizedRequestedIsbn && requestedBook.center === props.center
   })
 })
 
@@ -183,26 +235,45 @@ const bookStatus = computed(() => {
 })
 
 const statusText = computed(() => {
+  const status = bookStatus.value
+  
+  // hideOverdueStatus가 true이면 연체중도 대여중으로 표시 (일반 사용자용)
+  if (props.hideOverdueStatus && status === 'overdue') {
+    return '대여중'
+  }
+  
   const statusMap = {
     new: 'NEW',
     rented: '대여중',
     overdue: '연체중'
   }
-  return statusMap[bookStatus.value] || ''
+  return statusMap[status] || ''
 })
 
 const statusColor = computed(() => {
+  const status = bookStatus.value
+  
+  // hideOverdueStatus가 true이면 연체중도 대여중 색상 (일반 사용자용)
+  if (props.hideOverdueStatus && status === 'overdue') {
+    return 'info'
+  }
+  
   const colorMap = {
     new: 'primary',
     rented: 'info',
-    overdue: 'error'
+    overdue: 'error' // 연체중은 빨간색 계열
   }
-  return colorMap[bookStatus.value] || 'primary'
+  return colorMap[status] || 'primary'
+})
+
+// 대여중인지 확인 (연체중 포함)
+const isRented = computed(() => {
+  return bookStatus.value === 'rented' || bookStatus.value === 'overdue'
 })
 
 // 카드 클릭 처리
 const handleCardClick = () => {
-  if (props.selectable) {
+  if (props.selectable && !props.disabled) {
     emit('select', props.book, !props.selected)
   }
 }
@@ -230,6 +301,16 @@ const handleCardClick = () => {
 
 .book-card-selected {
   border-color: #002C5B;
+}
+
+.book-card-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  
+  &:hover {
+    transform: none;
+    box-shadow: none;
+  }
 }
 
 .book-card-header {
@@ -327,6 +408,17 @@ const handleCardClick = () => {
 
 .registered-text {
   color: #10b981;
+  font-weight: 500;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: rem(28);
+  box-sizing: border-box;
+}
+
+.requested-text {
+  color: #f59e0b;
   font-weight: 500;
   width: 100%;
   display: flex;

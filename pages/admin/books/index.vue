@@ -32,7 +32,7 @@
                 총 <strong>{{ filteredRegisteredBooks.length }}</strong>권
               </div>
               <div class="text-body-2 text-medium-emphasis">
-                대여중 <strong>{{ rentedCount }}</strong>권, 연체중 <strong>{{ overdueCount }}</strong>권
+                대여중 <strong>{{ rentedCount }}</strong>권, 연체중 <strong>{{ overdueCount }}</strong>권, 대여신청 <strong>{{ requestedCount }}</strong>권
               </div>
             </div>
             <div class="d-flex align-center registered-search-group">
@@ -134,6 +134,7 @@
                   :status="getBookStatus(book)"
                   :show-status-flags="true"
                   :renter-info="getRenterInfo(book)"
+                  :requester-info="getRequesterInfo(book)"
                   :return-date="getReturnDate(book)"
                   :show-admin-rent-button="true"
                   @select="handleBookSelect"
@@ -259,6 +260,7 @@ const sortOptions = [
   { title: '등록일순', value: 'date' },
   { title: '대여중도서', value: 'rented' },
   { title: '연체중도서', value: 'overdue' },
+  { title: '대여신청도서', value: 'requested' },
   { title: '신규등록도서', value: 'new' }
 ]
 
@@ -267,8 +269,9 @@ const selectedBooks = ref([])
 const selectAll = ref(false)
 const actionLoading = ref(false)
 
-// 대여자 정보 캐시
+// 대여자/신청자 정보 캐시
 const renterInfoCache = ref({})
+const requesterInfoCache = ref({})
 
 // 대여 다이얼로그 관련
 const rentDialog = ref(false)
@@ -345,7 +348,7 @@ const loadRegisteredBooks = async () => {
   }
 }
 
-// 대여자 정보 로드
+// 대여자/신청자 정보 로드
 const loadRenterInfoForBooks = async (books) => {
   if (!firestore) return
   
@@ -358,9 +361,20 @@ const loadRenterInfoForBooks = async (books) => {
       .map(book => book.rentedBy)
   )]
   
-  // 각 대여자 정보 가져오기
-  for (const userId of renterIds) {
-    if (renterInfoCache.value[userId]) continue // 이미 캐시에 있으면 스킵
+  // 신청중인 도서들의 requestedBy 수집
+  const requesterIds = [...new Set(
+    books
+      .filter(book => book.requestedBy)
+      .map(book => book.requestedBy)
+  )]
+  
+  // 모든 사용자 ID 합치기 (중복 제거)
+  const allUserIds = [...new Set([...renterIds, ...requesterIds])]
+  
+  // 각 사용자 정보 가져오기
+  for (const userId of allUserIds) {
+    // 이미 캐시에 있으면 스킵
+    if (renterInfoCache.value[userId] && requesterInfoCache.value[userId]) continue
     
     try {
       const userRef = doc(firestore, 'users', userId)
@@ -373,10 +387,12 @@ const loadRenterInfoForBooks = async (books) => {
         const name = userData.name || ''
         const center = userData.center || ''
         
-        renterInfoCache.value[userId] = `${center} ${name}(${emailId})`
+        const infoString = `${center} ${name}(${emailId})`
+        renterInfoCache.value[userId] = infoString
+        requesterInfoCache.value[userId] = infoString
       }
     } catch (error) {
-      console.error('대여자 정보 로드 오류:', error)
+      console.error('대여자/신청자 정보 로드 오류:', error)
     }
   }
 }
@@ -385,6 +401,12 @@ const loadRenterInfoForBooks = async (books) => {
 const getRenterInfo = (book) => {
   if (!book.rentedBy) return ''
   return renterInfoCache.value[book.rentedBy] || ''
+}
+
+// 신청자 정보 반환
+const getRequesterInfo = (book) => {
+  if (!book.requestedBy) return ''
+  return requesterInfoCache.value[book.requestedBy] || ''
 }
 
 // 반납예정일 계산 (대여일 + 7일)
@@ -443,6 +465,18 @@ const filteredRegisteredBooks = computed(() => {
       const status = calculateBookStatus(book)
       return status === 'overdue'
     })
+  } else if (sortBy.value === 'requested') {
+    // 대여신청 도서만 필터링
+    books = books.filter(book => {
+      const status = calculateBookStatus(book)
+      return status === 'requested'
+    })
+    // 신청일 기준 최신순 정렬
+    books.sort((a, b) => {
+      const dateA = a.requestedAt?.toDate?.() || new Date(0)
+      const dateB = b.requestedAt?.toDate?.() || new Date(0)
+      return dateB - dateA
+    })
   } else if (sortBy.value === 'new') {
     // 신규등록 도서만 필터링 (등록일 기준 한 달 이내)
     books = books.filter(book => {
@@ -459,18 +493,25 @@ const filteredRegisteredBooks = computed(() => {
   return books
 })
 
-// 대여중 및 연체중 도서 수 계산
+// 대여중, 연체중, 대여신청 도서 수 계산
 const rentedCount = computed(() => {
-  return filteredRegisteredBooks.value.filter(book => {
+  return registeredBooks.value.filter(book => {
     const status = calculateBookStatus(book)
     return status === 'rented'
   }).length
 })
 
 const overdueCount = computed(() => {
-  return filteredRegisteredBooks.value.filter(book => {
+  return registeredBooks.value.filter(book => {
     const status = calculateBookStatus(book)
     return status === 'overdue'
+  }).length
+})
+
+const requestedCount = computed(() => {
+  return registeredBooks.value.filter(book => {
+    const status = calculateBookStatus(book)
+    return status === 'requested'
   }).length
 })
 
@@ -583,7 +624,43 @@ const handleRentBooks = () => {
 }
 
 // 개별 대여 처리 (다이얼로그 열기)
-const openRentDialog = (book) => {
+const openRentDialog = async (book) => {
+  const status = calculateBookStatus(book)
+  
+  // 대여 신청된 도서인 경우 신청자 정보로 바로 대여 처리
+  if (status === 'requested' && book.requestedBy) {
+    if (!confirm(`신청자 정보로 대여 처리하시겠습니까?\n\n도서: ${book.title}\n신청자: ${getRequesterInfo(book)}`)) {
+      return
+    }
+    
+    try {
+      actionLoading.value = true
+      
+      const { doc, setDoc, serverTimestamp, deleteField } = await import('firebase/firestore')
+      const bookId = book.id || book.isbn13 || book.isbn
+      const bookRef = doc(firestore, 'books', bookId)
+      
+      await setDoc(bookRef, {
+        status: 'rented',
+        rentedBy: book.requestedBy,
+        rentedAt: serverTimestamp(),
+        requestedBy: deleteField(),
+        requestedAt: deleteField(),
+        updatedAt: serverTimestamp()
+      }, { merge: true })
+      
+      await loadRegisteredBooks()
+      alert('대여 처리가 완료되었습니다.')
+    } catch (error) {
+      console.error('대여 처리 오류:', error)
+      alert('대여 처리에 실패했습니다.')
+    } finally {
+      actionLoading.value = false
+    }
+    return
+  }
+  
+  // 일반 대여 처리 (다이얼로그 열기)
   rentDialogBooks.value = [book]
   rentFormCenter.value = currentCenter.value
   rentFormEmail.value = ''

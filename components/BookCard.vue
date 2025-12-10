@@ -56,9 +56,33 @@
       </div>
     </div>
     
-    <!-- 관리자용 대여 버튼 (대여중이 아닌 경우) -->
+    <!-- 대여 신청된 도서 (관리자용) - 신청자 정보 + 대여처리 버튼 -->
     <div
-      v-if="showAdminRentButton && !isRented"
+      v-if="showAdminRentButton && isRequested && requesterInfo"
+      class="book-action-area book-action-area-admin"
+    >
+      <div class="admin-info-text text-body-2">
+        <v-icon
+          size="small"
+          class="mr-1"
+        >
+          mdi-account-clock
+        </v-icon>
+        {{ requesterInfo }}
+      </div>
+      <v-btn
+        color="primary"
+        size="small"
+        class="admin-rent-btn mt-2"
+        @click.stop="handleAdminRent"
+      >
+        대여 처리
+      </v-btn>
+    </div>
+    
+    <!-- 관리자용 대여 버튼 (대여중/신청중이 아닌 경우) -->
+    <div
+      v-else-if="showAdminRentButton && !isRented && !isRequested"
       class="book-action-area"
     >
       <v-btn
@@ -137,6 +161,12 @@
         class="rented-text text-body-2"
       >
         대여중인 도서입니다.
+      </div>
+      <div
+        v-else-if="isRequested"
+        class="requested-status-text text-body-2"
+      >
+        신청중인 도서입니다.
       </div>
       <v-btn
         v-else
@@ -259,6 +289,10 @@ const props = defineProps({
     type: String,
     default: ''
   },
+  requesterInfo: { // 신청자 정보 (관리자 도서 관리 페이지용)
+    type: String,
+    default: ''
+  },
   showAdminRentButton: { // 관리자용 대여 버튼 표시 (도서 관리 페이지용)
     type: Boolean,
     default: false
@@ -359,7 +393,8 @@ const statusText = computed(() => {
   const statusMap = {
     new: 'NEW',
     rented: '대여중',
-    overdue: '연체중'
+    overdue: '연체중',
+    requested: '대여신청'
   }
   return statusMap[status] || ''
 })
@@ -375,7 +410,8 @@ const statusColor = computed(() => {
   const colorMap = {
     new: 'primary',
     rented: 'info',
-    overdue: 'error' // 연체중은 빨간색 계열
+    overdue: 'error', // 연체중은 빨간색 계열
+    requested: 'warning' // 대여신청은 주황색 계열
   }
   return colorMap[status] || 'primary'
 })
@@ -383,6 +419,11 @@ const statusColor = computed(() => {
 // 대여중인지 확인 (연체중 포함)
 const isRented = computed(() => {
   return bookStatus.value === 'rented' || bookStatus.value === 'overdue'
+})
+
+// 대여 신청중인지 확인
+const isRequested = computed(() => {
+  return bookStatus.value === 'requested'
 })
 
 // 카드 클릭 처리
@@ -605,6 +646,17 @@ const isOverdue = computed(() => {
 
 .rented-text {
   color: #3b82f6;
+  font-weight: 500;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: rem(28);
+  box-sizing: border-box;
+}
+
+.requested-status-text {
+  color: #f59e0b;
   font-weight: 500;
   width: 100%;
   display: flex;

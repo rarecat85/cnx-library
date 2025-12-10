@@ -344,9 +344,59 @@ export const useNaverBooks = () => {
   }
 
   /**
+   * 도서 대여 신청 (다른 센터 도서 대여 시)
+   * @param {string} isbn - ISBN
+   * @param {string} userId - 신청한 사용자 UID
+   * @returns {Promise<Object>} 신청 결과
+   */
+  const requestRent = async (isbn, userId) => {
+    if (!firestore) {
+      throw new Error('Firebase가 초기화되지 않았습니다.')
+    }
+
+    try {
+      loading.value = true
+      error.value = null
+
+      const bookRef = doc(firestore, 'books', isbn)
+      const bookDoc = await getDoc(bookRef)
+
+      if (!bookDoc.exists()) {
+        throw new Error('도서를 찾을 수 없습니다.')
+      }
+
+      const bookData = bookDoc.data()
+      // 이미 대여중이거나 신청중인지 확인
+      if (bookData.status === 'rented' && bookData.rentedBy) {
+        throw new Error('이미 대여 중인 도서입니다.')
+      }
+      if (bookData.status === 'requested' && bookData.requestedBy) {
+        throw new Error('이미 대여 신청된 도서입니다.')
+      }
+
+      await setDoc(bookRef, {
+        status: 'requested',
+        requestedBy: userId,
+        requestedAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      }, { merge: true })
+
+      return {
+        success: true
+      }
+    } catch (err) {
+      console.error('도서 대여 신청 오류:', err)
+      error.value = err.message || '도서 대여 신청에 실패했습니다.'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
    * 도서 상태 계산 (대여일 기준 일주일 지나면 연체)
    * @param {Object} book - 도서 데이터
-   * @returns {string|null} 상태 ('rented', 'overdue', null)
+   * @returns {string|null} 상태 ('rented', 'overdue', 'requested', null)
    */
   const calculateBookStatus = (book) => {
     if (!book) return null
@@ -354,6 +404,11 @@ export const useNaverBooks = () => {
     // 삭제된 도서는 null 반환
     if (book.status === 'deleted') {
       return null
+    }
+
+    // 대여 신청 중인 경우
+    if (book.status === 'requested' && book.requestedBy) {
+      return 'requested'
     }
 
     // 대여 중인 경우
@@ -381,6 +436,7 @@ export const useNaverBooks = () => {
     getBooksByCenter,
     getBestsellers,
     rentBook,
+    requestRent,
     returnBook,
     deleteBook,
     calculateBookStatus

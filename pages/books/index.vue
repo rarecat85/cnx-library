@@ -112,7 +112,7 @@
                   :selected="isBookSelected(book)"
                   :status="getBookStatus(book)"
                   :show-status-flags="true"
-                  :disabled="isBookRentedOrOverdue(book)"
+                  :disabled="isBookUnavailable(book)"
                   :hide-overdue-status="true"
                   :show-rent-button="true"
                   @select="handleBookSelect"
@@ -157,6 +157,7 @@ const {
   getBooksByCenter,
   calculateBookStatus,
   rentBook,
+  requestRent,
   loading: booksLoading 
 } = useNaverBooks()
 const { $firebaseFirestore } = useNuxtApp()
@@ -336,10 +337,10 @@ const getBookStatus = (book) => {
   return calculateBookStatus(book)
 }
 
-// 대여중 또는 연체중 여부 확인 (일반 사용자는 선택 불가)
-const isBookRentedOrOverdue = (book) => {
+// 대여 불가 여부 확인 (대여중, 연체중, 신청중인 도서는 선택 불가)
+const isBookUnavailable = (book) => {
   const status = getBookStatus(book)
-  return status === 'rented' || status === 'overdue'
+  return status === 'rented' || status === 'overdue' || status === 'requested'
 }
 
 // 도서 선택 여부 확인
@@ -356,8 +357,8 @@ const handleBookSelect = (book, selected) => {
   const isbn = book.isbn13 || book.isbn || book.id || ''
   const status = getBookStatus(book)
   
-  // 대여중이거나 연체중인 도서는 선택 불가
-  if (status === 'rented' || status === 'overdue') {
+  // 대여중, 연체중, 신청중인 도서는 선택 불가
+  if (status === 'rented' || status === 'overdue' || status === 'requested') {
     return
   }
   
@@ -389,41 +390,62 @@ const handleBookSelect = (book, selected) => {
 const handleRentRequest = async () => {
   if (selectedBooks.value.length === 0 || !user.value) return
 
-  // 대여 가능 여부 체크
-  if (!canRentMore.value) {
-    alert(`${MAX_RENT_COUNT}권을 대여중입니다. 대여중인 도서를 반납 후 대여해주세요.`)
-    return
-  }
+  // 사용자 센터와 현재 도서 센터가 같은지 확인
+  const isSameCenter = userCenter.value === currentCenter.value
 
-  // 선택한 도서 수가 남은 대여 가능 권수를 초과하는지 체크
-  if (selectedBooks.value.length > remainingRentCount.value) {
-    alert(`현재 ${remainingRentCount.value}권까지 추가 대여 가능합니다.`)
-    return
+  // 같은 센터일 경우에만 대여 가능 여부 체크
+  if (isSameCenter) {
+    if (!canRentMore.value) {
+      alert(`${MAX_RENT_COUNT}권을 대여중입니다. 대여중인 도서를 반납 후 대여해주세요.`)
+      return
+    }
+
+    if (selectedBooks.value.length > remainingRentCount.value) {
+      alert(`현재 ${remainingRentCount.value}권까지 추가 대여 가능합니다.`)
+      return
+    }
   }
 
   const bookTitles = selectedBooks.value.map(book => book.title).join(', ')
-  if (!confirm(`다음 도서들을 대여 신청하시겠습니까?\n\n${bookTitles}`)) {
+  const confirmMessage = isSameCenter 
+    ? `다음 도서들을 대여 신청하시겠습니까?\n\n${bookTitles}`
+    : `다른 센터의 도서입니다. 대여 신청하시겠습니까?\n(관리자 승인 후 대여 가능)\n\n${bookTitles}`
+  
+  if (!confirm(confirmMessage)) {
     return
   }
 
   try {
     rentRequestLoading.value = true
+    const bookCount = selectedBooks.value.length
     
-    // 선택된 도서들 대여 처리
-    const promises = selectedBooks.value.map(book => {
-      // book.id가 Firestore 문서 ID이므로 이것을 우선 사용
-      const bookId = book.id || book.isbn13 || book.isbn
-      return rentBook(bookId, user.value.uid)
-    })
-    await Promise.all(promises)
+    if (isSameCenter) {
+      // 같은 센터: 바로 대여 처리
+      const promises = selectedBooks.value.map(book => {
+        const bookId = book.id || book.isbn13 || book.isbn
+        return rentBook(bookId, user.value.uid)
+      })
+      await Promise.all(promises)
+      
+      await Promise.all([
+        loadRegisteredBooks(),
+        loadCurrentRentedCount()
+      ])
+      
+      alert(`${bookCount}권의 도서 대여가 완료되었습니다.`)
+    } else {
+      // 다른 센터: 대여 신청 처리
+      const promises = selectedBooks.value.map(book => {
+        const bookId = book.id || book.isbn13 || book.isbn
+        return requestRent(bookId, user.value.uid)
+      })
+      await Promise.all(promises)
+      
+      await loadRegisteredBooks()
+      
+      alert(`${bookCount}권의 도서 대여가 신청되었습니다.\n관리자 승인 후 대여가 완료됩니다.`)
+    }
     
-    // 도서 목록 및 대여중 도서 수 새로고침
-    await Promise.all([
-      loadRegisteredBooks(),
-      loadCurrentRentedCount()
-    ])
-    
-    alert(`${selectedBooks.value.length}권의 도서 대여가 완료되었습니다.`)
     selectedBooks.value = []
   } catch (err) {
     console.error('대여 신청 오류:', err)
@@ -437,33 +459,49 @@ const handleRentRequest = async () => {
 const handleSingleRent = async (book) => {
   if (!user.value || !book) return
 
-  // 대여 가능 여부 체크
-  if (!canRentMore.value) {
+  // 사용자 센터와 현재 도서 센터가 같은지 확인
+  const isSameCenter = userCenter.value === currentCenter.value
+
+  // 같은 센터일 경우에만 대여 가능 여부 체크
+  if (isSameCenter && !canRentMore.value) {
     alert(`${MAX_RENT_COUNT}권을 대여중입니다. 대여중인 도서를 반납 후 대여해주세요.`)
     return
   }
 
-  if (!confirm(`"${book.title}"을(를) 대여 신청하시겠습니까?`)) {
+  const confirmMessage = isSameCenter 
+    ? `"${book.title}"을(를) 대여 신청하시겠습니까?`
+    : `다른 센터의 도서입니다. "${book.title}"을(를) 대여 신청하시겠습니까?\n(관리자 승인 후 대여 가능)`
+  
+  if (!confirm(confirmMessage)) {
     return
   }
 
   try {
     rentRequestLoading.value = true
     
-    // book.id가 Firestore 문서 ID이므로 이것을 우선 사용
     const bookId = book.id || book.isbn13 || book.isbn
-    await rentBook(bookId, user.value.uid)
     
-    // 도서 목록 및 대여중 도서 수 새로고침
-    await Promise.all([
-      loadRegisteredBooks(),
-      loadCurrentRentedCount()
-    ])
+    if (isSameCenter) {
+      // 같은 센터: 바로 대여 처리
+      await rentBook(bookId, user.value.uid)
+      
+      await Promise.all([
+        loadRegisteredBooks(),
+        loadCurrentRentedCount()
+      ])
+      
+      alert('도서 대여가 완료되었습니다.')
+    } else {
+      // 다른 센터: 대여 신청 처리
+      await requestRent(bookId, user.value.uid)
+      
+      await loadRegisteredBooks()
+      
+      alert('도서 대여가 신청되었습니다.\n관리자 승인 후 대여가 완료됩니다.')
+    }
     
     // 선택 목록에서도 제거
     selectedBooks.value = selectedBooks.value.filter(b => b.id !== book.id)
-    
-    alert('도서 대여가 완료되었습니다.')
   } catch (err) {
     console.error('대여 신청 오류:', err)
     alert(err.message || '대여 신청에 실패했습니다.')

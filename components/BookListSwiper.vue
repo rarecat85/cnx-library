@@ -81,7 +81,14 @@
             :action-button-text="actionButtonText"
             :registered-message="registeredMessage"
             :requested-message="requestedMessage"
+            :show-action="showAction"
+            :show-status-flags="showStatusFlags"
+            :status="getBookStatus(book)"
+            :show-rent-button="showRentButton"
+            :hide-overdue-status="hideOverdueStatus"
+            :disabled="isBookDisabled(book)"
             @register="handleRegister"
+            @rent="handleRent"
           />
         </SwiperSlide>
       </Swiper>
@@ -178,10 +185,43 @@ const props = defineProps({
   requestedMessage: {
     type: String,
     default: ''
+  },
+  // 액션 버튼 표시 여부 (BookCard에 전달)
+  showAction: {
+    type: Boolean,
+    default: true
+  },
+  // 상태 플래그 표시 여부 (BookCard에 전달)
+  showStatusFlags: {
+    type: Boolean,
+    default: false
+  },
+  // 대여 버튼 표시 여부 (BookCard에 전달)
+  showRentButton: {
+    type: Boolean,
+    default: false
+  },
+  // 연체중을 대여중으로 표시 (BookCard에 전달)
+  hideOverdueStatus: {
+    type: Boolean,
+    default: false
   }
 })
 
-const emit = defineEmits(['register'])
+const emit = defineEmits(['register', 'rent'])
+
+// 도서 상태 계산
+const { calculateBookStatus } = useNaverBooks()
+
+const getBookStatus = (book) => {
+  return calculateBookStatus(book)
+}
+
+// 도서 비활성화 여부 (대여중, 연체중, 신청중인 도서)
+const isBookDisabled = (book) => {
+  const status = getBookStatus(book)
+  return status === 'rented' || status === 'overdue' || status === 'requested'
+}
 
 // Swiper 모듈
 const swiperModules = [Navigation, Pagination]
@@ -195,6 +235,11 @@ const uniqueId = computed(() => props.navId)
 // 도서 등록 처리
 const handleRegister = (book) => {
   emit('register', book)
+}
+
+// 도서 대여 처리
+const handleRent = (book) => {
+  emit('rent', book)
 }
 </script>
 

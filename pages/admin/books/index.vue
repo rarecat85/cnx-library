@@ -133,7 +133,11 @@
                   :selected="isBookSelected(book)"
                   :status="getBookStatus(book)"
                   :show-status-flags="true"
+                  :renter-info="getRenterInfo(book)"
+                  :return-date="getReturnDate(book)"
+                  :show-admin-rent-button="true"
                   @select="handleBookSelect"
+                  @admin-rent="openRentDialog"
                 />
               </v-col>
             </v-row>
@@ -159,6 +163,58 @@
         <SideNavigation />
       </div>
     </v-navigation-drawer>
+
+    <!-- 대여 처리 다이얼로그 -->
+    <v-dialog
+      v-model="rentDialog"
+      max-width="400"
+      persistent
+    >
+      <v-card class="rent-dialog-card">
+        <div class="rent-dialog-title text-h6">
+          대여자 정보 입력
+        </div>
+        <div class="rent-dialog-content">
+          <div class="mb-4 text-body-2 text-medium-emphasis">
+            대여 처리할 도서: {{ rentDialogBooks.length }}권
+          </div>
+          <v-select
+            v-model="rentFormCenter"
+            :items="centerOptions"
+            label="센터"
+            variant="outlined"
+            density="comfortable"
+            class="mb-3"
+          />
+          <v-text-field
+            v-model="rentFormEmail"
+            label="이메일"
+            variant="outlined"
+            density="comfortable"
+            placeholder="example@email.com"
+            :error-messages="rentFormError"
+          />
+        </div>
+        <div class="rent-dialog-actions">
+          <v-spacer />
+          <v-btn
+            variant="text"
+            @click="closeRentDialog"
+          >
+            취소
+          </v-btn>
+          <v-btn
+            color="primary"
+            variant="flat"
+            :loading="rentDialogLoading"
+            :disabled="!rentFormCenter || !rentFormEmail"
+            @click="confirmRentBooks"
+          >
+            대여 처리
+          </v-btn>
+        </div>
+      </v-card>
+    </v-dialog>
   </v-app>
 </template>
 
@@ -210,6 +266,17 @@ const sortOptions = [
 const selectedBooks = ref([])
 const selectAll = ref(false)
 const actionLoading = ref(false)
+
+// 대여자 정보 캐시
+const renterInfoCache = ref({})
+
+// 대여 다이얼로그 관련
+const rentDialog = ref(false)
+const rentDialogBooks = ref([])
+const rentDialogLoading = ref(false)
+const rentFormCenter = ref('')
+const rentFormEmail = ref('')
+const rentFormError = ref('')
 
 // 반응형 drawer 너비 계산
 onMounted(() => {
@@ -267,6 +334,9 @@ const loadRegisteredBooks = async () => {
     registeredBooksLoading.value = true
     const books = await getBooksByCenter(currentCenter.value)
     registeredBooks.value = books
+    
+    // 대여중인 도서의 대여자 정보 로드
+    await loadRenterInfoForBooks(books)
   } catch (error) {
     console.error('등록된 도서 로드 오류:', error)
     registeredBooks.value = []
@@ -275,6 +345,58 @@ const loadRegisteredBooks = async () => {
   }
 }
 
+// 대여자 정보 로드
+const loadRenterInfoForBooks = async (books) => {
+  if (!firestore) return
+  
+  const { doc, getDoc } = await import('firebase/firestore')
+  
+  // 대여중인 도서들의 rentedBy 수집
+  const renterIds = [...new Set(
+    books
+      .filter(book => book.rentedBy)
+      .map(book => book.rentedBy)
+  )]
+  
+  // 각 대여자 정보 가져오기
+  for (const userId of renterIds) {
+    if (renterInfoCache.value[userId]) continue // 이미 캐시에 있으면 스킵
+    
+    try {
+      const userRef = doc(firestore, 'users', userId)
+      const userDoc = await getDoc(userRef)
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data()
+        const email = userData.email || ''
+        const emailId = email.split('@')[0] || ''
+        const name = userData.name || ''
+        const center = userData.center || ''
+        
+        renterInfoCache.value[userId] = `${center} ${name}(${emailId})`
+      }
+    } catch (error) {
+      console.error('대여자 정보 로드 오류:', error)
+    }
+  }
+}
+
+// 대여자 정보 반환
+const getRenterInfo = (book) => {
+  if (!book.rentedBy) return ''
+  return renterInfoCache.value[book.rentedBy] || ''
+}
+
+// 반납예정일 계산 (대여일 + 7일)
+const getReturnDate = (book) => {
+  if (!book.rentedAt) return null
+  
+  const rentedDate = book.rentedAt?.toDate?.() || new Date(book.rentedAt)
+  const returnDate = new Date(rentedDate)
+  returnDate.setDate(returnDate.getDate() + 7)
+  
+  return returnDate
+}
 
 // 등록된 도서 검색
 const handleRegisteredBooksSearch = () => {
@@ -438,27 +560,106 @@ const handleDeleteBooks = async () => {
 }
 
 // 도서 대여 처리
-const handleRentBooks = async () => {
-  if (selectedBooks.value.length === 0 || !user.value) return
-
-  if (!confirm(`선택한 ${selectedBooks.value.length}권의 도서를 대여 처리하시겠습니까?`)) {
+// 다중 대여 처리 (다이얼로그 열기)
+const handleRentBooks = () => {
+  if (selectedBooks.value.length === 0) return
+  
+  // 이미 대여중인 도서 필터링
+  const availableBooks = selectedBooks.value.filter(book => {
+    const status = calculateBookStatus(book)
+    return status !== 'rented' && status !== 'overdue'
+  })
+  
+  if (availableBooks.length === 0) {
+    alert('선택한 도서가 모두 대여중입니다.')
     return
   }
+  
+  rentDialogBooks.value = availableBooks
+  rentFormCenter.value = currentCenter.value
+  rentFormEmail.value = ''
+  rentFormError.value = ''
+  rentDialog.value = true
+}
 
+// 개별 대여 처리 (다이얼로그 열기)
+const openRentDialog = (book) => {
+  rentDialogBooks.value = [book]
+  rentFormCenter.value = currentCenter.value
+  rentFormEmail.value = ''
+  rentFormError.value = ''
+  rentDialog.value = true
+}
+
+// 다이얼로그 닫기
+const closeRentDialog = () => {
+  rentDialog.value = false
+  rentDialogBooks.value = []
+  rentFormCenter.value = ''
+  rentFormEmail.value = ''
+  rentFormError.value = ''
+}
+
+// 대여 처리 확인
+const confirmRentBooks = async () => {
+  if (!rentFormCenter.value || !rentFormEmail.value) return
+  
   try {
-    actionLoading.value = true
-    const promises = selectedBooks.value.map(book => {
-      const isbn = book.isbn13 || book.isbn || book.id
-      return rentBook(isbn, user.value.uid)
-    })
-    await Promise.all(promises)
-    selectedBooks.value = []
+    rentDialogLoading.value = true
+    rentFormError.value = ''
+    
+    // 센터와 이메일이 모두 일치하는 사용자 찾기
+    const { collection, query, where, getDocs, doc, setDoc, serverTimestamp } = await import('firebase/firestore')
+    const usersRef = collection(firestore, 'users')
+    
+    // 먼저 이메일로만 검색하여 사용자 존재 여부 확인
+    const emailQuery = query(usersRef, where('email', '==', rentFormEmail.value))
+    const emailSnapshot = await getDocs(emailQuery)
+    
+    if (emailSnapshot.empty) {
+      rentFormError.value = '해당 이메일의 사용자를 찾을 수 없습니다.'
+      return
+    }
+    
+    // 해당 사용자의 센터 확인
+    const userData = emailSnapshot.docs[0].data()
+    if (userData.center !== rentFormCenter.value) {
+      rentFormError.value = `해당 사용자는 ${userData.center} 소속입니다.`
+      return
+    }
+    
+    const targetUser = emailSnapshot.docs[0]
+    const targetUserId = targetUser.id
+    
+    // 선택된 도서들 대여 처리
+    for (const book of rentDialogBooks.value) {
+      const bookId = book.id || book.isbn13 || book.isbn
+      const bookRef = doc(firestore, 'books', bookId)
+      
+      await setDoc(bookRef, {
+        status: 'rented',
+        rentedBy: targetUserId,
+        rentedAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      }, { merge: true })
+    }
+    
+    // 대여 처리된 도서 수 저장
+    const rentedCount = rentDialogBooks.value.length
+    
+    // 목록 새로고침 및 다이얼로그 닫기
     await loadRegisteredBooks()
+    selectedBooks.value = selectedBooks.value.filter(book => 
+      !rentDialogBooks.value.some(rb => rb.id === book.id)
+    )
+    closeRentDialog()
+    
+    alert(`${rentedCount}권의 도서가 대여 처리되었습니다.`)
   } catch (error) {
     console.error('도서 대여 오류:', error)
-    alert('도서 대여에 실패했습니다.')
+    rentFormError.value = error.message || '대여 처리에 실패했습니다.'
   } finally {
-    actionLoading.value = false
+    rentDialogLoading.value = false
   }
 }
 
@@ -466,19 +667,81 @@ const handleRentBooks = async () => {
 const handleReturnBooks = async () => {
   if (selectedBooks.value.length === 0) return
 
-  if (!confirm(`선택한 ${selectedBooks.value.length}권의 도서를 반납 처리하시겠습니까?`)) {
+  // 대여중인 도서만 필터링
+  const rentedBooks = selectedBooks.value.filter(book => {
+    const status = calculateBookStatus(book)
+    return status === 'rented' || status === 'overdue'
+  })
+
+  if (rentedBooks.length === 0) {
+    alert('선택한 도서 중 대여중인 도서가 없습니다.')
+    return
+  }
+
+  if (!confirm(`선택한 ${rentedBooks.length}권의 도서를 반납 처리하시겠습니까?`)) {
     return
   }
 
   try {
     actionLoading.value = true
-    const promises = selectedBooks.value.map(book => {
-      const isbn = book.isbn13 || book.isbn || book.id
-      return returnBook(isbn)
-    })
-    await Promise.all(promises)
+    
+    const { doc, updateDoc, collection, addDoc, query, where, getDocs, serverTimestamp, deleteField } = await import('firebase/firestore')
+    
+    for (const book of rentedBooks) {
+      const bookId = book.id || book.isbn13 || book.isbn
+      const rentedBy = book.rentedBy
+      const rentedAt = book.rentedAt
+      
+      // 1. 도서 상태 업데이트 (대여 정보 제거)
+      const bookRef = doc(firestore, 'books', bookId)
+      await updateDoc(bookRef, {
+        status: 'available',
+        rentedBy: deleteField(),
+        rentedAt: deleteField()
+      })
+      
+      // 2. 대여자의 rentalHistory에 반납 기록 추가/업데이트
+      if (rentedBy) {
+        const historyRef = collection(firestore, 'rentalHistory')
+        const historyQuery = query(
+          historyRef,
+          where('userId', '==', rentedBy),
+          where('bookId', '==', bookId)
+        )
+        const historySnapshot = await getDocs(historyQuery)
+        
+        if (historySnapshot.empty) {
+          // 새로운 기록 추가
+          await addDoc(historyRef, {
+            bookId: bookId,
+            isbn13: book.isbn13 || '',
+            isbn: book.isbn || '',
+            title: book.title || '',
+            author: book.author || '',
+            publisher: book.publisher || '',
+            cover: book.cover || book.image || '',
+            center: book.center || '',
+            userId: rentedBy,
+            rentedAt: rentedAt,
+            returnedAt: serverTimestamp(),
+            rentCount: 1
+          })
+        } else {
+          // 기존 기록 업데이트
+          const existingDoc = historySnapshot.docs[0]
+          const existingData = existingDoc.data()
+          await updateDoc(doc(firestore, 'rentalHistory', existingDoc.id), {
+            rentedAt: rentedAt,
+            returnedAt: serverTimestamp(),
+            rentCount: (existingData.rentCount || 1) + 1
+          })
+        }
+      }
+    }
+    
     selectedBooks.value = []
     await loadRegisteredBooks()
+    alert(`${rentedBooks.length}권의 도서가 반납 처리되었습니다.`)
   } catch (error) {
     console.error('도서 반납 오류:', error)
     alert('도서 반납에 실패했습니다.')
@@ -695,5 +958,26 @@ useHead({
   .side-navigation :deep(.v-overlay__scrim) {
     display: none;
   }
+}
+
+/* 대여 다이얼로그 스타일 */
+.rent-dialog-card {
+  padding: rem(24);
+}
+
+.rent-dialog-title {
+  font-weight: 600;
+  color: #002C5B;
+  margin-bottom: rem(16);
+}
+
+.rent-dialog-content {
+  margin-bottom: rem(16);
+}
+
+.rent-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: rem(8);
 }
 </style>

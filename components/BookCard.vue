@@ -56,6 +56,50 @@
       </div>
     </div>
     
+    <!-- 관리자용 대여 버튼 (대여중이 아닌 경우) -->
+    <div
+      v-if="showAdminRentButton && !isRented"
+      class="book-action-area"
+    >
+      <v-btn
+        color="primary"
+        size="small"
+        class="admin-rent-btn"
+        @click.stop="handleAdminRent"
+      >
+        대여 처리
+      </v-btn>
+    </div>
+    
+    <!-- 대여자 정보 및 반납예정일 (관리자 도서 관리 페이지용) -->
+    <div
+      v-else-if="renterInfo && isRented"
+      class="book-action-area book-action-area-admin"
+    >
+      <div class="admin-info-text text-body-2">
+        <v-icon
+          size="small"
+          class="mr-1"
+        >
+          mdi-account
+        </v-icon>
+        {{ renterInfo }}
+      </div>
+      <div
+        v-if="returnDate"
+        class="return-date-text text-body-2"
+        :class="{ 'return-date-overdue': isOverdue }"
+      >
+        <v-icon
+          size="small"
+          class="mr-1"
+        >
+          mdi-calendar-clock
+        </v-icon>
+        반납예정일: {{ formattedReturnDate }}
+      </div>
+    </div>
+    
     <!-- 반납예정일 및 반납하기 버튼 (마이페이지용) -->
     <div
       v-if="showReturnDate && returnDate"
@@ -210,10 +254,18 @@ const props = defineProps({
   showRentButton: { // 대여 신청 버튼 표시 여부 (도서 대여 페이지용)
     type: Boolean,
     default: false
+  },
+  renterInfo: { // 대여자 정보 (관리자 도서 관리 페이지용)
+    type: String,
+    default: ''
+  },
+  showAdminRentButton: { // 관리자용 대여 버튼 표시 (도서 관리 페이지용)
+    type: Boolean,
+    default: false
   }
 })
 
-const emit = defineEmits(['register', 'select', 'return', 'rent'])
+const emit = defineEmits(['register', 'select', 'return', 'rent', 'adminRent'])
 
 // 도서 이미지 (알라딘 API는 cover 필드 사용)
 const bookImage = computed(() => {
@@ -348,6 +400,11 @@ const handleReturn = () => {
 // 대여 신청 처리
 const handleRent = () => {
   emit('rent', props.book)
+}
+
+// 관리자 대여 처리
+const handleAdminRent = () => {
+  emit('adminRent', props.book)
 }
 
 // 반납예정일 포맷
@@ -525,8 +582,23 @@ const isOverdue = computed(() => {
   gap: rem(8);
 }
 
+.book-action-area-admin {
+  flex-direction: column;
+  gap: rem(4);
+}
+
+.admin-info-text {
+  color: #6b7280;
+  font-weight: 500;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .return-btn,
-.rent-btn {
+.rent-btn,
+.admin-rent-btn {
   width: 100%;
   box-sizing: border-box;
 }

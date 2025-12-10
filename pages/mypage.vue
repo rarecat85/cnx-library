@@ -15,16 +15,24 @@
 
         <!-- 내 대여 목록 섹션 -->
         <div class="rental-section mb-8">
-          <div class="section-header mb-4">
+          <div class="section-header-with-filter mb-4">
             <h2 class="section-title">
               내 대여 목록
             </h2>
+            <v-select
+              v-model="selectedCenter"
+              :items="centerOptions"
+              variant="outlined"
+              density="comfortable"
+              hide-details
+              class="center-filter-select"
+            />
           </div>
           
           <!-- 대여 정보 및 반납하기 영역 -->
           <div class="d-flex align-center justify-space-between flex-wrap gap-4 mb-4">
             <div class="text-body-1">
-              총 <strong>{{ rentedBooks.length }}</strong>권 대여중
+              총 <strong>{{ filteredRentedBooks.length }}</strong>권 대여중
               <span
                 v-if="selectedBooks.length > 0"
                 class="text-body-2 ml-2 text-medium-emphasis"
@@ -33,7 +41,7 @@
               </span>
             </div>
             <v-btn
-              v-if="rentedBooks.length > 0"
+              v-if="filteredRentedBooks.length > 0"
               class="return-btn"
               variant="flat"
               size="small"
@@ -55,12 +63,12 @@
             />
           </div>
           <div
-            v-else-if="rentedBooks.length > 0"
+            v-else-if="filteredRentedBooks.length > 0"
             class="rental-books-grid"
           >
             <v-row class="book-list-row">
               <v-col
-                v-for="(book, index) in rentedBooks"
+                v-for="(book, index) in filteredRentedBooks"
                 :key="`rented-${index}`"
                 cols="12"
                 sm="6"
@@ -192,9 +200,25 @@ const firestore = $firebaseFirestore
 const drawer = useState('navigationDrawer', () => false)
 const drawerWidth = ref(280)
 
+// 센터 필터
+const centerOptions = [
+  '강남1센터',
+  '강남2센터',
+  '용산센터'
+]
+const selectedCenter = ref('')
+
 // 대여중인 도서
 const rentedBooks = ref([])
 const rentedBooksLoading = ref(false)
+
+// 센터별 필터링된 대여 도서
+const filteredRentedBooks = computed(() => {
+  if (!selectedCenter.value) {
+    return rentedBooks.value
+  }
+  return rentedBooks.value.filter(book => book.center === selectedCenter.value)
+})
 
 // 읽은 책 목록 (대여 이력)
 const rentalHistory = ref([])
@@ -222,8 +246,39 @@ onMounted(() => {
   })
 })
 
+// 센터 변경 시 선택된 도서 초기화
+watch(selectedCenter, () => {
+  selectedBooks.value = []
+})
+
+// 사용자 센터 정보 가져오기
+const getUserCenter = async () => {
+  if (!user.value || !firestore) {
+    return centerOptions[0]
+  }
+
+  try {
+    const { doc, getDoc } = await import('firebase/firestore')
+    const userRef = doc(firestore, 'users', user.value.uid)
+    const userDoc = await getDoc(userRef)
+
+    if (userDoc.exists()) {
+      const userData = userDoc.data()
+      return userData.center || centerOptions[0]
+    }
+  } catch (error) {
+    console.error('사용자 센터 정보 가져오기 오류:', error)
+  }
+
+  return centerOptions[0]
+}
+
 // 초기화
 onMounted(async () => {
+  // 사용자 센터 설정
+  const userCenter = await getUserCenter()
+  selectedCenter.value = userCenter
+  
   await Promise.all([
     loadRentedBooks(),
     loadRentalHistory()
@@ -589,6 +644,34 @@ useHead({
 
 .section-header {
   padding-bottom: rem(8);
+}
+
+.section-header-with-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: rem(10);
+  padding-bottom: rem(8);
+  
+  .section-title {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .center-filter-select {
+    flex: 0 0 calc(30% - rem(5));
+    min-width: rem(120);
+    
+    :deep(.v-input) {
+      width: 100%;
+    }
+  }
+  
+  @media (max-width: 600px) {
+    .center-filter-select {
+      flex: 0 0 rem(120);
+    }
+  }
 }
 
 .section-title {

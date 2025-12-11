@@ -128,7 +128,7 @@ export const useAuth = () => {
   }
 
   // 회원가입
-  const signup = async (email, password, name, center) => {
+  const signup = async (email, password, name, workplace) => {
     if (!auth || !firestore) {
       console.error('Firebase가 초기화되지 않았습니다.')
       return { success: false, error: 'Firebase가 초기화되지 않았습니다.' }
@@ -150,7 +150,7 @@ export const useAuth = () => {
         uid: firebaseUser.uid,
         email: email,
         name: name,
-        center: center,
+        workplace: workplace,
         emailVerified: false,
         emailVerifiedAt: null,
         createdAt: serverTimestamp(),

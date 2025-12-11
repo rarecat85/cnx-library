@@ -63,6 +63,8 @@ definePageMeta({
   middleware: 'auth'
 })
 
+import { CENTERS, getCenterByWorkplace, canDirectRent } from '@/utils/centerMapping'
+
 const { user } = useAuth()
 const { getBooksByCenter, rentBook, requestRent } = useNaverBooks()
 const { $firebaseFirestore } = useNuxtApp()
@@ -90,20 +92,16 @@ onMounted(() => {
 })
 
 // 센터 관련
-const centerOptions = [
-  '강남1센터',
-  '강남2센터',
-  '용산센터'
-]
+const centerOptions = [...CENTERS]
 const currentCenter = ref('')
-const userCenter = ref('')
+const userWorkplace = ref('')
 
 // 신규 도서 관련
 const newBooks = ref([])
 const newBooksLoading = ref(false)
 
-// 사용자 센터 정보 가져오기
-const getUserCenter = async () => {
+// 사용자 근무지 정보 가져오기
+const getUserWorkplace = async () => {
   if (!user.value || !firestore) {
     return ''
   }
@@ -115,10 +113,10 @@ const getUserCenter = async () => {
 
     if (userDoc.exists()) {
       const userData = userDoc.data()
-      return userData.center || ''
+      return userData.workplace || ''
     }
   } catch (error) {
-    console.error('사용자 센터 정보 가져오기 오류:', error)
+    console.error('사용자 근무지 정보 가져오기 오류:', error)
   }
 
   return ''
@@ -126,9 +124,10 @@ const getUserCenter = async () => {
 
 // 초기화
 onMounted(async () => {
-  const center = await getUserCenter()
-  userCenter.value = center
-  currentCenter.value = center || centerOptions[0]
+  const workplace = await getUserWorkplace()
+  userWorkplace.value = workplace
+  // 근무지 기반으로 센터 매핑
+  currentCenter.value = workplace ? getCenterByWorkplace(workplace) : centerOptions[0]
   
   await loadNewBooks()
 })
@@ -167,12 +166,12 @@ const loadNewBooks = async () => {
 const handleRent = async (book) => {
   if (!user.value || !book) return
   
-  // 사용자 센터와 도서 센터가 같은지 확인
-  const isSameCenter = userCenter.value === currentCenter.value
+  // 바로 대여 가능 여부 확인 (강남 근무지 + 강남센터 또는 용산 근무지 + 용산센터)
+  const isDirectRent = canDirectRent(userWorkplace.value, currentCenter.value)
   
-  const confirmMessage = isSameCenter 
+  const confirmMessage = isDirectRent 
     ? `"${book.title}"을(를) 대여 신청하시겠습니까?`
-    : `다른 센터의 도서입니다. "${book.title}"을(를) 대여 신청하시겠습니까?\n(관리자 승인 후 대여 가능)`
+    : `"${book.title}"을(를) 대여 신청하시겠습니까?\n(관리자 승인 후 대여 가능)`
   
   if (!confirm(confirmMessage)) {
     return
@@ -183,13 +182,13 @@ const handleRent = async (book) => {
     
     const bookId = book.id || book.isbn13 || book.isbn
     
-    if (isSameCenter) {
-      // 같은 센터: 바로 대여 처리
+    if (isDirectRent) {
+      // 바로 대여 처리 (강남 근무지 + 강남센터 또는 용산 근무지 + 용산센터)
       await rentBook(bookId, user.value.uid)
       await loadNewBooks()
       alert('도서 대여가 완료되었습니다.')
     } else {
-      // 다른 센터: 대여 신청 처리
+      // 대여 신청 처리 (그 외 모든 경우)
       await requestRent(bookId, user.value.uid)
       await loadNewBooks()
       alert('도서 대여가 신청되었습니다.\n관리자 승인 후 대여가 완료됩니다.')

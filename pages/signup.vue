@@ -66,12 +66,12 @@
       />
 
       <v-select
-        v-model="center"
-        label="근무지(센터)"
-        :items="centerOptions"
+        v-model="workplace"
+        label="근무지"
+        :items="workplaceOptions"
         prepend-inner-icon="mdi-office-building-outline"
         variant="outlined"
-        :rules="centerRules"
+        :rules="workplaceRules"
         :disabled="loading"
         class="mb-2"
         density="comfortable"
@@ -136,22 +136,20 @@ definePageMeta({
 const { signup, loading } = useAuth()
 const router = useRouter()
 
+import { WORKPLACES } from '@/utils/centerMapping'
+
 const name = ref('')
 const email = ref('')
 const password = ref('')
 const confirmPassword = ref('')
-const center = ref('')
+const workplace = ref('')
 const error = ref('')
 const successMessage = ref('')
 const signupForm = ref()
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
 
-const centerOptions = [
-  '강남1센터',
-  '강남2센터',
-  '용산센터'
-]
+const workplaceOptions = [...WORKPLACES]
 
 // 폼 검증 규칙
 const nameRules = [
@@ -173,8 +171,8 @@ const confirmPasswordRules = [
   (v) => v === password.value || '비밀번호가 일치하지 않습니다'
 ]
 
-const centerRules = [
-  (v) => !!v || '근무지(센터)를 선택해주세요'
+const workplaceRules = [
+  (v) => !!v || '근무지를 선택해주세요'
 ]
 
 // 회원가입 처리
@@ -186,7 +184,7 @@ const handleSignup = async () => {
   const { valid } = await signupForm.value.validate()
   if (!valid) return
 
-  const result = await signup(email.value, password.value, name.value, center.value)
+  const result = await signup(email.value, password.value, name.value, workplace.value)
   
   if (result.success) {
     successMessage.value = '회원가입이 완료되었습니다. 이메일을 확인하여 인증을 완료해주세요.'
@@ -195,7 +193,7 @@ const handleSignup = async () => {
     email.value = ''
     password.value = ''
     confirmPassword.value = ''
-    center.value = ''
+    workplace.value = ''
     signupForm.value.resetValidation()
   } else {
     error.value = result.error || '회원가입에 실패했습니다.'

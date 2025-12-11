@@ -185,6 +185,8 @@
 </template>
 
 <script setup>
+import { CENTERS, getCenterByWorkplace } from '@/utils/centerMapping'
+
 definePageMeta({
   layout: false,
   middleware: 'admin'
@@ -205,13 +207,9 @@ const drawer = useState('navigationDrawer', () => false)
 const drawerWidth = ref(280)
 
 // 센터 관련
-const centerOptions = [
-  '강남1센터',
-  '강남2센터',
-  '용산센터'
-]
+const centerOptions = [...CENTERS]
 const currentCenter = ref('')
-const userCenter = ref('')
+const userWorkplace = ref('')
 
 // 검색 관련
 const searchQuery = ref('')
@@ -259,8 +257,8 @@ onMounted(() => {
   })
 })
 
-// 사용자 센터 정보 가져오기
-const getUserCenter = async () => {
+// 사용자 근무지 정보 가져오기
+const getUserWorkplace = async () => {
   if (!user.value || !firestore) {
     return ''
   }
@@ -272,10 +270,10 @@ const getUserCenter = async () => {
 
     if (userDoc.exists()) {
       const userData = userDoc.data()
-      return userData.center || ''
+      return userData.workplace || ''
     }
   } catch (error) {
-    console.error('사용자 센터 정보 가져오기 오류:', error)
+    console.error('사용자 근무지 정보 가져오기 오류:', error)
   }
 
   return ''
@@ -283,9 +281,10 @@ const getUserCenter = async () => {
 
 // 초기화
 onMounted(async () => {
-  const center = await getUserCenter()
-  userCenter.value = center
-  currentCenter.value = center || centerOptions[0]
+  const workplace = await getUserWorkplace()
+  userWorkplace.value = workplace
+  // 근무지 기반으로 센터 매핑
+  currentCenter.value = workplace ? getCenterByWorkplace(workplace) : centerOptions[0]
   
   await Promise.all([
     loadBestsellers(),

@@ -270,8 +270,6 @@ const handleRent = (book) => {
 }
 
 .book-list-swiper-container {
-  padding-bottom: rem(60);
-  
   :deep(.swiper-wrapper) {
     align-items: stretch;
   }

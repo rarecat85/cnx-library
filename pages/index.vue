@@ -6,6 +6,50 @@
       @toggle-drawer="drawer = !drawer"
     >
       <div class="home-page">
+        <!-- 나의 도서 대여 현황 -->
+        <div class="my-rental-status-section">
+          <div class="rental-status-header mb-6">
+            <h1 class="page-title mb-0">
+              {{ userName }}님의 도서 대여 현황
+            </h1>
+          </div>
+          <div class="rental-dashboard">
+            <div
+              class="dashboard-card"
+              @click="goToMyPage"
+            >
+              <div class="dashboard-number">
+                {{ myRentedCount }}
+              </div>
+              <div class="dashboard-label">
+                대여중 도서
+              </div>
+            </div>
+            <div
+              class="dashboard-card warning"
+              @click="goToMyPage"
+            >
+              <div class="dashboard-number">
+                {{ myDueSoonCount }}
+              </div>
+              <div class="dashboard-label">
+                반납 예정 도서
+              </div>
+            </div>
+            <div
+              class="dashboard-card"
+              @click="goToMyPage"
+            >
+              <div class="dashboard-number">
+                {{ myReadCount }}
+              </div>
+              <div class="dashboard-label">
+                내가 읽은 책
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- 센터 정보 헤더 -->
         <div class="center-header mb-6">
           <div class="center-header-inner">
@@ -31,6 +75,7 @@
             :center="currentCenter"
             :registered-books="newBooks"
             :loading="newBooksLoading"
+            :title="`총 ${newBooks.length}권`"
             :empty-message="'신규 입고된 도서가 없습니다.'"
             nav-id="new-books"
             :show-action="false"
@@ -39,6 +84,17 @@
             :hide-overdue-status="true"
             @rent="handleRent"
           />
+          <div class="more-books-btn-wrapper">
+            <v-btn
+              class="more-books-btn"
+              variant="flat"
+              size="large"
+              block
+              to="/books"
+            >
+              {{ currentCenter }} 도서 더보기
+            </v-btn>
+          </div>
         </div>
       </div>
     </PageLayout>
@@ -100,10 +156,22 @@ const userWorkplace = ref('')
 const newBooks = ref([])
 const newBooksLoading = ref(false)
 
-// 사용자 근무지 정보 가져오기
-const getUserWorkplace = async () => {
+// 나의 도서 대여 현황
+const userName = ref('')
+const myRentedCount = ref(0)
+const myDueSoonCount = ref(0)
+const myReadCount = ref(0)
+
+const router = useRouter()
+
+const goToMyPage = () => {
+  router.push('/mypage')
+}
+
+// 사용자 정보 가져오기 (근무지, 이름)
+const getUserInfo = async () => {
   if (!user.value || !firestore) {
-    return ''
+    return { workplace: '', name: '' }
   }
 
   try {
@@ -113,23 +181,72 @@ const getUserWorkplace = async () => {
 
     if (userDoc.exists()) {
       const userData = userDoc.data()
-      return userData.workplace || ''
+      return {
+        workplace: userData.workplace || '',
+        name: userData.name || ''
+      }
     }
   } catch (error) {
-    console.error('사용자 근무지 정보 가져오기 오류:', error)
+    console.error('사용자 정보 가져오기 오류:', error)
   }
 
-  return ''
+  return { workplace: '', name: '' }
+}
+
+// 나의 대여 현황 로드
+const loadMyRentalStatus = async () => {
+  if (!user.value || !firestore) return
+  
+  try {
+    const { collection, query, where, getDocs } = await import('firebase/firestore')
+    
+    // 대여중 도서 개수
+    const booksRef = collection(firestore, 'books')
+    const rentedQuery = query(booksRef, where('rentedBy', '==', user.value.uid))
+    const rentedSnapshot = await getDocs(rentedQuery)
+    const rentedBooks = rentedSnapshot.docs.map(doc => doc.data())
+    myRentedCount.value = rentedBooks.length
+    
+    // 반납 예정 도서 (반납예정일 1일 전부터 + 연체 도서 포함)
+    // 반납예정일 = 대여일 + 7일
+    // 내일 23:59:59까지의 반납예정일을 가진 도서 + 이미 지난 연체 도서
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    tomorrow.setHours(23, 59, 59, 999)
+    
+    myDueSoonCount.value = rentedBooks.filter(book => {
+      if (book.rentedAt) {
+        const rentedDate = book.rentedAt?.toDate?.() || new Date(book.rentedAt)
+        const returnDate = new Date(rentedDate)
+        returnDate.setDate(returnDate.getDate() + 7) // 대여일 + 7일 = 반납예정일
+        // 반납예정일이 내일까지이거나 이미 지난 경우 (연체 포함)
+        return returnDate <= tomorrow
+      }
+      return false
+    }).length
+    
+    // 내가 읽은 책 개수 (rentalHistory)
+    const historyRef = collection(firestore, 'rentalHistory')
+    const historyQuery = query(historyRef, where('userId', '==', user.value.uid))
+    const historySnapshot = await getDocs(historyQuery)
+    myReadCount.value = historySnapshot.docs.length
+  } catch (error) {
+    console.error('대여 현황 로드 오류:', error)
+  }
 }
 
 // 초기화
 onMounted(async () => {
-  const workplace = await getUserWorkplace()
-  userWorkplace.value = workplace
+  const userInfo = await getUserInfo()
+  userWorkplace.value = userInfo.workplace
+  userName.value = userInfo.name
   // 근무지 기반으로 센터 매핑
-  currentCenter.value = workplace ? getCenterByWorkplace(workplace) : centerOptions[0]
+  currentCenter.value = userInfo.workplace ? getCenterByWorkplace(userInfo.workplace) : centerOptions[0]
   
-  await loadNewBooks()
+  await Promise.all([
+    loadNewBooks(),
+    loadMyRentalStatus()
+  ])
 })
 
 // 센터 변경 처리
@@ -282,6 +399,82 @@ useHead({
     border-top: none;
     padding-top: 0;
   }
+}
+
+.more-books-btn-wrapper {
+  margin-top: rem(24);
+}
+
+.more-books-btn {
+  height: rem(48);
+  font-size: rem(16);
+  font-weight: 500;
+  border-radius: rem(8);
+  background-color: #002C5B;
+  color: #FFFFFF;
+  
+  &:hover:not(:disabled) {
+    background-color: #003d7a;
+  }
+}
+
+/* 나의 도서 대여 현황 섹션 */
+.my-rental-status-section {
+  margin-bottom: rem(32);
+}
+
+.rental-status-header {
+  padding-bottom: rem(16);
+  border-bottom: rem(1) solid #e0e0e0;
+}
+
+.rental-dashboard {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: rem(12);
+}
+
+.dashboard-card {
+  background-color: #f8f9fa;
+  border-radius: rem(12);
+  padding: rem(20) rem(16);
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: rem(1) solid #e9ecef;
+  
+  &:hover {
+    background-color: #e9ecef;
+    transform: translateY(rem(-2));
+  }
+  
+  &.warning {
+    background-color: #fff3cd;
+    border-color: #ffc107;
+    
+    .dashboard-number {
+      color: #856404;
+    }
+    
+    &:hover {
+      background-color: #ffe69c;
+    }
+  }
+}
+
+.dashboard-number {
+  font-size: rem(32);
+  font-weight: 700;
+  color: #002C5B;
+  line-height: 1.2;
+  margin-bottom: rem(4);
+}
+
+.dashboard-label {
+  font-size: rem(12);
+  font-weight: 500;
+  color: #6b7280;
+  line-height: 1.3;
 }
 
 .side-navigation {

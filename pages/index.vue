@@ -63,7 +63,7 @@ definePageMeta({
   middleware: 'auth'
 })
 
-import { CENTERS, getCenterByWorkplace, canDirectRent } from '@/utils/centerMapping'
+import { CENTERS, getCenterByWorkplace, canDirectRent } from '@/utils/centerMapping.js'
 
 const { user } = useAuth()
 const { getBooksByCenter, rentBook, requestRent } = useNaverBooks()

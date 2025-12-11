@@ -220,7 +220,7 @@
 </template>
 
 <script setup>
-import { CENTERS, getCenterByWorkplace } from '@/utils/centerMapping'
+import { CENTERS, getCenterByWorkplace } from '@/utils/centerMapping.js'
 
 definePageMeta({
   layout: false,

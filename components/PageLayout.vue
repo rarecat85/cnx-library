@@ -11,7 +11,9 @@
                 v-if="headerType === 'icon'"
                 class="page-icon"
               >
-                <v-icon size="28">mdi-book-open-variant</v-icon>
+                <v-icon size="28">
+                  mdi-book-open-variant
+                </v-icon>
               </div>
               
               <!-- 책 아이콘 버튼 (홈으로 이동) -->
@@ -22,7 +24,9 @@
                 class="header-icon-btn"
                 @click="goHome"
               >
-                <v-icon size="28">mdi-book-open-variant</v-icon>
+                <v-icon size="28">
+                  mdi-book-open-variant
+                </v-icon>
               </v-btn>
               
               <!-- 뒤로가기 + 책 아이콘 (다른 페이지) -->
@@ -36,7 +40,9 @@
                   class="header-icon-btn"
                   @click="goBack"
                 >
-                  <v-icon size="24">mdi-arrow-left</v-icon>
+                  <v-icon size="24">
+                    mdi-arrow-left
+                  </v-icon>
                 </v-btn>
                 <v-btn
                   icon
@@ -44,7 +50,9 @@
                   class="header-icon-btn"
                   @click="goHome"
                 >
-                  <v-icon size="28">mdi-book-open-variant</v-icon>
+                  <v-icon size="28">
+                    mdi-book-open-variant
+                  </v-icon>
                 </v-btn>
               </div>
             </div>
@@ -60,7 +68,9 @@
                 class="header-action-btn"
                 to="/mypage"
               >
-                <v-icon size="24">mdi-account-circle-outline</v-icon>
+                <v-icon size="24">
+                  mdi-account-circle-outline
+                </v-icon>
               </v-btn>
 
               <v-btn
@@ -74,7 +84,9 @@
                   color="error"
                   overlap
                 >
-                  <v-icon size="24">mdi-bell-outline</v-icon>
+                  <v-icon size="24">
+                    mdi-bell-outline
+                  </v-icon>
                 </v-badge>
               </v-btn>
 
@@ -84,7 +96,9 @@
                 class="header-action-btn"
                 @click="$emit('toggle-drawer')"
               >
-                <v-icon size="24">mdi-menu</v-icon>
+                <v-icon size="24">
+                  mdi-menu
+                </v-icon>
               </v-btn>
             </div>
           </div>
@@ -128,6 +142,8 @@
 </template>
 
 <script setup>
+import { getCenterByWorkplace } from '@/utils/centerMapping.js'
+
 const router = useRouter()
 const { user, isAuthenticated } = useAuth()
 const { $firebaseFirestore } = useNuxtApp()
@@ -154,9 +170,10 @@ const userData = ref(null)
 const computedHeaderText = computed(() => {
   if (isAuthenticated.value && userData.value) {
     // 로그인 후: 한글 텍스트
-    const center = userData.value.center || ''
+    const workplace = userData.value.workplace || ''
+    const centerName = workplace ? getCenterByWorkplace(workplace) : ''
     const name = userData.value.name || ''
-    return `안녕하세요,<br>${center} ${name} 님`
+    return `안녕하세요, ${name}님<br>이용하실 도서관은 ${centerName} 입니다.`
   } else {
     // 로그인 전: 영문 텍스트
     return 'The world belongs to<br>those who read.'

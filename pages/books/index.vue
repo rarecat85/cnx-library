@@ -146,7 +146,7 @@
 </template>
 
 <script setup>
-import { CENTERS, getCenterByWorkplace, canDirectRent } from '@/utils/centerMapping'
+import { CENTERS, getCenterByWorkplace, canDirectRent } from '@/utils/centerMapping.js'
 
 definePageMeta({
   layout: false,

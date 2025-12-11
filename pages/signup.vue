@@ -136,7 +136,7 @@ definePageMeta({
 const { signup, loading } = useAuth()
 const router = useRouter()
 
-import { WORKPLACES } from '@/utils/centerMapping'
+import { WORKPLACES } from '@/utils/centerMapping.js'
 
 const name = ref('')
 const email = ref('')

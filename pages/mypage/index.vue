@@ -8,9 +8,19 @@
       <div class="mypage">
         <!-- 페이지 헤더 -->
         <div class="page-header mb-6">
-          <h1 class="page-title mb-0">
-            마이페이지
-          </h1>
+          <div class="page-header-inner">
+            <h1 class="page-title mb-0">
+              마이페이지
+            </h1>
+            <v-btn
+              class="edit-profile-btn"
+              variant="flat"
+              size="small"
+              to="/mypage/edit"
+            >
+              정보수정
+            </v-btn>
+          </div>
         </div>
 
         <!-- 내 대여 목록 섹션 -->
@@ -633,6 +643,13 @@ useHead({
   border-bottom: rem(1) solid #e0e0e0;
 }
 
+.page-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: rem(16);
+}
+
 .page-title {
   font-size: rem(32);
   font-weight: 700;
@@ -680,6 +697,7 @@ useHead({
   margin: 0;
 }
 
+.edit-profile-btn,
 .return-btn,
 .delete-history-btn {
   background-color: #002C5B;

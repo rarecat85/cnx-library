@@ -79,7 +79,6 @@
 
       <v-btn
         type="submit"
-        color="primary"
         block
         size="large"
         :loading="loading"
@@ -365,6 +364,12 @@ useHead({
   font-size: rem(16);
   font-weight: 500;
   border-radius: rem(8);
+  background-color: #002C5B;
+  color: #FFFFFF;
+  
+  &:hover:not(:disabled) {
+    background-color: #003d7a;
+  }
 }
 
 /* 인증 링크 스타일 */

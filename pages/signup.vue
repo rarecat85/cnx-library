@@ -1,5 +1,6 @@
 <template>
-  <PageLayout>
+  <v-app>
+    <PageLayout>
     <div class="text-center mb-8">
       <h1 class="login-title mb-2">
         CNX Library
@@ -99,7 +100,6 @@
 
       <v-btn
         type="submit"
-        color="primary"
         block
         size="large"
         :loading="loading"
@@ -124,7 +124,8 @@
         <span class="credit-text">© rarecat</span>
       </div>
     </div>
-  </PageLayout>
+    </PageLayout>
+  </v-app>
 </template>
 
 <script setup>
@@ -276,6 +277,12 @@ useHead({
   font-size: rem(16);
   font-weight: 500;
   border-radius: rem(8);
+  background-color: #002C5B;
+  color: #FFFFFF;
+  
+  &:hover:not(:disabled) {
+    background-color: #003d7a;
+  }
 }
 
 /* 인증 링크 스타일 */

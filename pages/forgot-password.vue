@@ -1,81 +1,82 @@
 <template>
-  <PageLayout>
-    <div class="text-center mb-8">
-      <h1 class="login-title mb-2">
-        CNX Library
-      </h1>
-      <p class="login-subtitle">
-        비밀번호 찾기
-      </p>
-    </div>
-
-    <v-form
-      ref="forgotPasswordForm"
-      validate-on="submit"
-      @submit.prevent="handleSendResetEmail"
-    >
-      <v-text-field
-        v-model="email"
-        label="이메일"
-        type="email"
-        prepend-inner-icon="mdi-email-outline"
-        variant="outlined"
-        :rules="emailRules"
-        :disabled="loading"
-        class="mb-2"
-        density="comfortable"
-      />
-
-      <v-alert
-        v-if="error"
-        type="error"
-        variant="tonal"
-        closable
-        class="error-alert mb-4"
-        @click:close="error = ''"
-      >
-        {{ error }}
-      </v-alert>
-
-      <v-alert
-        v-if="successMessage"
-        type="success"
-        variant="tonal"
-        class="success-alert mb-4"
-      >
-        {{ successMessage }}
-      </v-alert>
-
-      <v-btn
-        type="submit"
-        color="primary"
-        block
-        size="large"
-        :loading="loading"
-        :disabled="loading"
-        class="submit-btn"
-        elevation="2"
-      >
-        비밀번호 재설정 이메일 발송
-      </v-btn>
-    </v-form>
-
-    <div class="auth-links text-center mt-4">
-      <NuxtLink
-        to="/login"
-        class="auth-link"
-      >
-        로그인
-      </NuxtLink>
-    </div>
-    
-    <div class="logo-bottom text-center mt-6">
-      <div class="logo-with-credit">
-        <ConcentrixLogo />
-        <span class="credit-text">© rarecat</span>
+  <v-app>
+    <PageLayout>
+      <div class="text-center mb-8">
+        <h1 class="login-title mb-2">
+          CNX Library
+        </h1>
+        <p class="login-subtitle">
+          비밀번호 찾기
+        </p>
       </div>
-    </div>
-  </PageLayout>
+
+      <v-form
+        ref="forgotPasswordForm"
+        validate-on="submit"
+        @submit.prevent="handleSendResetEmail"
+      >
+        <v-text-field
+          v-model="email"
+          label="이메일"
+          type="email"
+          prepend-inner-icon="mdi-email-outline"
+          variant="outlined"
+          :rules="emailRules"
+          :disabled="loading"
+          class="mb-2"
+          density="comfortable"
+        />
+
+        <v-alert
+          v-if="error"
+          type="error"
+          variant="tonal"
+          closable
+          class="error-alert mb-4"
+          @click:close="error = ''"
+        >
+          {{ error }}
+        </v-alert>
+
+        <v-alert
+          v-if="successMessage"
+          type="success"
+          variant="tonal"
+          class="success-alert mb-4"
+        >
+          {{ successMessage }}
+        </v-alert>
+
+        <v-btn
+          type="submit"
+          block
+          size="large"
+          :loading="loading"
+          :disabled="loading"
+          class="submit-btn"
+          elevation="2"
+        >
+          비밀번호 재설정 이메일 발송
+        </v-btn>
+      </v-form>
+
+      <div class="auth-links text-center mt-4">
+        <NuxtLink
+          to="/login"
+          class="auth-link"
+        >
+          로그인
+        </NuxtLink>
+      </div>
+      
+      <div class="logo-bottom text-center mt-6">
+        <div class="logo-with-credit">
+          <ConcentrixLogo />
+          <span class="credit-text">© rarecat</span>
+        </div>
+      </div>
+    </PageLayout>
+  </v-app>
 </template>
 
 <script setup>
@@ -194,6 +195,12 @@ useHead({
   font-size: rem(16);
   font-weight: 500;
   border-radius: rem(8);
+  background-color: #002C5B;
+  color: #FFFFFF;
+  
+  &:hover:not(:disabled) {
+    background-color: #003d7a;
+  }
 }
 
 /* 인증 링크 스타일 */
@@ -236,4 +243,3 @@ useHead({
   padding: 0;
 }
 </style>
-

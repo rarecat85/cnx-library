@@ -1,154 +1,152 @@
 <template>
-  <v-container
-    fluid
-    class="fill-height"
-  >
-    <v-row
-      align="center"
-      justify="center"
-      class="fill-height"
-    >
-      <v-col
-        cols="12"
-        sm="8"
-        lg="4"
+  <v-app>
+    <PageLayout>
+      <div class="text-center mb-8">
+        <h1 class="login-title mb-2">
+          CNX Library
+        </h1>
+        <p class="login-subtitle">
+          비밀번호 재설정
+        </p>
+      </div>
+
+      <div
+        v-if="processing"
+        class="text-center py-8"
       >
-        <v-card class="reset-password-card">
-          <div class="text-center mb-8">
-            <h1 class="reset-password-title mb-2">
-              CNX Library
-            </h1>
-            <p class="reset-password-subtitle">
-              비밀번호 재설정
-            </p>
-          </div>
+        <v-progress-circular
+          indeterminate
+          color="primary"
+          size="64"
+          class="mb-4"
+        />
+        <p class="processing-text">
+          비밀번호 재설정을 처리하는 중입니다...
+        </p>
+      </div>
 
-          <div v-if="processing" class="text-center">
-            <v-progress-circular
-              indeterminate
-              color="primary"
-              size="64"
-              class="mb-4"
-            />
-            <p class="processing-text">
-              비밀번호 재설정을 처리하는 중입니다...
-            </p>
-          </div>
+      <div
+        v-else-if="success"
+        class="text-center"
+      >
+        <v-icon
+          color="success"
+          size="64"
+          class="mb-4"
+        >
+          mdi-check-circle
+        </v-icon>
+        <h2 class="success-title mb-4">
+          비밀번호가 재설정되었습니다!
+        </h2>
+        <p class="success-text mb-6">
+          {{ isLoggedIn ? '비밀번호가 성공적으로 변경되었습니다.' : '새로운 비밀번호로 로그인해주세요.' }}
+        </p>
+        <v-btn
+          block
+          size="large"
+          class="login-btn"
+          elevation="2"
+          @click="goToNextPage"
+        >
+          {{ isLoggedIn ? '마이페이지로 돌아가기' : '로그인하기' }}
+        </v-btn>
+      </div>
 
-          <div v-else-if="success" class="text-center">
-            <v-icon
-              color="success"
-              size="64"
-              class="mb-4"
-            >
-              mdi-check-circle
-            </v-icon>
-            <h2 class="success-title mb-4">
-              비밀번호가 재설정되었습니다!
-            </h2>
-            <p class="success-text mb-6">
-              새로운 비밀번호로 로그인해주세요.
-            </p>
-            <v-btn
-              color="primary"
-              size="large"
-              block
-              class="login-btn"
-              elevation="2"
-              @click="goToLogin"
-            >
-              로그인하기
-            </v-btn>
-          </div>
+      <div
+        v-else-if="error"
+        class="text-center"
+      >
+        <v-icon
+          color="error"
+          size="64"
+          class="mb-4"
+        >
+          mdi-alert-circle
+        </v-icon>
+        <h2 class="error-title mb-4">
+          재설정에 실패했습니다
+        </h2>
+        <p class="error-text mb-6">
+          {{ errorMessage }}
+        </p>
+        <v-btn
+          block
+          size="large"
+          class="login-btn"
+          elevation="2"
+          @click="goToNextPage"
+        >
+          {{ isLoggedIn ? '마이페이지로 돌아가기' : '로그인 페이지로 이동' }}
+        </v-btn>
+      </div>
 
-          <div v-else-if="error" class="text-center">
-            <v-icon
-              color="error"
-              size="64"
-              class="mb-4"
-            >
-              mdi-alert-circle
-            </v-icon>
-            <h2 class="error-title mb-4">
-              재설정에 실패했습니다
-            </h2>
-            <p class="error-text mb-6">
-              {{ errorMessage }}
-            </p>
-            <v-btn
-              color="primary"
-              size="large"
-              block
-              class="login-btn"
-              elevation="2"
-              @click="goToLogin"
-            >
-              로그인 페이지로 이동
-            </v-btn>
-          </div>
+      <v-form
+        v-else
+        ref="resetPasswordForm"
+        validate-on="submit"
+        @submit.prevent="handleResetPassword"
+      >
+        <v-text-field
+          v-model="newPassword"
+          label="새 비밀번호"
+          :type="showPassword ? 'text' : 'password'"
+          prepend-inner-icon="mdi-lock-outline"
+          :append-inner-icon="showPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+          variant="outlined"
+          :rules="passwordRules"
+          :disabled="loading"
+          class="mb-2"
+          density="comfortable"
+          @click:append-inner="showPassword = !showPassword"
+        />
 
-          <v-form
-            v-else
-            ref="resetPasswordForm"
-            validate-on="submit"
-            @submit.prevent="handleResetPassword"
-          >
-            <v-text-field
-              v-model="newPassword"
-              label="새 비밀번호"
-              :type="showPassword ? 'text' : 'password'"
-              prepend-inner-icon="mdi-lock-outline"
-              :append-inner-icon="showPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
-              variant="outlined"
-              :rules="passwordRules"
-              :disabled="loading"
-              class="mb-2"
-              density="comfortable"
-              @click:append-inner="showPassword = !showPassword"
-            />
+        <v-text-field
+          v-model="confirmPassword"
+          label="비밀번호 확인"
+          :type="showConfirmPassword ? 'text' : 'password'"
+          prepend-inner-icon="mdi-lock-check-outline"
+          :append-inner-icon="showConfirmPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+          variant="outlined"
+          :rules="confirmPasswordRules"
+          :disabled="loading"
+          class="mb-2"
+          density="comfortable"
+          @click:append-inner="showConfirmPassword = !showConfirmPassword"
+        />
 
-            <v-text-field
-              v-model="confirmPassword"
-              label="비밀번호 확인"
-              :type="showConfirmPassword ? 'text' : 'password'"
-              prepend-inner-icon="mdi-lock-check-outline"
-              :append-inner-icon="showConfirmPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
-              variant="outlined"
-              :rules="confirmPasswordRules"
-              :disabled="loading"
-              class="mb-2"
-              density="comfortable"
-              @click:append-inner="showConfirmPassword = !showConfirmPassword"
-            />
+        <v-alert
+          v-if="formError"
+          type="error"
+          variant="tonal"
+          closable
+          class="error-alert mb-4"
+          @click:close="formError = ''"
+        >
+          {{ formError }}
+        </v-alert>
 
-            <v-alert
-              v-if="formError"
-              type="error"
-              variant="tonal"
-              closable
-              class="error-alert mb-4"
-              @click:close="formError = ''"
-            >
-              {{ formError }}
-            </v-alert>
+        <v-btn
+          type="submit"
+          block
+          size="large"
+          :loading="loading"
+          :disabled="loading"
+          class="reset-btn"
+          elevation="2"
+        >
+          비밀번호 재설정
+        </v-btn>
+      </v-form>
 
-            <v-btn
-              type="submit"
-              color="primary"
-              block
-              size="large"
-              :loading="loading"
-              :disabled="loading"
-              class="reset-btn"
-              elevation="2"
-            >
-              비밀번호 재설정
-            </v-btn>
-          </v-form>
-        </v-card>
-      </v-col>
-    </v-row>
-  </v-container>
+      <div class="logo-bottom text-center mt-6">
+        <div class="logo-with-credit">
+          <ConcentrixLogo />
+          <span class="credit-text">© rarecat</span>
+        </div>
+      </div>
+    </PageLayout>
+  </v-app>
 </template>
 
 <script setup>
@@ -157,7 +155,7 @@ definePageMeta({
   middleware: []
 })
 
-const { confirmPasswordReset, loading } = useAuth()
+const { confirmPasswordReset, loading, user } = useAuth()
 const router = useRouter()
 const route = useRoute()
 
@@ -171,6 +169,7 @@ const formError = ref('')
 const resetPasswordForm = ref()
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
+const isLoggedIn = ref(false)
 
 // URL 파라미터에서 mode와 oobCode 추출
 const mode = route.query.mode
@@ -188,6 +187,9 @@ const confirmPasswordRules = [
 ]
 
 onMounted(async () => {
+  // 로그인 상태 확인
+  isLoggedIn.value = !!user.value
+
   if (!mode || !oobCode) {
     error.value = true
     errorMessage.value = '잘못된 재설정 링크입니다.'
@@ -238,31 +240,63 @@ const handleResetPassword = async () => {
   }
 }
 
-const goToLogin = () => {
-  router.push('/login')
+const goToNextPage = () => {
+  // 로그인 상태였으면 마이페이지로, 아니면 로그인 페이지로 이동
+  if (isLoggedIn.value) {
+    router.push('/mypage')
+  } else {
+    router.push('/login')
+  }
 }
 
 // 페이지 메타데이터
 useHead({
-  title: '비밀번호 재설정 - CNX Library'
+  title: '비밀번호 재설정 - CNX Library',
+  link: [
+    {
+      rel: 'preconnect',
+      href: 'https://fonts.googleapis.com'
+    },
+    {
+      rel: 'preconnect',
+      href: 'https://fonts.gstatic.com',
+      crossorigin: ''
+    },
+    {
+      rel: 'stylesheet',
+      href: 'https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap'
+    }
+  ]
 })
 </script>
 
 <style lang="scss" scoped>
 @use '@/assets/scss/functions' as *;
 
-.fill-height {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #F2F2F2 0%, #E8E8E8 100%);
+.logo-bottom {
+  margin-top: rem(24);
 }
 
-.reset-password-card {
-  padding: rem(48) rem(40);
-  max-width: rem(440);
-  margin: 0 auto;
+.logo-with-credit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: rem(8);
 }
 
-.reset-password-title {
+.logo-with-credit :deep(.logo-svg) {
+  height: rem(16);
+  width: auto;
+  color: #002C5B;
+}
+
+.credit-text {
+  font-size: rem(10);
+  color: #6b7280;
+  font-weight: 400;
+}
+
+.login-title {
   font-size: rem(32);
   font-weight: 700;
   color: #002C5B;
@@ -270,7 +304,7 @@ useHead({
   margin: 0;
 }
 
-.reset-password-subtitle {
+.login-subtitle {
   font-size: rem(16);
   color: #6b7280;
   margin: 0;
@@ -315,6 +349,12 @@ useHead({
   font-size: rem(16);
   font-weight: 500;
   border-radius: rem(8);
+  background-color: #002C5B;
+  color: #FFFFFF;
+  
+  &:hover:not(:disabled) {
+    background-color: #003d7a;
+  }
 }
 
 .error-alert {
@@ -348,4 +388,3 @@ useHead({
   padding: 0;
 }
 </style>
-

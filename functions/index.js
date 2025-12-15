@@ -6,9 +6,12 @@ const { initializeApp } = require('firebase-admin/app')
 const { getAuth } = require('firebase-admin/auth')
 const { getFirestore, FieldValue } = require('firebase-admin/firestore')
 const functions = require('firebase-functions')
+const nodemailer = require('nodemailer')
 
-// 알라딘 API 키 (환경 변수)
+// 환경 변수
 const aladinTtbKey = defineString('ALADIN_TTB_KEY', { default: '' })
+const gmailUser = defineString('GMAIL_USER', { default: '' })
+const gmailAppPassword = defineString('GMAIL_APP_PASSWORD', { default: '' })
 
 // Firebase Admin 초기화
 initializeApp()
@@ -442,6 +445,218 @@ exports.getAladinBestsellers = onCall({
   }
 })
 
+// ==================== 이메일 발송 시스템 ====================
+
+/**
+ * Nodemailer 트랜스포터 생성
+ */
+const createMailTransporter = () => {
+  const user = gmailUser.value()
+  const pass = gmailAppPassword.value()
+  
+  if (!user || !pass) {
+    console.log('Gmail 인증 정보가 설정되지 않았습니다.')
+    return null
+  }
+  
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user, pass }
+  })
+}
+
+/**
+ * 이메일 템플릿 생성
+ * @param {string} type - 알림 타입
+ * @param {string} title - 알림 제목
+ * @param {string} message - 알림 메시지
+ * @param {Object} extra - 추가 정보
+ * @returns {string} HTML 이메일 템플릿
+ */
+const createEmailTemplate = (type, title, message, extra = {}) => {
+  // 알림 타입별 아이콘 및 색상
+  const typeConfig = {
+    book_request: { icon: '📚', color: '#002C5B', label: '도서 등록 신청' },
+    rent_request: { icon: '📖', color: '#0284c7', label: '도서 대여 신청' },
+    book_registered: { icon: '✅', color: '#16a34a', label: '도서 등록 완료' },
+    return_reminder: { icon: '⏰', color: '#f59e0b', label: '반납 예정 알림' },
+    overdue: { icon: '⚠️', color: '#dc2626', label: '연체 알림' },
+    overdue_admin: { icon: '🚨', color: '#dc2626', label: '연체 알림 (관리자)' }
+  }
+  
+  const config = typeConfig[type] || { icon: '🔔', color: '#002C5B', label: '알림' }
+  
+  return `
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #F2F2F2;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #F2F2F2;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 600px; margin: 0 auto;">
+          
+          <!-- 헤더 -->
+          <tr>
+            <td style="background-color: #002C5B; padding: 32px 40px; border-radius: 16px 16px 0 0;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td>
+                    <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #FFFFFF; letter-spacing: -0.5px;">
+                      CNX Library
+                    </h1>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- 본문 -->
+          <tr>
+            <td style="background-color: #FFFFFF; padding: 40px;">
+              <!-- 알림 타입 배지 -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 24px;">
+                <tr>
+                  <td style="background-color: ${config.color}15; border-radius: 8px; padding: 8px 16px;">
+                    <span style="font-size: 14px; font-weight: 600; color: ${config.color};">
+                      ${config.icon} ${config.label}
+                    </span>
+                  </td>
+                </tr>
+              </table>
+              
+              <!-- 제목 -->
+              <h2 style="margin: 0 0 16px 0; font-size: 22px; font-weight: 700; color: #002C5B; line-height: 1.4;">
+                ${title}
+              </h2>
+              
+              <!-- 메시지 -->
+              <p style="margin: 0 0 32px 0; font-size: 16px; color: #4b5563; line-height: 1.7;">
+                ${message}
+              </p>
+              
+              <!-- 도서 정보 (있는 경우) -->
+              ${extra.bookTitle ? `
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f9fafb; border-radius: 12px; padding: 20px; margin-bottom: 32px;">
+                <tr>
+                  <td>
+                    <p style="margin: 0 0 8px 0; font-size: 13px; color: #6b7280; font-weight: 500;">도서 정보</p>
+                    <p style="margin: 0; font-size: 16px; color: #002C5B; font-weight: 600;">${extra.bookTitle}</p>
+                    ${extra.center ? `<p style="margin: 8px 0 0 0; font-size: 14px; color: #6b7280;">${extra.center}</p>` : ''}
+                  </td>
+                </tr>
+              </table>
+              ` : ''}
+              
+              <!-- CTA 버튼 -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td style="border-radius: 8px; background-color: #002C5B;">
+                    <a href="https://rarecat85.github.io/cnx-library" target="_blank" style="display: inline-block; padding: 14px 32px; font-size: 15px; font-weight: 600; color: #FFFFFF; text-decoration: none;">
+                      CNX Library 바로가기
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- 푸터 -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 24px 40px; border-radius: 0 0 16px 16px; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 8px 0; font-size: 13px; color: #9ca3af; text-align: center;">
+                이 메일은 CNX Library 알림 설정에 따라 자동 발송되었습니다.
+              </p>
+              <p style="margin: 0; font-size: 13px; color: #9ca3af; text-align: center;">
+                알림을 받지 않으려면 <a href="https://rarecat85.github.io/cnx-library/notifications" style="color: #002C5B;">알림 설정</a>에서 변경해주세요.
+              </p>
+            </td>
+          </tr>
+          
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+}
+
+/**
+ * 이메일 발송
+ * @param {string} to - 수신자 이메일
+ * @param {string} type - 알림 타입
+ * @param {string} title - 알림 제목
+ * @param {string} message - 알림 메시지
+ * @param {Object} extra - 추가 정보
+ */
+const sendNotificationEmail = async (to, type, title, message, extra = {}) => {
+  const transporter = createMailTransporter()
+  
+  if (!transporter) {
+    console.log('이메일 발송 스킵: 트랜스포터 없음')
+    return false
+  }
+  
+  try {
+    const html = createEmailTemplate(type, title, message, extra)
+    
+    await transporter.sendMail({
+      from: `"CNX Library" <${gmailUser.value()}>`,
+      to,
+      subject: `[CNX Library] ${title}`,
+      html
+    })
+    
+    console.log(`이메일 발송 성공: ${to}`)
+    return true
+  } catch (error) {
+    console.error('이메일 발송 오류:', error)
+    return false
+  }
+}
+
+/**
+ * 사용자가 이메일 알림을 활성화했는지 확인하고 이메일 발송
+ * @param {string} userId - 사용자 UID
+ * @param {string} type - 알림 타입
+ * @param {string} title - 알림 제목
+ * @param {string} message - 알림 메시지
+ * @param {Object} extra - 추가 정보
+ */
+const sendEmailIfEnabled = async (userId, type, title, message, extra = {}) => {
+  try {
+    const userDoc = await firestore.collection('users').doc(userId).get()
+    
+    if (!userDoc.exists) {
+      console.log(`사용자 문서 없음: ${userId}`)
+      return
+    }
+    
+    const userData = userDoc.data()
+    
+    // 이메일 알림 활성화 확인
+    if (userData.emailNotification !== true) {
+      console.log(`이메일 알림 비활성화: ${userId}`)
+      return
+    }
+    
+    // 이메일 주소 확인
+    if (!userData.email) {
+      console.log(`이메일 주소 없음: ${userId}`)
+      return
+    }
+    
+    await sendNotificationEmail(userData.email, type, title, message, extra)
+  } catch (error) {
+    console.error('이메일 발송 확인 오류:', error)
+  }
+}
+
 // ==================== 알림 시스템 ====================
 
 // 센터 -> 근무지 매핑 (역방향)
@@ -451,12 +666,13 @@ const CENTER_WORKPLACE_MAP = {
 }
 
 /**
- * 알림 생성 헬퍼 함수
+ * 알림 생성 헬퍼 함수 (이메일 발송 포함)
  */
 const createNotification = async (userId, type, title, message, extra = {}) => {
   const now = new Date()
   const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) // 30일 후
   
+  // Firestore에 알림 저장
   await firestore.collection('notifications').add({
     userId,
     type,
@@ -466,6 +682,11 @@ const createNotification = async (userId, type, title, message, extra = {}) => {
     createdAt: FieldValue.serverTimestamp(),
     expiresAt: expiresAt,
     ...extra
+  })
+  
+  // 이메일 발송 (비동기, 실패해도 알림 생성에 영향 없음)
+  sendEmailIfEnabled(userId, type, title, message, extra).catch(err => {
+    console.error('이메일 발송 백그라운드 오류:', err)
   })
 }
 

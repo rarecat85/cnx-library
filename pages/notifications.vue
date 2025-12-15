@@ -7,7 +7,7 @@
     >
       <div class="notifications-page">
         <!-- 헤더 -->
-        <div class="page-header mb-6">
+        <div class="page-header mb-4">
           <h1 class="page-title mb-0">
             알림
           </h1>
@@ -20,6 +20,32 @@
           >
             모두 읽음
           </v-btn>
+        </div>
+
+        <!-- 이메일 알림 설정 -->
+        <div class="email-notification-setting mb-6">
+          <div class="setting-content">
+            <div class="setting-info">
+              <v-icon
+                size="20"
+                class="setting-icon"
+              >
+                mdi-email-outline
+              </v-icon>
+              <div class="setting-text">
+                <span class="setting-label">이메일로 알림 받기</span>
+                <span class="setting-description">알림을 이메일로도 받습니다</span>
+              </div>
+            </div>
+            <v-switch
+              v-model="emailNotificationEnabled"
+              color="primary"
+              hide-details
+              density="compact"
+              :loading="emailSettingLoading"
+              @update:model-value="handleEmailSettingChange"
+            />
+          </div>
         </div>
 
         <!-- 필터 -->
@@ -161,6 +187,10 @@ definePageMeta({
 })
 
 const router = useRouter()
+const { user } = useAuth()
+const { $firebaseFirestore } = useNuxtApp()
+const firestore = $firebaseFirestore
+
 const {
   notifications,
   unreadCount,
@@ -180,6 +210,61 @@ const selectedFilter = ref('all')
 const loadingMore = ref(false)
 const hasMore = ref(true)
 const lastDoc = ref(null)
+
+// 이메일 알림 설정
+const emailNotificationEnabled = ref(false)
+const emailSettingLoading = ref(false)
+
+// 이메일 알림 설정 로드
+const loadEmailNotificationSetting = async () => {
+  if (!user.value || !firestore) return
+  
+  try {
+    const { doc, getDoc } = await import('firebase/firestore')
+    const userRef = doc(firestore, 'users', user.value.uid)
+    const userDoc = await getDoc(userRef)
+    
+    if (userDoc.exists()) {
+      const userData = userDoc.data()
+      emailNotificationEnabled.value = userData.emailNotification === true
+    }
+  } catch (error) {
+    console.error('이메일 알림 설정 로드 오류:', error)
+  }
+}
+
+// 이메일 알림 설정 변경
+const handleEmailSettingChange = async (value) => {
+  if (!user.value || !firestore) return
+  
+  try {
+    emailSettingLoading.value = true
+    
+    const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore')
+    const userRef = doc(firestore, 'users', user.value.uid)
+    
+    await updateDoc(userRef, {
+      emailNotification: value,
+      updatedAt: serverTimestamp()
+    })
+    
+    // 설정 변경 알림
+    const message = value ? '이메일 알림이 활성화되었습니다.' : '이메일 알림이 비활성화되었습니다.'
+    alert(message)
+  } catch (error) {
+    console.error('이메일 알림 설정 변경 오류:', error)
+    // 실패 시 원래 값으로 복구
+    emailNotificationEnabled.value = !value
+    alert('설정 변경에 실패했습니다.')
+  } finally {
+    emailSettingLoading.value = false
+  }
+}
+
+// 초기화
+onMounted(() => {
+  loadEmailNotificationSetting()
+})
 
 // 반응형 drawer 너비 계산
 onMounted(() => {
@@ -294,6 +379,47 @@ useHead({
   color: #6b7280;
   text-transform: none;
   letter-spacing: 0;
+}
+
+.email-notification-setting {
+  background-color: #FFFFFF;
+  border: rem(1) solid #e0e0e0;
+  border-radius: rem(12);
+  padding: rem(16);
+}
+
+.setting-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: rem(16);
+}
+
+.setting-info {
+  display: flex;
+  align-items: center;
+  gap: rem(12);
+}
+
+.setting-icon {
+  color: #002C5B;
+}
+
+.setting-text {
+  display: flex;
+  flex-direction: column;
+  gap: rem(2);
+}
+
+.setting-label {
+  font-size: rem(15);
+  font-weight: 600;
+  color: #002C5B;
+}
+
+.setting-description {
+  font-size: rem(13);
+  color: #6b7280;
 }
 
 .filter-section {

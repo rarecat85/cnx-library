@@ -705,8 +705,7 @@ npx firebase deploy --only firestore:rules</pre>
 
 <script setup>
 definePageMeta({
-  layout: 'page',
-  middleware: 'auth'
+  layout: 'page'
 })
 
 useHead({

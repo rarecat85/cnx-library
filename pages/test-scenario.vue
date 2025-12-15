@@ -18,8 +18,7 @@ import { ref, onMounted } from 'vue'
 import { marked } from 'marked'
 
 definePageMeta({
-  layout: 'page',
-  middleware: 'auth'
+  layout: 'page'
 })
 
 useHead({

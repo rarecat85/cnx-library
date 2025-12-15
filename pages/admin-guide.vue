@@ -350,8 +350,7 @@
 
 <script setup>
 definePageMeta({
-  layout: 'page',
-  middleware: 'auth'
+  layout: 'page'
 })
 
 useHead({

@@ -73,22 +73,7 @@
                 </v-icon>
               </v-btn>
 
-              <v-btn
-                icon
-                variant="text"
-                class="header-action-btn notification-btn"
-              >
-                <v-badge
-                  :content="0"
-                  :model-value="false"
-                  color="error"
-                  overlap
-                >
-                  <v-icon size="24">
-                    mdi-bell-outline
-                  </v-icon>
-                </v-badge>
-              </v-btn>
+              <NotificationBell />
 
               <v-btn
                 icon

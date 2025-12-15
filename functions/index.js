@@ -1,8 +1,10 @@
 const { onCall } = require('firebase-functions/v2/https')
+const { onSchedule } = require('firebase-functions/v2/scheduler')
+const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore')
 const { defineString } = require('firebase-functions/params')
 const { initializeApp } = require('firebase-admin/app')
 const { getAuth } = require('firebase-admin/auth')
-const { getFirestore } = require('firebase-admin/firestore')
+const { getFirestore, FieldValue } = require('firebase-admin/firestore')
 const functions = require('firebase-functions')
 
 // 알라딘 API 키 (환경 변수)
@@ -479,4 +481,329 @@ exports.getAladinBestsellers = onCall({
     }
   }
 })
+
+// ==================== 알림 시스템 ====================
+
+// 센터 -> 근무지 매핑 (역방향)
+const CENTER_WORKPLACE_MAP = {
+  '강남센터': ['강남', '잠실', '수원', '판교'],
+  '용산센터': ['용산', '증미', '여의도']
+}
+
+/**
+ * 알림 생성 헬퍼 함수
+ */
+const createNotification = async (userId, type, title, message, extra = {}) => {
+  const now = new Date()
+  const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) // 30일 후
+  
+  await firestore.collection('notifications').add({
+    userId,
+    type,
+    title,
+    message,
+    isRead: false,
+    createdAt: FieldValue.serverTimestamp(),
+    expiresAt: expiresAt,
+    ...extra
+  })
+}
+
+/**
+ * 센터에 속한 관리자 목록 조회
+ * 센터에 매핑된 근무지(workplace)를 가진 관리자/매니저를 찾음
+ */
+const getAdminsByCenter = async (center) => {
+  const workplaces = CENTER_WORKPLACE_MAP[center] || []
+  
+  if (workplaces.length === 0) {
+    console.log(`센터 ${center}에 매핑된 근무지가 없습니다.`)
+    return []
+  }
+  
+  // workplace가 해당 센터에 속하고, role이 admin 또는 manager인 사용자 조회
+  const usersSnapshot = await firestore.collection('users')
+    .where('workplace', 'in', workplaces)
+    .get()
+  
+  // role 필터링 (Firestore에서 in과 in을 동시에 사용할 수 없으므로 클라이언트에서 필터링)
+  const adminIds = usersSnapshot.docs
+    .filter(doc => {
+      const data = doc.data()
+      return data.role === 'admin' || data.role === 'manager'
+    })
+    .map(doc => doc.id)
+  
+  console.log(`센터 ${center}의 관리자: ${adminIds.length}명`)
+  return adminIds
+}
+
+/**
+ * 도서 등록 신청 시 관리자에게 알림
+ * Trigger: bookRequests 컬렉션에 문서 생성 시
+ */
+exports.onBookRequestCreated = onDocumentCreated(
+  'bookRequests/{requestId}',
+  async (event) => {
+    const snapshot = event.data
+    if (!snapshot) return
+    
+    const data = snapshot.data()
+    const { center, title, requestedBy } = data
+    
+    if (!center || !title) return
+    
+    try {
+      // 신청자 정보 조회
+      const requesterDoc = await firestore.collection('users').doc(requestedBy).get()
+      const requesterName = requesterDoc.exists ? requesterDoc.data().name || '알 수 없음' : '알 수 없음'
+      
+      // 해당 센터의 관리자들에게 알림
+      const adminIds = await getAdminsByCenter(center)
+      
+      for (const adminId of adminIds) {
+        await createNotification(
+          adminId,
+          'book_request',
+          '새로운 도서 등록 신청',
+          `${requesterName}님이 "${title}" 도서를 신청했습니다.`,
+          { bookTitle: title, requestId: snapshot.id, center }
+        )
+      }
+      
+      console.log(`도서 등록 신청 알림 생성 완료: ${title}, 관리자 ${adminIds.length}명`)
+    } catch (error) {
+      console.error('도서 등록 신청 알림 생성 오류:', error)
+    }
+  }
+)
+
+/**
+ * 도서 대여 신청 시 관리자에게 알림
+ * Trigger: books 컬렉션에서 status가 'requested'로 변경될 때
+ */
+exports.onRentRequestCreated = onDocumentUpdated(
+  'books/{bookId}',
+  async (event) => {
+    const before = event.data.before.data()
+    const after = event.data.after.data()
+    
+    // status가 'requested'로 변경된 경우만 처리
+    if (before.status === 'requested' || after.status !== 'requested') return
+    
+    const { center, title, requestedBy } = after
+    
+    if (!center || !title || !requestedBy) return
+    
+    try {
+      // 신청자 정보 조회
+      const requesterDoc = await firestore.collection('users').doc(requestedBy).get()
+      const requesterName = requesterDoc.exists ? requesterDoc.data().name || '알 수 없음' : '알 수 없음'
+      
+      // 해당 센터의 관리자들에게 알림
+      const adminIds = await getAdminsByCenter(center)
+      
+      for (const adminId of adminIds) {
+        await createNotification(
+          adminId,
+          'rent_request',
+          '새로운 도서 대여 신청',
+          `${requesterName}님이 "${title}" 도서 대여를 신청했습니다.`,
+          { bookId: event.params.bookId, bookTitle: title, center }
+        )
+      }
+      
+      console.log(`도서 대여 신청 알림 생성 완료: ${title}, 관리자 ${adminIds.length}명`)
+    } catch (error) {
+      console.error('도서 대여 신청 알림 생성 오류:', error)
+    }
+  }
+)
+
+/**
+ * 신청한 도서가 등록되면 신청자에게 알림
+ * Trigger: bookRequests 컬렉션에서 status가 'approved'로 변경될 때
+ */
+exports.onBookRequestApproved = onDocumentUpdated(
+  'bookRequests/{requestId}',
+  async (event) => {
+    const before = event.data.before.data()
+    const after = event.data.after.data()
+    
+    // status가 'approved'로 변경된 경우만 처리
+    if (before.status === 'approved' || after.status !== 'approved') return
+    
+    const { requestedBy, title, center } = after
+    
+    if (!requestedBy || !title) return
+    
+    try {
+      await createNotification(
+        requestedBy,
+        'book_registered',
+        '신청한 도서가 등록되었습니다',
+        `"${title}" 도서가 ${center}에 등록되었습니다. 지금 대여해보세요!`,
+        { bookTitle: title, center }
+      )
+      
+      console.log(`도서 등록 완료 알림 생성: ${title} -> ${requestedBy}`)
+    } catch (error) {
+      console.error('도서 등록 완료 알림 생성 오류:', error)
+    }
+  }
+)
+
+/**
+ * 스케줄된 알림 처리 (매일 오전 9시 KST 실행)
+ * - 반납예정일 1일 전 알림
+ * - 연체 도서 알림 (사용자 + 관리자)
+ * - 30일 지난 알림 자동 삭제
+ */
+exports.scheduledNotifications = onSchedule(
+  {
+    schedule: '0 0 * * *', // 매일 UTC 00:00 (KST 09:00)
+    timeZone: 'Asia/Seoul',
+    region: 'asia-northeast3'
+  },
+  async (event) => {
+    const now = new Date()
+    const tomorrow = new Date(now)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    tomorrow.setHours(23, 59, 59, 999)
+    
+    const today = new Date(now)
+    today.setHours(0, 0, 0, 0)
+    
+    try {
+      // 1. 대여중인 도서 조회 (rentedAt이 있는 도서)
+      const booksSnapshot = await firestore.collection('books')
+        .where('rentedBy', '!=', null)
+        .get()
+      
+      for (const bookDoc of booksSnapshot.docs) {
+        const book = bookDoc.data()
+        const { rentedBy, rentedAt, title, center } = book
+        
+        if (!rentedAt || !rentedBy) continue
+        
+        const rentedDate = rentedAt.toDate()
+        const returnDate = new Date(rentedDate)
+        returnDate.setDate(returnDate.getDate() + 7) // 대여일 + 7일 = 반납예정일
+        
+        // 반납예정일까지 남은 일수 계산
+        const daysUntilReturn = Math.ceil((returnDate - today) / (1000 * 60 * 60 * 24))
+        
+        // 반납예정일 1일 전 알림 (오늘이 반납예정일 하루 전)
+        if (daysUntilReturn === 1) {
+          // 오늘 이미 알림을 보냈는지 확인
+          const existingNotification = await firestore.collection('notifications')
+            .where('userId', '==', rentedBy)
+            .where('type', '==', 'return_reminder')
+            .where('bookId', '==', bookDoc.id)
+            .orderBy('createdAt', 'desc')
+            .limit(1)
+            .get()
+          
+          let shouldSend = true
+          if (!existingNotification.empty) {
+            const lastNotification = existingNotification.docs[0].data()
+            const lastSentDate = lastNotification.createdAt?.toDate()
+            if (lastSentDate && lastSentDate.toDateString() === today.toDateString()) {
+              shouldSend = false
+            }
+          }
+          
+          if (shouldSend) {
+            await createNotification(
+              rentedBy,
+              'return_reminder',
+              '반납예정일 알림',
+              `"${title}" 도서의 반납예정일이 내일입니다.`,
+              { bookId: bookDoc.id, bookTitle: title, center }
+            )
+            console.log(`반납예정 알림 생성: ${title} -> ${rentedBy}`)
+          }
+        }
+        
+        // 연체 알림 (반납예정일이 지난 경우)
+        if (daysUntilReturn < 0) {
+          const overdueDays = Math.abs(daysUntilReturn)
+          
+          // 오늘 이미 연체 알림을 보냈는지 확인
+          const existingOverdue = await firestore.collection('notifications')
+            .where('userId', '==', rentedBy)
+            .where('type', '==', 'overdue')
+            .where('bookId', '==', bookDoc.id)
+            .orderBy('createdAt', 'desc')
+            .limit(1)
+            .get()
+          
+          let shouldSendOverdue = true
+          if (!existingOverdue.empty) {
+            const lastNotification = existingOverdue.docs[0].data()
+            const lastSentDate = lastNotification.createdAt?.toDate()
+            if (lastSentDate && lastSentDate.toDateString() === today.toDateString()) {
+              shouldSendOverdue = false
+            }
+          }
+          
+          if (shouldSendOverdue) {
+            // 대여자에게 연체 알림
+            await createNotification(
+              rentedBy,
+              'overdue',
+              '도서 연체 알림',
+              `"${title}" 도서가 ${overdueDays}일 연체되었습니다. 빠른 반납 부탁드립니다.`,
+              { bookId: bookDoc.id, bookTitle: title, center, overdueDays }
+            )
+            console.log(`연체 알림 생성 (사용자): ${title} -> ${rentedBy}`)
+            
+            // 관리자에게 연체 알림
+            const adminIds = await getAdminsByCenter(center)
+            
+            // 대여자 정보 조회
+            const renterDoc = await firestore.collection('users').doc(rentedBy).get()
+            const renterName = renterDoc.exists ? renterDoc.data().name || '알 수 없음' : '알 수 없음'
+            
+            for (const adminId of adminIds) {
+              await createNotification(
+                adminId,
+                'overdue_admin',
+                '도서 연체 알림',
+                `${renterName}님이 대여한 "${title}" 도서가 ${overdueDays}일 연체되었습니다.`,
+                { bookId: bookDoc.id, bookTitle: title, center, overdueDays, rentedBy }
+              )
+            }
+            console.log(`연체 알림 생성 (관리자): ${title}, 관리자 ${adminIds.length}명`)
+          }
+        }
+      }
+      
+      // 2. 30일 지난 알림 자동 삭제
+      const thirtyDaysAgo = new Date(now)
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+      
+      const oldNotifications = await firestore.collection('notifications')
+        .where('createdAt', '<', thirtyDaysAgo)
+        .get()
+      
+      const batch = firestore.batch()
+      let deleteCount = 0
+      
+      oldNotifications.forEach(doc => {
+        batch.delete(doc.ref)
+        deleteCount++
+      })
+      
+      if (deleteCount > 0) {
+        await batch.commit()
+        console.log(`${deleteCount}개의 오래된 알림 삭제 완료`)
+      }
+      
+      console.log('스케줄된 알림 처리 완료')
+    } catch (error) {
+      console.error('스케줄된 알림 처리 오류:', error)
+    }
+  }
+)
 

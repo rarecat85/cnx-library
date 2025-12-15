@@ -48,6 +48,7 @@
                 <li>도서 등록/삭제</li>
                 <li>도서 신청 승인</li>
                 <li>대여 현황 관리</li>
+                <li>대여 처리 (타 센터 대여 신청 승인)</li>
                 <li>반납 처리</li>
                 <li>연체 도서 관리</li>
               </ul>
@@ -90,7 +91,7 @@ const WORKPLACE_CENTER_MAP = {
               </tr>
               <tr>
                 <td><strong>Backend</strong></td>
-                <td>Firebase (Authentication, Firestore, Functions, Hosting)</td>
+                <td>Firebase (Authentication, Firestore, Functions)</td>
               </tr>
               <tr>
                 <td><strong>외부 API</strong></td>
@@ -102,7 +103,7 @@ const WORKPLACE_CENTER_MAP = {
               </tr>
               <tr>
                 <td><strong>배포</strong></td>
-                <td>Firebase Hosting, GitHub Pages</td>
+                <td>GitHub Pages</td>
               </tr>
             </tbody>
           </table>
@@ -202,7 +203,7 @@ GMAIL_APP_PASSWORD=your_gmail_app_password</pre>
             <pre># 개발 서버 실행
 npm run dev
 
-# 브라우저에서 http://localhost:3000 접속</pre>
+# 브라우저에서 http://localhost:5001 접속</pre>
           </div>
         </div>
       </section>
@@ -549,22 +550,16 @@ npm run dev
       <section id="deploy" class="guide-section">
         <h2>📦 배포</h2>
         <div class="section-content">
-          <h3>Firebase Hosting + Functions 배포</h3>
+          <h3>Firebase Functions 배포</h3>
           <div class="code-block">
-            <pre># 빌드
-npm run build
-
-# 전체 배포 (Hosting + Functions + Firestore Rules)
-npx firebase deploy
-
-# Functions만 배포
+            <pre># Functions 배포
 npx firebase deploy --only functions
 
-# Hosting만 배포
-npx firebase deploy --only hosting
+# Firestore Rules 배포
+npx firebase deploy --only firestore:rules
 
-# Firestore Rules만 배포
-npx firebase deploy --only firestore:rules</pre>
+# Functions + Rules 동시 배포
+npx firebase deploy --only functions,firestore:rules</pre>
           </div>
 
           <h3>GitHub Pages 배포</h3>
@@ -577,12 +572,8 @@ npm run generate
 
           <h3>배포 URL</h3>
           <div class="url-cards">
-            <div class="url-card">
-              <span class="url-label">Firebase Hosting</span>
-              <a href="https://cnx-library.web.app" target="_blank">https://cnx-library.web.app</a>
-            </div>
             <div class="url-card primary">
-              <span class="url-label">GitHub Pages (Primary)</span>
+              <span class="url-label">GitHub Pages</span>
               <a href="https://rarecat85.github.io/cnx-library" target="_blank">https://rarecat85.github.io/cnx-library</a>
             </div>
           </div>
@@ -683,12 +674,12 @@ npx firebase deploy --only firestore:rules</pre>
               <tr>
                 <td><code>manager</code></td>
                 <td>매니저</td>
-                <td>+ 관리자 메뉴 (소속 센터 도서 관리)</td>
+                <td>+ 관리자 메뉴 (모든 센터 도서 관리 가능)</td>
               </tr>
               <tr>
                 <td><code>admin</code></td>
-                <td>관리자</td>
-                <td>+ 모든 권한</td>
+                <td>최고 관리자</td>
+                <td>시스템 관리, 사용자 권한 관리</td>
               </tr>
             </tbody>
           </table>

@@ -41,17 +41,21 @@
               <h4>매니저 (manager)</h4>
               <ul>
                 <li>일반 사용자 권한 모두 포함</li>
-                <li>소속 센터 도서 등록</li>
-                <li>소속 센터 도서 관리</li>
+                <li>관리자 메뉴 접근</li>
+                <li>도서 등록/삭제</li>
+                <li>도서 대여/반납 관리</li>
+                <li>연체 도서 관리</li>
+                <li class="highlight">💡 센터 변경으로 모든 센터 관리 가능</li>
               </ul>
             </div>
             <div class="role-card admin">
-              <div class="role-icon">⚙️</div>
-              <h4>관리자 (admin)</h4>
+              <div class="role-icon">👑</div>
+              <h4>최고 관리자 (admin)</h4>
               <ul>
-                <li>매니저 권한 모두 포함</li>
-                <li>모든 센터 도서 관리</li>
-                <li>사용자 권한 관리</li>
+                <li>시스템 전체 관리자</li>
+                <li>사용자 권한 관리 (Firestore)</li>
+                <li>관리자 메뉴 접근 가능</li>
+                <li class="note">* 도서 관리는 매니저가 담당</li>
               </ul>
             </div>
           </div>
@@ -254,6 +258,15 @@
               </div>
             </li>
           </ol>
+
+          <div class="warning-box">
+            <h4>⚠️ 반납 처리 전 확인사항</h4>
+            <ul>
+              <li><strong>실물 도서 확인:</strong> 대여자로부터 실제 도서를 반납받았는지 확인하세요.</li>
+              <li><strong>반납 방법:</strong> 직접 반납 또는 센터 간 배송 등 반납 방법을 대여자와 확인하세요.</li>
+            </ul>
+            <p>시스템상 반납 처리는 실물 도서 반납 후에 진행해주세요.</p>
+          </div>
 
           <div class="info-box">
             <h4>💡 활용 사례</h4>
@@ -519,6 +532,24 @@ useHead({
       border-bottom: 1px dashed #ddd;
       
       &:last-child {
+        border-bottom: none;
+      }
+      
+      &.note {
+        color: #888;
+        font-size: rem(12);
+        font-style: italic;
+        border-bottom: none;
+        margin-top: rem(5);
+      }
+      
+      &.highlight {
+        color: #0369a1;
+        font-weight: 500;
+        background: #e0f2fe;
+        padding: rem(8);
+        border-radius: 4px;
+        margin-top: rem(8);
         border-bottom: none;
       }
     }

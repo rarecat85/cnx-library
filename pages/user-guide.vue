@@ -41,9 +41,10 @@
               <li>최대 대여 권수: <strong>5권</strong></li>
               <li>대여 기간: <strong>7일</strong></li>
               <li>연체 시 추가 대여 불가</li>
-              <li>같은 센터 도서는 즉시 대여 가능</li>
-              <li>다른 센터 도서는 관리자 승인 후 대여</li>
+              <li>내 근무지와 동일한 센터 도서는 <strong>즉시 대여</strong> 가능</li>
+              <li>내 근무지와 다른 센터 도서는 <strong>관리자 승인 후</strong> 대여</li>
             </ul>
+            <p class="small-note">예) 용산 근무자 → 용산센터 도서 즉시 대여 / 증미 근무자 → 용산센터 도서 승인 필요</p>
           </div>
         </div>
       </section>
@@ -72,7 +73,7 @@
               <span class="step-number">3</span>
               <div class="step-content">
                 <strong>정보 입력</strong>
-                <p>이메일, 비밀번호, 이름, 근무지를 입력합니다.</p>
+                <p>회사 이메일(@concentrix.com), 비밀번호, 이름, 근무지를 입력합니다.</p>
               </div>
             </li>
             <li>
@@ -87,6 +88,7 @@
           <div class="warning-box">
             <h4>⚠️ 주의사항</h4>
             <ul>
+              <li><strong>회사 이메일(@concentrix.com)만</strong> 사용 가능합니다.</li>
               <li>이메일 인증을 완료해야 로그인이 가능합니다.</li>
               <li>인증 메일이 오지 않으면 스팸함을 확인하세요.</li>
               <li>근무지는 정확하게 선택해주세요. (센터 배정에 영향)</li>
@@ -562,6 +564,13 @@ useHead({
   p {
     margin: 0;
     font-size: rem(14);
+    
+    &.small-note {
+      margin-top: rem(12);
+      font-size: rem(12);
+      color: #888;
+      font-style: italic;
+    }
   }
 }
 

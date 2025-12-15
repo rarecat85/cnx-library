@@ -137,8 +137,10 @@
                   :requester-info="getRequesterInfo(book)"
                   :return-date="getReturnDate(book)"
                   :show-admin-rent-button="true"
+                  :show-admin-return-button="true"
                   @select="handleBookSelect"
                   @admin-rent="openRentDialog"
+                  @admin-return="handleSingleReturn"
                 />
               </v-col>
             </v-row>
@@ -384,9 +386,9 @@ const loadRenterInfoForBooks = async (books) => {
         const email = userData.email || ''
         const emailId = email.split('@')[0] || ''
         const name = userData.name || ''
-        const center = userData.center || ''
+        const workplace = userData.workplace || ''
         
-        const infoString = `${center} ${name}(${emailId})`
+        const infoString = `${workplace} ${name}(${emailId})`
         renterInfoCache.value[userId] = infoString
         requesterInfoCache.value[userId] = infoString
       }
@@ -818,6 +820,83 @@ const handleReturnBooks = async () => {
     selectedBooks.value = []
     await loadRegisteredBooks()
     alert(`${rentedBooks.length}권의 도서가 반납 처리되었습니다.`)
+  } catch (error) {
+    console.error('도서 반납 오류:', error)
+    alert('도서 반납에 실패했습니다.')
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+// 개별 도서 반납 처리
+const handleSingleReturn = async (book) => {
+  const status = calculateBookStatus(book)
+  if (status !== 'rented' && status !== 'overdue') {
+    alert('대여중인 도서가 아닙니다.')
+    return
+  }
+
+  if (!confirm(`"${book.title}" 도서를 반납 처리하시겠습니까?`)) {
+    return
+  }
+
+  try {
+    actionLoading.value = true
+    
+    const { doc, updateDoc, collection, addDoc, query, where, getDocs, serverTimestamp, deleteField } = await import('firebase/firestore')
+    
+    const bookId = book.id || book.isbn13 || book.isbn
+    const rentedBy = book.rentedBy
+    const rentedAt = book.rentedAt
+    
+    // 1. 도서 상태 업데이트 (대여 정보 제거)
+    const bookRef = doc(firestore, 'books', bookId)
+    await updateDoc(bookRef, {
+      status: 'available',
+      rentedBy: deleteField(),
+      rentedAt: deleteField()
+    })
+    
+    // 2. 대여자의 rentalHistory에 반납 기록 추가/업데이트
+    if (rentedBy) {
+      const historyRef = collection(firestore, 'rentalHistory')
+      const historyQuery = query(
+        historyRef,
+        where('userId', '==', rentedBy),
+        where('bookId', '==', bookId)
+      )
+      const historySnapshot = await getDocs(historyQuery)
+      
+      if (historySnapshot.empty) {
+        // 새로운 기록 추가
+        await addDoc(historyRef, {
+          bookId: bookId,
+          isbn13: book.isbn13 || '',
+          isbn: book.isbn || '',
+          title: book.title || '',
+          author: book.author || '',
+          publisher: book.publisher || '',
+          cover: book.cover || book.image || '',
+          center: book.center || '',
+          userId: rentedBy,
+          rentedAt: rentedAt,
+          returnedAt: serverTimestamp(),
+          rentCount: 1
+        })
+      } else {
+        // 기존 기록 업데이트
+        const existingDoc = historySnapshot.docs[0]
+        const existingData = existingDoc.data()
+        await updateDoc(doc(firestore, 'rentalHistory', existingDoc.id), {
+          rentedAt: rentedAt,
+          returnedAt: serverTimestamp(),
+          rentCount: (existingData.rentCount || 1) + 1
+        })
+      }
+    }
+    
+    await loadRegisteredBooks()
+    alert('도서가 반납 처리되었습니다.')
   } catch (error) {
     console.error('도서 반납 오류:', error)
     alert('도서 반납에 실패했습니다.')

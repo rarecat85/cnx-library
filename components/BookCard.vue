@@ -122,6 +122,15 @@
         </v-icon>
         반납예정일: {{ formattedReturnDate }}
       </div>
+      <v-btn
+        v-if="showAdminReturnButton"
+        color="primary"
+        size="small"
+        class="admin-return-btn mt-2"
+        @click.stop="handleAdminReturn"
+      >
+        반납 처리
+      </v-btn>
     </div>
     
     <!-- 반납예정일 및 반납하기 버튼 (마이페이지용) -->
@@ -183,6 +192,7 @@
     <div
       v-else-if="showAction"
       class="book-action-area"
+      :class="{ 'book-action-area-admin': requesterInfo && !isBookRegistered && !isBookRequested }"
     >
       <div
         v-if="isBookRegistered"
@@ -196,17 +206,31 @@
       >
         {{ requestedMessage || `${center}에 이미 신청된 도서입니다.` }}
       </div>
-      <v-btn
-        v-else
-        color="primary"
-        size="small"
-        :loading="isRegistering"
-        :disabled="isRegistering"
-        class="register-btn"
-        @click.stop="handleRegister"
-      >
-        {{ actionButtonText || `${center}에 등록하기` }}
-      </v-btn>
+      <template v-else>
+        <div
+          v-if="requesterInfo"
+          class="admin-info-text text-body-2"
+        >
+          <v-icon
+            size="small"
+            class="mr-1"
+          >
+            mdi-account-clock
+          </v-icon>
+          {{ requesterInfo }}
+        </div>
+        <v-btn
+          color="primary"
+          size="small"
+          :loading="isRegistering"
+          :disabled="isRegistering"
+          class="register-btn"
+          :class="{ 'mt-2': requesterInfo }"
+          @click.stop="handleRegister"
+        >
+          {{ actionButtonText || `${center}에 등록하기` }}
+        </v-btn>
+      </template>
     </div>
   </v-card>
 </template>
@@ -296,10 +320,14 @@ const props = defineProps({
   showAdminRentButton: { // 관리자용 대여 버튼 표시 (도서 관리 페이지용)
     type: Boolean,
     default: false
+  },
+  showAdminReturnButton: { // 관리자용 반납 버튼 표시 (도서 관리 페이지용)
+    type: Boolean,
+    default: false
   }
 })
 
-const emit = defineEmits(['register', 'select', 'return', 'rent', 'adminRent'])
+const emit = defineEmits(['register', 'select', 'return', 'rent', 'adminRent', 'adminReturn'])
 
 // 도서 이미지 (알라딘 API는 cover 필드 사용)
 const bookImage = computed(() => {
@@ -446,6 +474,11 @@ const handleRent = () => {
 // 관리자 대여 처리
 const handleAdminRent = () => {
   emit('adminRent', props.book)
+}
+
+// 관리자 반납 처리
+const handleAdminReturn = () => {
+  emit('adminReturn', props.book)
 }
 
 // 반납예정일 포맷
@@ -639,7 +672,8 @@ const isOverdue = computed(() => {
 
 .return-btn,
 .rent-btn,
-.admin-rent-btn {
+.admin-rent-btn,
+.admin-return-btn {
   width: 100%;
   box-sizing: border-box;
 }

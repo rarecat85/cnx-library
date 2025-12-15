@@ -144,6 +144,7 @@
                   :selectable="false"
                   :show-action="true"
                   :action-button-text="`${currentCenter}에 등록하기`"
+                  :requester-info="getRequesterInfo(request)"
                   @register="handleBookRegisterFromRequest"
                 />
               </v-col>
@@ -232,6 +233,7 @@ const registeringBooks = ref(new Set())
 
 // 도서 신청 목록 관련
 const bookRequests = ref([])
+const requesterInfoCache = ref({})
 const bookRequestsLoading = ref(false)
 const currentBookRequestsPage = ref(1)
 const REQUESTS_PER_PAGE = 4
@@ -398,7 +400,7 @@ const loadBookRequests = async () => {
       return
     }
     
-    const { collection, query, where, getDocs } = await import('firebase/firestore')
+    const { collection, query, where, getDocs, doc, getDoc } = await import('firebase/firestore')
     const requestsRef = collection(firestore, 'bookRequests')
     const q = query(
       requestsRef,
@@ -409,10 +411,10 @@ const loadBookRequests = async () => {
     const snapshot = await getDocs(q)
     const requests = []
     
-    snapshot.forEach((doc) => {
+    snapshot.forEach((docSnapshot) => {
       requests.push({
-        id: doc.id,
-        ...doc.data()
+        id: docSnapshot.id,
+        ...docSnapshot.data()
       })
     })
     
@@ -424,12 +426,40 @@ const loadBookRequests = async () => {
     })
     
     bookRequests.value = requests
+    
+    // 신청자 정보 로드
+    const userIds = [...new Set(requests.filter(r => r.requestedBy).map(r => r.requestedBy))]
+    for (const requestedBy of userIds) {
+      if (requesterInfoCache.value[requestedBy]) continue
+      
+      try {
+        const userRef = doc(firestore, 'users', requestedBy)
+        const userDoc = await getDoc(userRef)
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data()
+          const emailId = (userData.email || '').split('@')[0]
+          const name = userData.name || ''
+          const workplace = userData.workplace || ''
+          
+          requesterInfoCache.value[requestedBy] = `${workplace} ${name}(${emailId})`
+        }
+      } catch (error) {
+        console.error('신청자 정보 로드 오류:', error)
+      }
+    }
   } catch (error) {
     console.error('도서 신청 목록 로드 오류:', error)
     bookRequests.value = []
   } finally {
     bookRequestsLoading.value = false
   }
+}
+
+// 신청자 정보 반환
+const getRequesterInfo = (request) => {
+  if (!request.requestedBy) return ''
+  return requesterInfoCache.value[request.requestedBy] || ''
 }
 
 // 도서 등록

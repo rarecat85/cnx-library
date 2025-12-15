@@ -18,6 +18,78 @@ const firestore = getFirestore()
 
 // 알라딘 API 인증 정보는 aladinTtbKey를 직접 사용
 
+// ==================== 알라딘 API 공통 헬퍼 함수 ====================
+
+/**
+ * 알라딘 API JSONP 응답 파싱
+ * @param {string} responseText - API 응답 텍스트
+ * @returns {Object} 파싱된 JSON 데이터
+ */
+const parseAladinResponse = (responseText) => {
+  let cleanedText = responseText.trim()
+  
+  // callback 함수 호출 제거 (예: "callback({...})" -> "{...}")
+  if (cleanedText.includes('(') && cleanedText.includes(')')) {
+    // 함수명과 괄호 제거
+    const match = cleanedText.match(/^\w+\((.+)\);?\s*$/)
+    if (match) {
+      cleanedText = match[1]
+    } else {
+      // 다른 형식 시도
+      const jsonMatch = cleanedText.match(/\(({.*})\)/)
+      if (jsonMatch) {
+        cleanedText = jsonMatch[1]
+      }
+    }
+  }
+  
+  return JSON.parse(cleanedText)
+}
+
+/**
+ * 세트 상품 여부 확인
+ * @param {Object} item - 도서 아이템
+ * @returns {boolean} 세트 상품 여부
+ */
+const isSetProduct = (item) => {
+  if (!item || !item.title) {
+    return false
+  }
+  
+  const title = item.title.toLowerCase()
+  const setKeywords = [
+    '세트',
+    '전집',
+    'box',
+    '박스',
+    '시리즈',
+    '전권',
+    '완전판',
+    '합본',
+    '모음',
+    '선집',
+    '문고판 세트',
+    '문고세트'
+  ]
+  
+  // 제목에 세트 관련 키워드가 포함되어 있는지 확인
+  for (const keyword of setKeywords) {
+    if (title.includes(keyword)) {
+      return true
+    }
+  }
+  
+  // 괄호 안에 "전N권", "N권 세트" 등의 패턴 확인
+  const bracketPattern = /\([^)]*(전\s*\d+권|\d+권\s*세트|전\s*\d+권\s*세트)[^)]*\)/i
+  if (bracketPattern.test(item.title)) {
+    return true
+  }
+  
+  return false
+}
+
+// ==================== 인증 관련 함수 ====================
+
 /**
  * 이메일 인증 완료 후 Firestore 업데이트
  * 
@@ -229,28 +301,10 @@ exports.searchAladinBooks = onCall({
 
     const responseText = await response.text()
     
-    // JSONP 응답 처리 (callback 함수 제거)
+    // JSONP 응답 파싱
     let data
     try {
-      // 알라딘 API는 JSONP 형식으로 응답 (예: callback({...}))
-      let cleanedText = responseText.trim()
-      
-      // callback 함수 호출 제거 (예: "callback({...})" -> "{...}")
-      if (cleanedText.includes('(') && cleanedText.includes(')')) {
-        // 함수명과 괄호 제거
-        const match = cleanedText.match(/^\w+\((.+)\);?\s*$/)
-        if (match) {
-          cleanedText = match[1]
-        } else {
-          // 다른 형식 시도
-          const jsonMatch = cleanedText.match(/\(({.*})\)/)
-          if (jsonMatch) {
-            cleanedText = jsonMatch[1]
-          }
-        }
-      }
-      
-      data = JSON.parse(cleanedText)
+      data = parseAladinResponse(responseText)
     } catch (parseError) {
       console.error('알라딘 API 응답 파싱 오류:', parseError)
       console.error('응답 텍스트 (처음 500자):', responseText.substring(0, 500))
@@ -267,44 +321,6 @@ exports.searchAladinBooks = onCall({
         success: false,
         error: data.errorMessage || `알라딘 API 오류가 발생했습니다. (코드: ${data.errorCode})`
       }
-    }
-
-    // 세트 상품 필터링 함수
-    const isSetProduct = (item) => {
-      if (!item || !item.title) {
-        return false
-      }
-      
-      const title = item.title.toLowerCase()
-      const setKeywords = [
-        '세트',
-        '전집',
-        'box',
-        '박스',
-        '시리즈',
-        '전권',
-        '완전판',
-        '합본',
-        '모음',
-        '선집',
-        '문고판 세트',
-        '문고세트'
-      ]
-      
-      // 제목에 세트 관련 키워드가 포함되어 있는지 확인
-      for (const keyword of setKeywords) {
-        if (title.includes(keyword)) {
-          return true
-        }
-      }
-      
-      // 괄호 안에 "전N권", "N권 세트" 등의 패턴 확인
-      const bracketPattern = /\([^)]*(전\s*\d+권|\d+권\s*세트|전\s*\d+권\s*세트)[^)]*\)/i
-      if (bracketPattern.test(item.title)) {
-        return true
-      }
-      
-      return false
     }
 
     // 세트 상품 제외
@@ -380,28 +396,10 @@ exports.getAladinBestsellers = onCall({
 
     const responseText = await response.text()
     
-    // JSONP 응답 처리 (callback 함수 제거)
+    // JSONP 응답 파싱
     let data
     try {
-      // 알라딘 API는 JSONP 형식으로 응답 (예: callback({...}))
-      let cleanedText = responseText.trim()
-      
-      // callback 함수 호출 제거 (예: "callback({...})" -> "{...}")
-      if (cleanedText.includes('(') && cleanedText.includes(')')) {
-        // 함수명과 괄호 제거
-        const match = cleanedText.match(/^\w+\((.+)\);?\s*$/)
-        if (match) {
-          cleanedText = match[1]
-        } else {
-          // 다른 형식 시도
-          const jsonMatch = cleanedText.match(/\(({.*})\)/)
-          if (jsonMatch) {
-            cleanedText = jsonMatch[1]
-          }
-        }
-      }
-      
-      data = JSON.parse(cleanedText)
+      data = parseAladinResponse(responseText)
     } catch (parseError) {
       console.error('알라딘 API 응답 파싱 오류:', parseError)
       console.error('응답 텍스트 (처음 500자):', responseText.substring(0, 500))
@@ -418,44 +416,6 @@ exports.getAladinBestsellers = onCall({
         success: false,
         error: data.errorMessage || `알라딘 API 오류가 발생했습니다. (코드: ${data.errorCode})`
       }
-    }
-
-    // 세트 상품 필터링 함수
-    const isSetProduct = (item) => {
-      if (!item || !item.title) {
-        return false
-      }
-      
-      const title = item.title.toLowerCase()
-      const setKeywords = [
-        '세트',
-        '전집',
-        'box',
-        '박스',
-        '시리즈',
-        '전권',
-        '완전판',
-        '합본',
-        '모음',
-        '선집',
-        '문고판 세트',
-        '문고세트'
-      ]
-      
-      // 제목에 세트 관련 키워드가 포함되어 있는지 확인
-      for (const keyword of setKeywords) {
-        if (title.includes(keyword)) {
-          return true
-        }
-      }
-      
-      // 괄호 안에 "전N권", "N권 세트" 등의 패턴 확인
-      const bracketPattern = /\([^)]*(전\s*\d+권|\d+권\s*세트|전\s*\d+권\s*세트)[^)]*\)/i
-      if (bracketPattern.test(item.title)) {
-        return true
-      }
-      
-      return false
     }
 
     // 세트 상품 제외

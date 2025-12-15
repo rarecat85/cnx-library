@@ -107,6 +107,21 @@
           </div>
         </div>
 
+        <!-- 내가 신청한 책 목록 섹션 -->
+        <div class="requested-section mb-8">
+          <BookListSwiper
+            :books="myRequestedBooks"
+            :center="''"
+            :registered-books="[]"
+            :loading="requestedBooksLoading"
+            title="내가 신청한 책"
+            :empty-message="'신청한 도서가 없습니다.'"
+            nav-id="my-requested"
+            :show-action="false"
+            :show-status-flags="false"
+          />
+        </div>
+
         <!-- 읽은 책 목록 섹션 -->
         <div class="history-section">
           <div class="section-header mb-4">
@@ -220,6 +235,10 @@ const selectedCenter = ref('')
 const rentedBooks = ref([])
 const rentedBooksLoading = ref(false)
 
+// 내가 신청한 도서
+const myRequestedBooks = ref([])
+const requestedBooksLoading = ref(false)
+
 // 센터별 필터링된 대여 도서
 const filteredRentedBooks = computed(() => {
   if (!selectedCenter.value) {
@@ -290,9 +309,51 @@ onMounted(async () => {
   
   await Promise.all([
     loadRentedBooks(),
+    loadMyRequestedBooks(),
     loadRentalHistory()
   ])
 })
+
+// 내가 신청한 도서 로드
+const loadMyRequestedBooks = async () => {
+  if (!user.value || !firestore) return
+
+  try {
+    requestedBooksLoading.value = true
+    
+    const { collection, query, where, getDocs, orderBy } = await import('firebase/firestore')
+    const requestsRef = collection(firestore, 'bookRequests')
+    const q = query(
+      requestsRef,
+      where('requestedBy', '==', user.value.uid),
+      where('status', '==', 'pending')
+    )
+    
+    const snapshot = await getDocs(q)
+    const books = []
+    
+    snapshot.forEach((doc) => {
+      books.push({
+        id: doc.id,
+        ...doc.data()
+      })
+    })
+    
+    // 신청일 기준 내림차순 정렬
+    books.sort((a, b) => {
+      const dateA = a.requestedAt?.toDate?.() || new Date(0)
+      const dateB = b.requestedAt?.toDate?.() || new Date(0)
+      return dateB - dateA
+    })
+    
+    myRequestedBooks.value = books
+  } catch (error) {
+    console.error('신청 도서 로드 오류:', error)
+    myRequestedBooks.value = []
+  } finally {
+    requestedBooksLoading.value = false
+  }
+}
 
 // 대여중인 도서 로드
 const loadRentedBooks = async () => {
@@ -719,8 +780,22 @@ useHead({
 }
 
 .rental-section,
+.requested-section,
 .history-section {
   padding-top: rem(16);
+}
+
+.requested-section {
+  border-top: rem(1) solid #e0e0e0;
+  
+  :deep(.book-list-swiper-section) {
+    padding-top: 0;
+    border-top: none;
+  }
+  
+  :deep(.section-title) {
+    font-size: rem(20);
+  }
 }
 
 .history-section {

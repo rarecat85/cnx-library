@@ -40,9 +40,47 @@
           />
         </div>
 
+        <!-- 검색 로딩 -->
+        <div
+          v-if="searchLoading"
+          class="search-loading-section mb-8"
+        >
+          <div class="text-center py-8">
+            <v-progress-circular
+              indeterminate
+              color="primary"
+            />
+            <p class="mt-4 text-medium-emphasis">
+              검색 중...
+            </p>
+          </div>
+        </div>
+
+        <!-- 검색 결과 없음 -->
+        <div
+          v-else-if="hasSearched && searchResults.length === 0"
+          class="search-empty-section mb-8"
+        >
+          <div class="text-center py-8 text-medium-emphasis empty-state">
+            <v-icon
+              size="48"
+              color="grey-lighten-1"
+              class="mb-4"
+            >
+              mdi-book-search-outline
+            </v-icon>
+            <p class="mb-2">
+              '<strong>{{ searchQuery }}</strong>'에 대한 검색 결과가 없습니다.
+            </p>
+            <p class="text-body-2">
+              다른 검색어로 시도해보세요.
+            </p>
+          </div>
+        </div>
+
         <!-- 검색 결과 영역 -->
         <div
-          v-if="searchResults.length > 0"
+          v-else-if="searchResults.length > 0"
           class="search-results-section mb-8"
         >
           <div class="search-results-header mb-4">
@@ -220,6 +258,7 @@ const searchError = ref(null)
 const searchTotal = ref(0)
 const currentSearchPage = ref(1)
 const searchTotalPages = computed(() => Math.ceil(searchTotal.value / 10))
+const hasSearched = ref(false) // 검색 수행 여부
 
 // 베스트셀러 관련
 const bestsellers = ref([])
@@ -316,6 +355,7 @@ const handleSearch = async () => {
     searchLoading.value = true
     searchError.value = null
     currentSearchPage.value = 1
+    hasSearched.value = true
     
     const start = (currentSearchPage.value - 1) * 10 + 1
     const result = await searchBooks(searchQuery.value, start, 10)
@@ -338,6 +378,7 @@ const clearSearch = () => {
   searchResults.value = []
   searchTotal.value = 0
   currentSearchPage.value = 1
+  hasSearched.value = false
 }
 
 // 검색 페이지 변경

@@ -123,9 +123,21 @@
           </div>
           <div
             v-else
-            class="text-center py-8 mt-6 text-medium-emphasis"
+            class="text-center py-8 mt-6 text-medium-emphasis empty-state"
           >
-            등록된 도서가 없습니다.
+            <v-icon
+              size="48"
+              color="grey-lighten-1"
+              class="mb-4"
+            >
+              {{ registeredBooksSearchQuery ? 'mdi-book-search-outline' : 'mdi-book-off-outline' }}
+            </v-icon>
+            <p v-if="registeredBooksSearchQuery">
+              '<strong>{{ registeredBooksSearchQuery }}</strong>'에 대한 검색 결과가 없습니다.
+            </p>
+            <p v-else>
+              등록된 도서가 없습니다.
+            </p>
           </div>
         </div>
       </div>

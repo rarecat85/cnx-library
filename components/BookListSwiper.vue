@@ -26,8 +26,9 @@
             </span>
           </div>
         </div>
-        <!-- 네비게이션 버튼 -->
+        <!-- 네비게이션 버튼 (도서가 있을 때만 표시) -->
         <div
+          v-if="!loading && books.length > 0"
           :class="navClass"
         >
           <div :class="`swiper-button-prev ${prevClass}`" />

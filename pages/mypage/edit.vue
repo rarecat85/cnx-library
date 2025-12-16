@@ -135,7 +135,7 @@
 </template>
 
 <script setup>
-import { WORKPLACES } from '@/utils/centerMapping.js'
+import { WORKPLACES, CENTERS } from '@/utils/centerMapping.js'
 
 definePageMeta({
   layout: false,
@@ -184,7 +184,18 @@ onMounted(async () => {
       const userData = userDoc.data()
       name.value = userData.name || ''
       email.value = userData.email || user.value.email || ''
-      workplace.value = userData.workplace || ''
+      
+      // 기존 센터 형식('강남센터', '용산센터')으로 저장된 경우 호환 처리
+      let savedWorkplace = userData.workplace || ''
+      if (CENTERS.includes(savedWorkplace)) {
+        // 센터 형식이면 해당하는 기본 근무지로 매핑
+        if (savedWorkplace === '강남센터') {
+          savedWorkplace = '강남'
+        } else if (savedWorkplace === '용산센터') {
+          savedWorkplace = '용산'
+        }
+      }
+      workplace.value = savedWorkplace
     }
   } catch (err) {
     console.error('사용자 정보 로드 오류:', err)

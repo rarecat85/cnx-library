@@ -271,9 +271,9 @@ exports.searchAladinBooks = onCall({
       }
     }
 
-    // display 최대값 제한 (알라딘 API 최대 200)
-    const displayLimit = Math.min(display, 200)
-    const startValue = Math.max(1, start)
+    // 한 번에 충분한 양의 결과를 가져옴 (세트 필터링 후에도 충분하도록)
+    // 알라딘 API 최대 50개 제한
+    const fetchAmount = 50
 
     // 알라딘 API 인증 정보 가져오기
     const ttbKey = aladinTtbKey.value()
@@ -291,8 +291,8 @@ exports.searchAladinBooks = onCall({
       ttbkey: ttbKey,
       Query: query.trim(),
       QueryType: 'Title',
-      MaxResults: displayLimit.toString(),
-      start: startValue.toString(),
+      MaxResults: fetchAmount.toString(),
+      start: '1',
       SearchTarget: 'Book',
       output: 'js',
       Version: '20131101'
@@ -335,15 +335,13 @@ exports.searchAladinBooks = onCall({
       }
     }
 
-    // 세트 상품 제외
+    // 세트 상품 제외 (필터링된 전체 결과 반환)
     const filteredItems = (data.item || []).filter(item => !isSetProduct(item))
 
     return {
       success: true,
       data: {
         total: filteredItems.length,
-        start: startValue,
-        display: filteredItems.length,
         items: filteredItems
       }
     }

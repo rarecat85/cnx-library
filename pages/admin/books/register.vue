@@ -85,13 +85,12 @@
         >
           <div class="search-results-header mb-4">
             <div class="text-body-1">
-              총 <strong>{{ searchTotal }}</strong>개의 검색 결과
-              <span
-                v-if="searchTotalPages > 1"
-                class="text-body-2 ml-2 text-medium-emphasis"
-              >
-                ({{ currentSearchPage }} / {{ searchTotalPages }} 페이지)
-              </span>
+              <template v-if="searchTotal >= 10">
+                검색 결과가 많습니다. (현재 <strong>{{ searchResults.length }}</strong>개 표시 중)
+              </template>
+              <template v-else>
+                총 <strong>{{ searchResults.length }}</strong>개의 검색 결과
+              </template>
             </div>
           </div>
           
@@ -117,15 +116,16 @@
           </v-row>
           
           <div
-            v-if="searchTotalPages > 1"
+            v-if="hasMoreResults"
             class="d-flex justify-center mt-6"
           >
-            <v-pagination
-              v-model="currentSearchPage"
-              :length="searchTotalPages"
-              :total-visible="7"
-              @update:model-value="handleSearchPageChange"
-            />
+            <v-btn
+              variant="outlined"
+              color="primary"
+              @click="handleLoadMore"
+            >
+              더보기
+            </v-btn>
           </div>
         </div>
 
@@ -257,13 +257,18 @@ const userWorkplace = ref('')
 
 // 검색 관련
 const searchQuery = ref('')
-const searchResults = ref([])
+const allSearchResults = ref([]) // API에서 가져온 전체 결과 (필터링 완료)
+const displayCount = ref(10) // 현재 표시 중인 개수
 const searchLoading = ref(false)
 const searchError = ref(null)
-const searchTotal = ref(0)
-const currentSearchPage = ref(1)
-const searchTotalPages = computed(() => Math.ceil(searchTotal.value / 10))
 const hasSearched = ref(false) // 검색 수행 여부
+
+// 화면에 표시할 검색 결과 (displayCount 만큼만)
+const searchResults = computed(() => allSearchResults.value.slice(0, displayCount.value))
+// 전체 결과 수
+const searchTotal = computed(() => allSearchResults.value.length)
+// 더보기 버튼 표시 여부
+const hasMoreResults = computed(() => displayCount.value < allSearchResults.value.length)
 
 // 베스트셀러 관련
 const bestsellers = ref([])
@@ -359,19 +364,17 @@ const handleSearch = async () => {
   try {
     searchLoading.value = true
     searchError.value = null
-    currentSearchPage.value = 1
+    displayCount.value = 10
     hasSearched.value = true
     
-    const start = (currentSearchPage.value - 1) * 10 + 1
-    const result = await searchBooks(searchQuery.value, start, 10)
+    // API 한 번 호출로 필터링된 전체 결과 가져오기
+    const result = await searchBooks(searchQuery.value)
     
-    searchResults.value = result.items || []
-    searchTotal.value = result.total || 0
+    allSearchResults.value = result.items || []
   } catch (error) {
     console.error('도서 검색 오류:', error)
     searchError.value = error.message || '도서 검색에 실패했습니다.'
-    searchResults.value = []
-    searchTotal.value = 0
+    allSearchResults.value = []
   } finally {
     searchLoading.value = false
   }
@@ -380,35 +383,14 @@ const handleSearch = async () => {
 // 검색 초기화
 const clearSearch = () => {
   searchQuery.value = ''
-  searchResults.value = []
-  searchTotal.value = 0
-  currentSearchPage.value = 1
+  allSearchResults.value = []
+  displayCount.value = 10
   hasSearched.value = false
 }
 
-// 검색 페이지 변경
-const handleSearchPageChange = async (page) => {
-  if (!searchQuery.value.trim()) {
-    return
-  }
-
-  try {
-    searchLoading.value = true
-    currentSearchPage.value = page
-    const start = (page - 1) * 10 + 1
-    const result = await searchBooks(searchQuery.value, start, 10)
-    
-    searchResults.value = result.items || []
-    searchTotal.value = result.total || 0
-    
-    // 페이지 상단으로 스크롤
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  } catch (error) {
-    console.error('도서 검색 오류:', error)
-    searchError.value = error.message || '도서 검색에 실패했습니다.'
-  } finally {
-    searchLoading.value = false
-  }
+// 더보기 (API 호출 없이 표시 개수만 증가)
+const handleLoadMore = () => {
+  displayCount.value += 10
 }
 
 // 베스트셀러 로드

@@ -18,10 +18,13 @@ service cloud.firestore {
       // 읽기: 모든 인증된 사용자
       allow read: if request.auth != null;
       
-      // 쓰기: 관리자(role: 'admin' 또는 'manager')만 가능
-      allow write: if request.auth != null && 
+      // 생성/삭제: 관리자(role: 'admin' 또는 'manager')만 가능
+      allow create, delete: if request.auth != null && 
         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'manager');
+      
+      // 업데이트: 모든 인증된 사용자 (대여/반납 처리를 위해)
+      allow update: if request.auth != null;
     }
     
     // bookRequests 컬렉션 규칙 (도서 신청)

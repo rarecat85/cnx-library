@@ -150,6 +150,8 @@ const handleNotificationClick = async (notification) => {
   
   switch (notification.type) {
     case 'book_request':
+      router.push('/admin/books/register')
+      break
     case 'rent_request':
     case 'overdue_admin':
       router.push('/admin/books')

@@ -2,6 +2,9 @@
   <NuxtLayout>
     <NuxtPage />
   </NuxtLayout>
+  
+  <!-- 전역 다이얼로그 -->
+  <GlobalDialog />
 </template>
 
 <script setup>

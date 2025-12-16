@@ -211,7 +211,7 @@ const props = defineProps({
 const emit = defineEmits(['register', 'rent'])
 
 // 도서 상태 계산
-const { calculateBookStatus } = useNaverBooks()
+const { calculateBookStatus } = useBooks()
 
 const getBookStatus = (book) => {
   return calculateBookStatus(book)

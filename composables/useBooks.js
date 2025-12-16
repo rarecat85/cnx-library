@@ -10,12 +10,22 @@ import {
   serverTimestamp
 } from 'firebase/firestore'
 
-export const useNaverBooks = () => {
+export const useBooks = () => {
   const { $firebaseFirestore, $firebaseApp } = useNuxtApp()
   const firestore = $firebaseFirestore
 
   const loading = ref(false)
   const error = ref(null)
+
+  /**
+   * 도서 문서 ID 생성 (ISBN_센터 형식)
+   * @param {string} isbn - ISBN
+   * @param {string} center - 센터명
+   * @returns {string} 문서 ID
+   */
+  const createBookId = (isbn, center) => {
+    return `${isbn}_${center}`
+  }
 
   /**
    * 알라딘 도서 검색
@@ -58,7 +68,7 @@ export const useNaverBooks = () => {
 
   /**
    * Firestore에 도서 등록
-   * @param {Object} bookData - 도서 정보 (네이버 API 응답의 item)
+   * @param {Object} bookData - 도서 정보 (알라딘 API 응답의 item)
    * @param {string} center - 센터명
    * @param {string} userId - 등록한 사용자 UID
    * @returns {Promise<Object>} 등록 결과
@@ -79,18 +89,14 @@ export const useNaverBooks = () => {
         throw new Error('ISBN 정보가 없습니다.')
       }
 
-      // ISBN을 문서 ID로 사용 (중복 방지)
-      const bookRef = doc(firestore, 'books', isbn)
+      // ISBN_센터를 문서 ID로 사용 (센터별로 별도 관리)
+      const bookId = createBookId(isbn, center)
+      const bookRef = doc(firestore, 'books', bookId)
       const bookDoc = await getDoc(bookRef)
 
       // 이미 등록된 도서인지 확인
       if (bookDoc.exists()) {
-        const existingBook = bookDoc.data()
-        // 같은 센터에 이미 등록되어 있는지 확인
-        if (existingBook.center === center) {
-          throw new Error('이미 해당 센터에 등록된 도서입니다.')
-        }
-        // 다른 센터에 등록되어 있으면 새로 등록 가능 (센터별로 관리)
+        throw new Error('이미 해당 센터에 등록된 도서입니다.')
       }
 
       // 도서 정보 정리 (알라딘 API 형식)
@@ -113,11 +119,12 @@ export const useNaverBooks = () => {
       }
 
       // Firestore에 저장
-      await setDoc(bookRef, bookInfo, { merge: true })
+      await setDoc(bookRef, bookInfo)
 
       return {
         success: true,
-        book: bookInfo
+        book: bookInfo,
+        bookId: bookId
       }
     } catch (err) {
       console.error('도서 등록 오류:', err)
@@ -216,10 +223,11 @@ export const useNaverBooks = () => {
   /**
    * 도서 대여 처리
    * @param {string} isbn - ISBN
+   * @param {string} center - 센터명
    * @param {string} userId - 대여한 사용자 UID
    * @returns {Promise<Object>} 대여 결과
    */
-  const rentBook = async (isbn, userId) => {
+  const rentBook = async (isbn, center, userId) => {
     if (!firestore) {
       throw new Error('Firebase가 초기화되지 않았습니다.')
     }
@@ -228,7 +236,8 @@ export const useNaverBooks = () => {
       loading.value = true
       error.value = null
 
-      const bookRef = doc(firestore, 'books', isbn)
+      const bookId = createBookId(isbn, center)
+      const bookRef = doc(firestore, 'books', bookId)
       const bookDoc = await getDoc(bookRef)
 
       if (!bookDoc.exists()) {
@@ -269,9 +278,10 @@ export const useNaverBooks = () => {
   /**
    * 도서 반납 처리
    * @param {string} isbn - ISBN
+   * @param {string} center - 센터명
    * @returns {Promise<Object>} 반납 결과
    */
-  const returnBook = async (isbn) => {
+  const returnBook = async (isbn, center) => {
     if (!firestore) {
       throw new Error('Firebase가 초기화되지 않았습니다.')
     }
@@ -280,7 +290,8 @@ export const useNaverBooks = () => {
       loading.value = true
       error.value = null
 
-      const bookRef = doc(firestore, 'books', isbn)
+      const bookId = createBookId(isbn, center)
+      const bookRef = doc(firestore, 'books', bookId)
       const bookDoc = await getDoc(bookRef)
 
       if (!bookDoc.exists()) {
@@ -316,9 +327,10 @@ export const useNaverBooks = () => {
   /**
    * 도서 삭제 처리
    * @param {string} isbn - ISBN
+   * @param {string} center - 센터명
    * @returns {Promise<Object>} 삭제 결과
    */
-  const deleteBook = async (isbn) => {
+  const deleteBook = async (isbn, center) => {
     if (!firestore) {
       throw new Error('Firebase가 초기화되지 않았습니다.')
     }
@@ -328,7 +340,8 @@ export const useNaverBooks = () => {
       error.value = null
 
       const { deleteDoc } = await import('firebase/firestore')
-      const bookRef = doc(firestore, 'books', isbn)
+      const bookId = createBookId(isbn, center)
+      const bookRef = doc(firestore, 'books', bookId)
       await deleteDoc(bookRef)
 
       return {
@@ -346,10 +359,11 @@ export const useNaverBooks = () => {
   /**
    * 도서 대여 신청 (다른 센터 도서 대여 시)
    * @param {string} isbn - ISBN
+   * @param {string} center - 센터명
    * @param {string} userId - 신청한 사용자 UID
    * @returns {Promise<Object>} 신청 결과
    */
-  const requestRent = async (isbn, userId) => {
+  const requestRent = async (isbn, center, userId) => {
     if (!firestore) {
       throw new Error('Firebase가 초기화되지 않았습니다.')
     }
@@ -358,7 +372,8 @@ export const useNaverBooks = () => {
       loading.value = true
       error.value = null
 
-      const bookRef = doc(firestore, 'books', isbn)
+      const bookId = createBookId(isbn, center)
+      const bookRef = doc(firestore, 'books', bookId)
       const bookDoc = await getDoc(bookRef)
 
       if (!bookDoc.exists()) {
@@ -431,6 +446,7 @@ export const useNaverBooks = () => {
   return {
     loading: readonly(loading),
     error: readonly(error),
+    createBookId,
     searchBooks,
     registerBook,
     getBooksByCenter,

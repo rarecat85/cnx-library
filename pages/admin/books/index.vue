@@ -249,7 +249,8 @@ const {
   deleteBook,
   calculateBookStatus,
   loading: booksLoading 
-} = useNaverBooks()
+} = useBooks()
+const { confirm, alert } = useDialog()
 const { $firebaseFirestore } = useNuxtApp()
 const firestore = $firebaseFirestore
 
@@ -592,22 +593,62 @@ watch(() => filteredRegisteredBooks.value, () => {
 const handleDeleteBooks = async () => {
   if (selectedBooks.value.length === 0) return
 
-  if (!confirm(`선택한 ${selectedBooks.value.length}권의 도서를 삭제하시겠습니까?`)) {
+  // 삭제 가능한 도서와 불가능한 도서 분리
+  const deletableBooks = []
+  const undeletableBooks = []
+  
+  for (const book of selectedBooks.value) {
+    const status = calculateBookStatus(book)
+    if (status === 'rented' || status === 'overdue') {
+      undeletableBooks.push({ book, reason: '대여중' })
+    } else if (status === 'requested') {
+      undeletableBooks.push({ book, reason: '대여신청중' })
+    } else {
+      deletableBooks.push(book)
+    }
+  }
+
+  // 모든 도서가 삭제 불가능한 경우
+  if (deletableBooks.length === 0) {
+    const reasons = undeletableBooks.map(item => 
+      `• ${item.book.title} (${item.reason})`
+    ).join('\n')
+    await alert(`선택한 도서를 삭제할 수 없습니다.\n\n${reasons}\n\n대여중/대여신청중인 도서는 반납 또는 신청 취소 후 삭제해주세요.`, { type: 'warning' })
+    return
+  }
+
+  // 일부 도서만 삭제 가능한 경우
+  let confirmMessage = `선택한 ${selectedBooks.value.length}권 중 ${deletableBooks.length}권의 도서를 삭제하시겠습니까?`
+  
+  if (undeletableBooks.length > 0) {
+    const undeletableList = undeletableBooks.map(item => 
+      `• ${item.book.title} (${item.reason})`
+    ).join('\n')
+    confirmMessage += `\n\n⚠️ 다음 도서는 삭제할 수 없습니다:\n${undeletableList}`
+  }
+
+  if (!await confirm(confirmMessage)) {
     return
   }
 
   try {
     actionLoading.value = true
-    const promises = selectedBooks.value.map(book => {
-      const isbn = book.isbn13 || book.isbn || book.id
-      return deleteBook(isbn)
+    const promises = deletableBooks.map(book => {
+      const isbn = book.isbn13 || book.isbn
+      return deleteBook(isbn, currentCenter.value)
     })
     await Promise.all(promises)
     selectedBooks.value = []
     await loadRegisteredBooks()
+    
+    if (undeletableBooks.length > 0) {
+      await alert(`${deletableBooks.length}권의 도서가 삭제되었습니다.\n(${undeletableBooks.length}권은 대여중/대여신청중으로 삭제되지 않았습니다.)`, { type: 'success' })
+    } else {
+      await alert(`${deletableBooks.length}권의 도서가 삭제되었습니다.`, { type: 'success' })
+    }
   } catch (error) {
     console.error('도서 삭제 오류:', error)
-    alert('도서 삭제에 실패했습니다.')
+    await alert('도서 삭제에 실패했습니다.', { type: 'error' })
   } finally {
     actionLoading.value = false
   }
@@ -615,7 +656,7 @@ const handleDeleteBooks = async () => {
 
 // 도서 대여 처리
 // 다중 대여 처리 (다이얼로그 열기)
-const handleRentBooks = () => {
+const handleRentBooks = async () => {
   if (selectedBooks.value.length === 0) return
   
   // 이미 대여중인 도서 필터링
@@ -625,7 +666,7 @@ const handleRentBooks = () => {
   })
   
   if (availableBooks.length === 0) {
-    alert('선택한 도서가 모두 대여중입니다.')
+    await alert('선택한 도서가 모두 대여중입니다.', { type: 'warning' })
     return
   }
   
@@ -642,7 +683,7 @@ const openRentDialog = async (book) => {
   
   // 대여 신청된 도서인 경우 신청자 정보로 바로 대여 처리
   if (status === 'requested' && book.requestedBy) {
-    if (!confirm(`신청자 정보로 대여 처리하시겠습니까?\n\n도서: ${book.title}\n신청자: ${getRequesterInfo(book)}`)) {
+    if (!await confirm(`신청자 정보로 대여 처리하시겠습니까?\n\n도서: ${book.title}\n신청자: ${getRequesterInfo(book)}`)) {
       return
     }
     
@@ -663,10 +704,10 @@ const openRentDialog = async (book) => {
       }, { merge: true })
       
       await loadRegisteredBooks()
-      alert('대여 처리가 완료되었습니다.')
+      await alert('대여 처리가 완료되었습니다.', { type: 'success' })
     } catch (error) {
       console.error('대여 처리 오류:', error)
-      alert('대여 처리에 실패했습니다.')
+      await alert('대여 처리에 실패했습니다.', { type: 'error' })
     } finally {
       actionLoading.value = false
     }
@@ -735,7 +776,7 @@ const confirmRentBooks = async () => {
     }
     
     // 대여 처리된 도서 수 저장
-    const rentedCount = rentDialogBooks.value.length
+    const rentedBookCount = rentDialogBooks.value.length
     
     // 목록 새로고침 및 다이얼로그 닫기
     await loadRegisteredBooks()
@@ -744,7 +785,7 @@ const confirmRentBooks = async () => {
     )
     closeRentDialog()
     
-    alert(`${rentedCount}권의 도서가 대여 처리되었습니다.`)
+    await alert(`${rentedBookCount}권의 도서가 대여 처리되었습니다.`, { type: 'success' })
   } catch (error) {
     console.error('도서 대여 오류:', error)
     rentFormError.value = error.message || '대여 처리에 실패했습니다.'
@@ -764,11 +805,11 @@ const handleReturnBooks = async () => {
   })
 
   if (rentedBooks.length === 0) {
-    alert('선택한 도서 중 대여중인 도서가 없습니다.')
+    await alert('선택한 도서 중 대여중인 도서가 없습니다.', { type: 'warning' })
     return
   }
 
-  if (!confirm(`선택한 ${rentedBooks.length}권의 도서를 반납 처리하시겠습니까?`)) {
+  if (!await confirm(`선택한 ${rentedBooks.length}권의 도서를 반납 처리하시겠습니까?`)) {
     return
   }
 
@@ -831,10 +872,10 @@ const handleReturnBooks = async () => {
     
     selectedBooks.value = []
     await loadRegisteredBooks()
-    alert(`${rentedBooks.length}권의 도서가 반납 처리되었습니다.`)
+    await alert(`${rentedBooks.length}권의 도서가 반납 처리되었습니다.`, { type: 'success' })
   } catch (error) {
     console.error('도서 반납 오류:', error)
-    alert('도서 반납에 실패했습니다.')
+    await alert('도서 반납에 실패했습니다.', { type: 'error' })
   } finally {
     actionLoading.value = false
   }
@@ -844,11 +885,11 @@ const handleReturnBooks = async () => {
 const handleSingleReturn = async (book) => {
   const status = calculateBookStatus(book)
   if (status !== 'rented' && status !== 'overdue') {
-    alert('대여중인 도서가 아닙니다.')
+    await alert('대여중인 도서가 아닙니다.', { type: 'warning' })
     return
   }
 
-  if (!confirm(`"${book.title}" 도서를 반납 처리하시겠습니까?`)) {
+  if (!await confirm(`"${book.title}" 도서를 반납 처리하시겠습니까?`)) {
     return
   }
 
@@ -908,10 +949,10 @@ const handleSingleReturn = async (book) => {
     }
     
     await loadRegisteredBooks()
-    alert('도서가 반납 처리되었습니다.')
+    await alert('도서가 반납 처리되었습니다.', { type: 'success' })
   } catch (error) {
     console.error('도서 반납 오류:', error)
-    alert('도서 반납에 실패했습니다.')
+    await alert('도서 반납에 실패했습니다.', { type: 'error' })
   } finally {
     actionLoading.value = false
   }

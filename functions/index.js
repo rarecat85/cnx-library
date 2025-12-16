@@ -99,7 +99,10 @@ const isSetProduct = (item) => {
  * 이 함수는 이메일 인증이 완료된 후 Firestore의 emailVerified 상태를 업데이트합니다.
  */
 exports.updateEmailVerificationStatus = onCall({
-  cors: true
+  cors: [
+    'https://rarecat85.github.io',
+    'http://localhost:5001'
+  ]
 }, async (request) => {
   try {
     const { email } = request.data
@@ -175,7 +178,10 @@ exports.updateEmailVerificationStatus = onCall({
  * false로 초기화하여 새로운 액션 코드를 생성할 수 있도록 합니다.
  */
 exports.resendVerificationEmailWithReset = onCall({
-  cors: true
+  cors: [
+    'https://rarecat85.github.io',
+    'http://localhost:5001'
+  ]
 }, async (request) => {
   try {
     const { email, password } = request.data
@@ -250,7 +256,10 @@ exports.resendVerificationEmailWithReset = onCall({
  * 이 함수는 알라딘 Open API를 사용하여 도서를 검색합니다.
  */
 exports.searchAladinBooks = onCall({
-  cors: true
+  cors: [
+    'https://rarecat85.github.io',
+    'http://localhost:5001'
+  ]
 }, async (request) => {
   try {
     const { query, start = 1, display = 20 } = request.data
@@ -354,7 +363,10 @@ exports.searchAladinBooks = onCall({
  * 알라딘 API는 QueryType='Bestseller'로 베스트셀러 목록을 제공합니다.
  */
 exports.getAladinBestsellers = onCall({
-  cors: true
+  cors: [
+    'https://rarecat85.github.io',
+    'http://localhost:5001'
+  ]
 }, async (request) => {
   try {
     const { display = 10 } = request.data

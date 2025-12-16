@@ -122,7 +122,8 @@ definePageMeta({
 import { CENTERS, getCenterByWorkplace, canDirectRent } from '@/utils/centerMapping.js'
 
 const { user } = useAuth()
-const { getBooksByCenter, rentBook, requestRent } = useNaverBooks()
+const { getBooksByCenter, rentBook, requestRent } = useBooks()
+const { confirm, alert } = useDialog()
 const { $firebaseFirestore } = useNuxtApp()
 const firestore = $firebaseFirestore
 
@@ -290,29 +291,29 @@ const handleRent = async (book) => {
     ? `"${book.title}"을(를) 대여 신청하시겠습니까?`
     : `"${book.title}"을(를) 대여 신청하시겠습니까?\n(관리자 승인 후 대여 가능)`
   
-  if (!confirm(confirmMessage)) {
+  if (!await confirm(confirmMessage)) {
     return
   }
   
   try {
     rentLoading.value = true
     
-    const bookId = book.id || book.isbn13 || book.isbn
+    const isbn = book.isbn13 || book.isbn
     
     if (isDirectRent) {
       // 바로 대여 처리 (강남 근무지 + 강남센터 또는 용산 근무지 + 용산센터)
-      await rentBook(bookId, user.value.uid)
+      await rentBook(isbn, currentCenter.value, user.value.uid)
       await loadNewBooks()
-      alert('도서 대여가 완료되었습니다.')
+      await alert('도서 대여가 완료되었습니다.', { type: 'success' })
     } else {
       // 대여 신청 처리 (그 외 모든 경우)
-      await requestRent(bookId, user.value.uid)
+      await requestRent(isbn, currentCenter.value, user.value.uid)
       await loadNewBooks()
-      alert('도서 대여가 신청되었습니다.\n관리자 승인 후 대여가 완료됩니다.')
+      await alert('도서 대여가 신청되었습니다.\n관리자 승인 후 대여가 완료됩니다.', { type: 'success' })
     }
   } catch (err) {
     console.error('대여 신청 오류:', err)
-    alert(err.message || '대여 신청에 실패했습니다.')
+    await alert(err.message || '대여 신청에 실패했습니다.', { type: 'error' })
   } finally {
     rentLoading.value = false
   }

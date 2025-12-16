@@ -52,7 +52,7 @@ cnx-library/
 │   └── SideNavigation.vue    # 사이드 네비게이션
 ├── composables/
 │   ├── useAuth.js            # 인증 관련 로직
-│   ├── useNaverBooks.js      # 도서 관련 로직 (알라딘 API)
+│   ├── useBooks.js           # 도서 관련 로직 (알라딘 API)
 │   └── useNotifications.js   # 알림 관련 로직
 ├── functions/
 │   ├── index.js              # Firebase Cloud Functions

@@ -188,6 +188,7 @@ definePageMeta({
 
 const router = useRouter()
 const { user } = useAuth()
+const { confirm, alert } = useDialog()
 const { $firebaseFirestore } = useNuxtApp()
 const firestore = $firebaseFirestore
 
@@ -250,12 +251,12 @@ const handleEmailSettingChange = async (value) => {
     
     // 설정 변경 알림
     const message = value ? '이메일 알림이 활성화되었습니다.' : '이메일 알림이 비활성화되었습니다.'
-    alert(message)
+    await alert(message, { type: 'success' })
   } catch (error) {
     console.error('이메일 알림 설정 변경 오류:', error)
     // 실패 시 원래 값으로 복구
     emailNotificationEnabled.value = !value
-    alert('설정 변경에 실패했습니다.')
+    await alert('설정 변경에 실패했습니다.', { type: 'error' })
   } finally {
     emailSettingLoading.value = false
   }

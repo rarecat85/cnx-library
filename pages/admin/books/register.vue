@@ -238,7 +238,8 @@ const {
   getBooksByCenter, 
   getBestsellers,
   loading: booksLoading 
-} = useNaverBooks()
+} = useBooks()
+const { confirm, alert } = useDialog()
 const { $firebaseFirestore } = useNuxtApp()
 const firestore = $firebaseFirestore
 
@@ -507,7 +508,7 @@ const getRequesterInfo = (request) => {
 const handleBookRegister = async (book) => {
   const isbn = book.isbn13 || book.isbn || ''
   if (!isbn) {
-    alert('ISBN 정보가 없어 등록할 수 없습니다.')
+    await alert('ISBN 정보가 없어 등록할 수 없습니다.', { type: 'error' })
     return
   }
 
@@ -523,10 +524,10 @@ const handleBookRegister = async (book) => {
     await loadRegisteredBooks()
     
     // 성공 메시지
-    alert('도서가 성공적으로 등록되었습니다.')
+    await alert('도서가 성공적으로 등록되었습니다.', { type: 'success' })
   } catch (error) {
     console.error('도서 등록 오류:', error)
-    alert(error.message || '도서 등록에 실패했습니다.')
+    await alert(error.message || '도서 등록에 실패했습니다.', { type: 'error' })
   } finally {
     registeringBooks.value.delete(isbn)
   }
@@ -536,7 +537,7 @@ const handleBookRegister = async (book) => {
 const handleBookRegisterFromRequest = async (book) => {
   const isbn = book.isbn13 || book.isbn || ''
   if (!isbn) {
-    alert('ISBN 정보가 없어 등록할 수 없습니다.')
+    await alert('ISBN 정보가 없어 등록할 수 없습니다.', { type: 'error' })
     return
   }
 
@@ -589,10 +590,10 @@ const handleBookRegisterFromRequest = async (book) => {
     await loadRegisteredBooks()
     
     // 성공 메시지
-    alert('도서가 성공적으로 등록되었습니다.')
+    await alert('도서가 성공적으로 등록되었습니다.', { type: 'success' })
   } catch (error) {
     console.error('도서 등록 오류:', error)
-    alert(error.message || '도서 등록에 실패했습니다.')
+    await alert(error.message || '도서 등록에 실패했습니다.', { type: 'error' })
   } finally {
     registeringBooks.value.delete(isbn)
   }

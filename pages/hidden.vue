@@ -36,12 +36,12 @@
         <v-icon class="card-arrow">mdi-chevron-right</v-icon>
       </div>
 
-      <div class="page-card" @click="navigateTo('/test-scenario')">
+      <div class="page-card" @click="navigateTo('/test-scenario/sessions')">
         <div class="card-icon">✅</div>
         <div class="card-content">
           <h3>테스트 시나리오</h3>
-          <p>QA 및 기능 검증을 위한 테스트 케이스</p>
-          <span class="card-url">/test-scenario</span>
+          <p>QA 및 기능 검증을 위한 테스트 세션 관리</p>
+          <span class="card-url">/test-scenario/sessions</span>
         </div>
         <v-icon class="card-arrow">mdi-chevron-right</v-icon>
       </div>
@@ -127,6 +127,11 @@ const navigateTo = (path) => {
   border: 2px solid transparent;
   cursor: pointer;
   transition: all 0.2s;
+  
+  &.highlight {
+    background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+    border-color: #c7d2fe;
+  }
   
   &:hover {
     background: #eef2ff;

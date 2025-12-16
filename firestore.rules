@@ -77,6 +77,19 @@ service cloud.firestore {
       allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
     
+    // testSessions 컬렉션 규칙 (테스트 세션)
+    // 테스트 시나리오는 로그인 전 테스트도 필요하므로 인증 없이 접근 허용
+    match /testSessions/{sessionId} {
+      // 읽기/쓰기: 모든 사용자 (테스트 도구용)
+      allow read, write: if true;
+      
+      // 테스트 결과 서브컬렉션
+      match /results/{resultId} {
+        // 읽기/쓰기: 모든 사용자
+        allow read, write: if true;
+      }
+    }
+    
     // 다른 컬렉션은 기본적으로 거부
     match /{document=**} {
       allow read, write: if false;

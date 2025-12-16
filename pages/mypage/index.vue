@@ -220,7 +220,8 @@ definePageMeta({
 })
 
 const { user } = useAuth()
-const { returnBook } = useNaverBooks()
+const { returnBook } = useBooks()
+const { confirm, alert } = useDialog()
 const { $firebaseFirestore } = useNuxtApp()
 const firestore = $firebaseFirestore
 
@@ -506,7 +507,7 @@ const handleDeleteHistory = async () => {
   if (selectedHistoryBooks.value.length === 0 || !user.value) return
 
   const bookTitles = selectedHistoryBooks.value.map(record => record.title).join(', ')
-  if (!confirm(`다음 도서들을 읽은 책 목록에서 삭제하시겠습니까?\n\n${bookTitles}`)) {
+  if (!await confirm(`다음 도서들을 읽은 책 목록에서 삭제하시겠습니까?\n\n${bookTitles}`)) {
     return
   }
 
@@ -522,11 +523,11 @@ const handleDeleteHistory = async () => {
     // 목록 새로고침
     await loadRentalHistory()
     
-    alert(`${selectedHistoryBooks.value.length}권이 읽은 책 목록에서 삭제되었습니다.`)
+    await alert(`${selectedHistoryBooks.value.length}권이 읽은 책 목록에서 삭제되었습니다.`, { type: 'success' })
     selectedHistoryBooks.value = []
   } catch (error) {
     console.error('이력 삭제 오류:', error)
-    alert('삭제에 실패했습니다.')
+    await alert('삭제에 실패했습니다.', { type: 'error' })
   } finally {
     deleteHistoryLoading.value = false
   }
@@ -537,7 +538,7 @@ const handleReturnBooks = async () => {
   if (selectedBooks.value.length === 0 || !user.value) return
 
   const bookTitles = selectedBooks.value.map(book => book.title).join(', ')
-  if (!confirm(`다음 도서들을 반납하시겠습니까?\n\n${bookTitles}`)) {
+  if (!await confirm(`다음 도서들을 반납하시겠습니까?\n\n${bookTitles}`)) {
     return
   }
 
@@ -598,11 +599,11 @@ const handleReturnBooks = async () => {
       loadRentalHistory()
     ])
     
-    alert(`${selectedBooks.value.length}권의 도서가 반납되었습니다.`)
+    await alert(`${selectedBooks.value.length}권의 도서가 반납되었습니다.`, { type: 'success' })
     selectedBooks.value = []
   } catch (error) {
     console.error('반납 처리 오류:', error)
-    alert('반납 처리에 실패했습니다.')
+    await alert('반납 처리에 실패했습니다.', { type: 'error' })
   } finally {
     returnLoading.value = false
   }
@@ -612,7 +613,7 @@ const handleReturnBooks = async () => {
 const handleSingleReturn = async (book) => {
   if (!user.value || !book) return
 
-  if (!confirm(`"${book.title}"을(를) 반납하시겠습니까?`)) {
+  if (!await confirm(`"${book.title}"을(를) 반납하시겠습니까?`)) {
     return
   }
 
@@ -674,10 +675,10 @@ const handleSingleReturn = async (book) => {
     // 선택 목록에서도 제거
     selectedBooks.value = selectedBooks.value.filter(b => b.id !== book.id)
     
-    alert('도서가 반납되었습니다.')
+    await alert('도서가 반납되었습니다.', { type: 'success' })
   } catch (error) {
     console.error('반납 처리 오류:', error)
-    alert('반납 처리에 실패했습니다.')
+    await alert('반납 처리에 실패했습니다.', { type: 'error' })
   } finally {
     returnLoading.value = false
   }

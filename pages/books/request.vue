@@ -178,7 +178,8 @@ const {
   getBooksByCenter, 
   getBestsellers,
   loading: booksLoading 
-} = useNaverBooks()
+} = useBooks()
+const { confirm, alert } = useDialog()
 const { $firebaseFirestore } = useNuxtApp()
 const firestore = $firebaseFirestore
 
@@ -396,7 +397,7 @@ const loadRequestedBooks = async () => {
 const handleBookRequest = async (book) => {
   const isbn = book.isbn13 || book.isbn || ''
   if (!isbn) {
-    alert('ISBN 정보가 없어 신청할 수 없습니다.')
+    await alert('ISBN 정보가 없어 신청할 수 없습니다.', { type: 'error' })
     return
   }
 
@@ -408,7 +409,7 @@ const handleBookRequest = async (book) => {
     requestingBooks.value.add(isbn)
     
     if (!firestore || !user.value) {
-      alert('로그인이 필요합니다.')
+      await alert('로그인이 필요합니다.', { type: 'warning' })
       return
     }
     
@@ -436,11 +437,11 @@ const handleBookRequest = async (book) => {
     await loadRequestedBooks()
     
     const bookTitle = book.title || '도서'
-    alert(`"${bookTitle}"이(가) ${currentCenter.value}에 신청되었습니다.\n\n관리자 승인 후 등록됩니다.`)
+    await alert(`"${bookTitle}"이(가) ${currentCenter.value}에 신청되었습니다.\n\n관리자 승인 후 등록됩니다.`, { type: 'success' })
     
   } catch (error) {
     console.error('도서 신청 오류:', error)
-    alert(error.message || '도서 신청에 실패했습니다.')
+    await alert(error.message || '도서 신청에 실패했습니다.', { type: 'error' })
   } finally {
     requestingBooks.value.delete(isbn)
   }

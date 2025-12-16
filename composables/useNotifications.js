@@ -6,24 +6,20 @@
  * - 알림 목록 조회
  */
 
-// 전역 상태 (모든 컴포넌트에서 공유)
-const globalNotifications = ref([])
-const globalUnreadCount = ref(0)
-const globalLoading = ref(false)
-const globalError = ref(null)
+// 함수 참조는 직렬화 불가하므로 모듈 레벨에 유지
 let globalUnsubscribe = null
-let isSubscribed = false
 
 export const useNotifications = () => {
   const { $firebaseFirestore } = useNuxtApp()
   const { user } = useAuth()
   const firestore = $firebaseFirestore
 
-  // 전역 상태 참조
-  const notifications = globalNotifications
-  const unreadCount = globalUnreadCount
-  const loading = globalLoading
-  const error = globalError
+  // useState로 전역 상태 관리 (Nuxt 권장 방식)
+  const notifications = useState('notifications', () => [])
+  const unreadCount = useState('unreadCount', () => 0)
+  const loading = useState('notificationsLoading', () => false)
+  const error = useState('notificationsError', () => null)
+  const isSubscribed = useState('notificationsSubscribed', () => false)
 
   /**
    * 실시간 알림 구독 시작
@@ -36,7 +32,7 @@ export const useNotifications = () => {
     }
 
     // 이미 구독 중이면 스킵
-    if (isSubscribed) return
+    if (isSubscribed.value) return
 
     try {
       const { collection, query, where, orderBy, limit, onSnapshot } = await import('firebase/firestore')
@@ -64,7 +60,7 @@ export const useNotifications = () => {
         error.value = err.message
       })
       
-      isSubscribed = true
+      isSubscribed.value = true
     } catch (err) {
       console.error('알림 구독 시작 오류:', err)
       error.value = err.message
@@ -78,7 +74,7 @@ export const useNotifications = () => {
     if (globalUnsubscribe) {
       globalUnsubscribe()
       globalUnsubscribe = null
-      isSubscribed = false
+      isSubscribed.value = false
     }
   }
 
@@ -293,4 +289,3 @@ export const useNotifications = () => {
     formatNotificationTime
   }
 }
-

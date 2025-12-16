@@ -172,7 +172,8 @@ const {
   rentBook,
   requestRent,
   loading: booksLoading 
-} = useNaverBooks()
+} = useBooks()
+const { confirm, alert } = useDialog()
 const { $firebaseFirestore } = useNuxtApp()
 const firestore = $firebaseFirestore
 
@@ -363,7 +364,7 @@ const isBookSelected = (book) => {
 }
 
 // 도서 선택 처리
-const handleBookSelect = (book, selected) => {
+const handleBookSelect = async (book, selected) => {
   const isbn = book.isbn13 || book.isbn || book.id || ''
   const status = getBookStatus(book)
   
@@ -375,13 +376,13 @@ const handleBookSelect = (book, selected) => {
   if (selected) {
     // 대여 가능 여부 체크
     if (!canRentMore.value) {
-      alert(`${MAX_RENT_COUNT}권을 대여중입니다. 대여중인 도서를 반납 후 대여해주세요.`)
+      await alert(`${MAX_RENT_COUNT}권을 대여중입니다. 대여중인 도서를 반납 후 대여해주세요.`, { type: 'warning' })
       return
     }
     
     // 최대 선택 개수 체크 (남은 대여 가능 권수까지만)
     if (selectedBooks.value.length >= remainingRentCount.value) {
-      alert(`현재 ${remainingRentCount.value}권까지 추가 대여 가능합니다.`)
+      await alert(`현재 ${remainingRentCount.value}권까지 추가 대여 가능합니다.`, { type: 'warning' })
       return
     }
     
@@ -406,12 +407,12 @@ const handleRentRequest = async () => {
   // 바로 대여 가능할 경우에만 대여 가능 여부 체크
   if (isDirectRent) {
     if (!canRentMore.value) {
-      alert(`${MAX_RENT_COUNT}권을 대여중입니다. 대여중인 도서를 반납 후 대여해주세요.`)
+      await alert(`${MAX_RENT_COUNT}권을 대여중입니다. 대여중인 도서를 반납 후 대여해주세요.`, { type: 'warning' })
       return
     }
 
     if (selectedBooks.value.length > remainingRentCount.value) {
-      alert(`현재 ${remainingRentCount.value}권까지 추가 대여 가능합니다.`)
+      await alert(`현재 ${remainingRentCount.value}권까지 추가 대여 가능합니다.`, { type: 'warning' })
       return
     }
   }
@@ -421,7 +422,7 @@ const handleRentRequest = async () => {
     ? `다음 도서들을 대여 신청하시겠습니까?\n\n${bookTitles}`
     : `대여 신청하시겠습니까?\n(관리자 승인 후 대여 가능)\n\n${bookTitles}`
   
-  if (!confirm(confirmMessage)) {
+  if (!await confirm(confirmMessage)) {
     return
   }
 
@@ -432,8 +433,8 @@ const handleRentRequest = async () => {
     if (isDirectRent) {
       // 바로 대여 처리 (강남 근무지 + 강남센터 또는 용산 근무지 + 용산센터)
       const promises = selectedBooks.value.map(book => {
-        const bookId = book.id || book.isbn13 || book.isbn
-        return rentBook(bookId, user.value.uid)
+        const isbn = book.isbn13 || book.isbn
+        return rentBook(isbn, currentCenter.value, user.value.uid)
       })
       await Promise.all(promises)
       
@@ -442,24 +443,24 @@ const handleRentRequest = async () => {
         loadCurrentRentedCount()
       ])
       
-      alert(`${bookCount}권의 도서 대여가 완료되었습니다.`)
+      await alert(`${bookCount}권의 도서 대여가 완료되었습니다.`, { type: 'success' })
     } else {
       // 대여 신청 처리 (그 외 모든 경우)
       const promises = selectedBooks.value.map(book => {
-        const bookId = book.id || book.isbn13 || book.isbn
-        return requestRent(bookId, user.value.uid)
+        const isbn = book.isbn13 || book.isbn
+        return requestRent(isbn, currentCenter.value, user.value.uid)
       })
       await Promise.all(promises)
       
       await loadRegisteredBooks()
       
-      alert(`${bookCount}권의 도서 대여가 신청되었습니다.\n관리자 승인 후 대여가 완료됩니다.`)
+      await alert(`${bookCount}권의 도서 대여가 신청되었습니다.\n관리자 승인 후 대여가 완료됩니다.`, { type: 'success' })
     }
     
     selectedBooks.value = []
   } catch (err) {
     console.error('대여 신청 오류:', err)
-    alert(err.message || '대여 신청에 실패했습니다.')
+    await alert(err.message || '대여 신청에 실패했습니다.', { type: 'error' })
   } finally {
     rentRequestLoading.value = false
   }
@@ -474,7 +475,7 @@ const handleSingleRent = async (book) => {
 
   // 바로 대여 가능할 경우에만 대여 가능 여부 체크
   if (isDirectRent && !canRentMore.value) {
-    alert(`${MAX_RENT_COUNT}권을 대여중입니다. 대여중인 도서를 반납 후 대여해주세요.`)
+    await alert(`${MAX_RENT_COUNT}권을 대여중입니다. 대여중인 도서를 반납 후 대여해주세요.`, { type: 'warning' })
     return
   }
 
@@ -482,39 +483,39 @@ const handleSingleRent = async (book) => {
     ? `"${book.title}"을(를) 대여 신청하시겠습니까?`
     : `"${book.title}"을(를) 대여 신청하시겠습니까?\n(관리자 승인 후 대여 가능)`
   
-  if (!confirm(confirmMessage)) {
+  if (!await confirm(confirmMessage)) {
     return
   }
 
   try {
     rentRequestLoading.value = true
     
-    const bookId = book.id || book.isbn13 || book.isbn
+    const isbn = book.isbn13 || book.isbn
     
     if (isDirectRent) {
       // 바로 대여 처리 (강남 근무지 + 강남센터 또는 용산 근무지 + 용산센터)
-      await rentBook(bookId, user.value.uid)
+      await rentBook(isbn, currentCenter.value, user.value.uid)
       
       await Promise.all([
         loadRegisteredBooks(),
         loadCurrentRentedCount()
       ])
       
-      alert('도서 대여가 완료되었습니다.')
+      await alert('도서 대여가 완료되었습니다.', { type: 'success' })
     } else {
       // 대여 신청 처리 (그 외 모든 경우)
-      await requestRent(bookId, user.value.uid)
+      await requestRent(isbn, currentCenter.value, user.value.uid)
       
       await loadRegisteredBooks()
       
-      alert('도서 대여가 신청되었습니다.\n관리자 승인 후 대여가 완료됩니다.')
+      await alert('도서 대여가 신청되었습니다.\n관리자 승인 후 대여가 완료됩니다.', { type: 'success' })
     }
     
     // 선택 목록에서도 제거
     selectedBooks.value = selectedBooks.value.filter(b => b.id !== book.id)
   } catch (err) {
     console.error('대여 신청 오류:', err)
-    alert(err.message || '대여 신청에 실패했습니다.')
+    await alert(err.message || '대여 신청에 실패했습니다.', { type: 'error' })
   } finally {
     rentRequestLoading.value = false
   }

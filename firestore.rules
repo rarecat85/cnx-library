@@ -70,8 +70,10 @@ service cloud.firestore {
       // 읽기: 자신의 알림만 읽기 가능
       allow read: if request.auth != null && resource.data.userId == request.auth.uid;
       
-      // 생성: Cloud Functions에서만 생성 (클라이언트에서는 생성 불가)
-      allow create: if false;
+      // 생성: 관리자만 생성 가능 (Cloud Functions 또는 관리자 클라이언트)
+      allow create: if request.auth != null && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'manager');
       
       // 업데이트: 자신의 알림만 수정 가능 (읽음 처리)
       allow update: if request.auth != null && resource.data.userId == request.auth.uid;

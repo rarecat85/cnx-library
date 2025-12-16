@@ -107,8 +107,10 @@
                 :book="book"
                 :center="currentCenter"
                 :registered-books="registeredBooks"
+                :requested-books="bookRequests"
                 :selectable="false"
                 :show-action="true"
+                :allow-register-requested="true"
                 @register="handleBookRegister"
               />
             </v-col>
@@ -132,9 +134,11 @@
           :books="bestsellers"
           :center="currentCenter"
           :registered-books="registeredBooks"
+          :requested-books="bookRequests"
           :title="'베스트셀러'"
           :loading="bestsellersLoading"
           :empty-message="'베스트셀러를 불러올 수 없습니다.'"
+          :allow-register-requested="true"
           nav-id="bestseller"
           class="mb-8"
           @register="handleBookRegister"
@@ -520,6 +524,43 @@ const handleBookRegister = async (book) => {
     registeringBooks.value.add(isbn)
     await registerBook(book, currentCenter.value, user.value.uid)
     
+    // 신청된 도서인지 확인하고 처리
+    const matchingRequest = bookRequests.value.find(req => {
+      const reqIsbn = req.isbn13 || req.isbn || ''
+      return reqIsbn === isbn
+    })
+    
+    if (matchingRequest && firestore) {
+      const { doc, updateDoc, serverTimestamp, addDoc, collection } = await import('firebase/firestore')
+      
+      // 신청 상태 업데이트
+      const requestRef = doc(firestore, 'bookRequests', matchingRequest.id)
+      await updateDoc(requestRef, {
+        status: 'approved',
+        approvedAt: serverTimestamp(),
+        approvedBy: user.value.uid
+      })
+      
+      // 신청자에게 알림 발송
+      if (matchingRequest.requestedBy) {
+        const notificationsRef = collection(firestore, 'notifications')
+        await addDoc(notificationsRef, {
+          userId: matchingRequest.requestedBy,
+          type: 'book_registered',
+          title: '신청 도서 등록 완료',
+          message: `신청하신 도서 "${book.title}"이(가) ${currentCenter.value}에 등록되었습니다.`,
+          bookTitle: book.title,
+          bookIsbn: isbn,
+          center: currentCenter.value,
+          isRead: false,
+          createdAt: serverTimestamp()
+        })
+      }
+      
+      // 로컬 상태에서 신청 목록 제거
+      bookRequests.value = bookRequests.value.filter(req => req.id !== matchingRequest.id)
+    }
+    
     // 등록된 도서 목록 새로고침
     await loadRegisteredBooks()
     
@@ -549,11 +590,12 @@ const handleBookRegisterFromRequest = async (book) => {
     registeringBooks.value.add(isbn)
     await registerBook(book, currentCenter.value, user.value.uid)
     
-    // 신청 상태 업데이트 (approved로 변경)
+    // 신청 상태 업데이트 (approved로 변경) 및 알림 발송
     if (firestore) {
-      const { doc, updateDoc, serverTimestamp, collection, query, where, getDocs } = await import('firebase/firestore')
+      const { doc, updateDoc, serverTimestamp, collection, query, where, getDocs, addDoc } = await import('firebase/firestore')
       
       let requestId = book.id
+      let requestedBy = book.requestedBy
       
       // book.id가 없으면 isbn으로 찾기
       if (!requestId) {
@@ -567,6 +609,7 @@ const handleBookRegisterFromRequest = async (book) => {
         const snapshot = await getDocs(q)
         if (!snapshot.empty) {
           requestId = snapshot.docs[0].id
+          requestedBy = snapshot.docs[0].data().requestedBy
         }
       }
       
@@ -577,6 +620,22 @@ const handleBookRegisterFromRequest = async (book) => {
           approvedAt: serverTimestamp(),
           approvedBy: user.value.uid
         })
+        
+        // 신청자에게 알림 발송
+        if (requestedBy) {
+          const notificationsRef = collection(firestore, 'notifications')
+          await addDoc(notificationsRef, {
+            userId: requestedBy,
+            type: 'book_registered',
+            title: '신청 도서 등록 완료',
+            message: `신청하신 도서 "${book.title}"이(가) ${currentCenter.value}에 등록되었습니다.`,
+            bookTitle: book.title,
+            bookIsbn: isbn,
+            center: currentCenter.value,
+            isRead: false,
+            createdAt: serverTimestamp()
+          })
+        }
       }
     }
     

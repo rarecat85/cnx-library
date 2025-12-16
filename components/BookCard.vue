@@ -192,7 +192,7 @@
     <div
       v-else-if="showAction"
       class="book-action-area"
-      :class="{ 'book-action-area-admin': requesterInfo && !isBookRegistered && !isBookRequested }"
+      :class="{ 'book-action-area-admin': (requesterInfo || (isBookRequested && allowRegisterRequested)) && !isBookRegistered }"
     >
       <div
         v-if="isBookRegistered"
@@ -201,14 +201,26 @@
         {{ registeredMessage || `${center}에 등록된 도서입니다.` }}
       </div>
       <div
-        v-else-if="isBookRequested"
+        v-else-if="isBookRequested && !allowRegisterRequested"
         class="requested-text text-body-2"
       >
         {{ requestedMessage || `${center}에 이미 신청된 도서입니다.` }}
       </div>
       <template v-else>
         <div
-          v-if="requesterInfo"
+          v-if="isBookRequested && allowRegisterRequested"
+          class="admin-info-text text-body-2 requested-badge"
+        >
+          <v-icon
+            size="small"
+            class="mr-1"
+          >
+            mdi-book-clock
+          </v-icon>
+          신청된 도서
+        </div>
+        <div
+          v-else-if="requesterInfo"
           class="admin-info-text text-body-2"
         >
           <v-icon
@@ -225,7 +237,7 @@
           :loading="isRegistering"
           :disabled="isRegistering"
           class="register-btn"
-          :class="{ 'mt-2': requesterInfo }"
+          :class="{ 'mt-2': requesterInfo || (isBookRequested && allowRegisterRequested) }"
           @click.stop="handleRegister"
         >
           {{ actionButtonText || `${center}에 등록하기` }}
@@ -322,6 +334,10 @@ const props = defineProps({
     default: false
   },
   showAdminReturnButton: { // 관리자용 반납 버튼 표시 (도서 관리 페이지용)
+    type: Boolean,
+    default: false
+  },
+  allowRegisterRequested: { // 신청된 도서도 등록 가능 (관리자용)
     type: Boolean,
     default: false
   }
@@ -698,6 +714,10 @@ const isOverdue = computed(() => {
   justify-content: center;
   min-height: rem(28);
   box-sizing: border-box;
+}
+
+.requested-badge {
+  color: #f59e0b;
 }
 
 .return-date-text {

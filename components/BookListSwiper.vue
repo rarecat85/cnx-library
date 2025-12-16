@@ -87,6 +87,7 @@
             :show-rent-button="showRentButton"
             :hide-overdue-status="hideOverdueStatus"
             :disabled="isBookDisabled(book)"
+            :allow-register-requested="allowRegisterRequested"
             @register="handleRegister"
             @rent="handleRent"
           />
@@ -203,6 +204,11 @@ const props = defineProps({
   },
   // 연체중을 대여중으로 표시 (BookCard에 전달)
   hideOverdueStatus: {
+    type: Boolean,
+    default: false
+  },
+  // 신청된 도서도 등록 가능 (관리자용, BookCard에 전달)
+  allowRegisterRequested: {
     type: Boolean,
     default: false
   }

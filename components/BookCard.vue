@@ -3,7 +3,7 @@
     class="book-card"
     :class="{ 
       'book-card-selected': selectable && selected,
-      'book-card-disabled': selectable && disabled
+      'book-card-disabled': disabled
     }"
     elevation="0"
     @click="selectable ? handleCardClick() : null"

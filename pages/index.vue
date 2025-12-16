@@ -201,11 +201,13 @@ const loadMyRentalStatus = async () => {
   try {
     const { collection, query, where, getDocs } = await import('firebase/firestore')
     
-    // 대여중 도서 개수
+    // 대여중 도서 개수 (status가 rented 또는 overdue인 경우만)
     const booksRef = collection(firestore, 'books')
     const rentedQuery = query(booksRef, where('rentedBy', '==', user.value.uid))
     const rentedSnapshot = await getDocs(rentedQuery)
-    const rentedBooks = rentedSnapshot.docs.map(doc => doc.data())
+    const rentedBooks = rentedSnapshot.docs
+      .map(doc => doc.data())
+      .filter(book => book.status === 'rented' || book.status === 'overdue')
     myRentedCount.value = rentedBooks.length
     
     // 반납 예정 도서 (반납예정일 1일 전부터 + 연체 도서 포함)
@@ -280,12 +282,21 @@ const loadNewBooks = async () => {
   }
 }
 
+// 최대 대여 권수
+const MAX_RENT_COUNT = 5
+
 // 도서 대여 처리
 const handleRent = async (book) => {
   if (!user.value || !book) return
   
   // 바로 대여 가능 여부 확인 (강남 근무지 + 강남센터 또는 용산 근무지 + 용산센터)
   const isDirectRent = canDirectRent(userWorkplace.value, currentCenter.value)
+  
+  // 바로 대여 가능한 경우에만 대여 권수 체크
+  if (isDirectRent && myRentedCount.value >= MAX_RENT_COUNT) {
+    await alert(`${MAX_RENT_COUNT}권을 대여중입니다. 대여중인 도서를 반납 후 대여해주세요.`, { type: 'warning' })
+    return
+  }
   
   const confirmMessage = isDirectRent 
     ? `"${book.title}"을(를) 대여 신청하시겠습니까?`
@@ -303,7 +314,10 @@ const handleRent = async (book) => {
     if (isDirectRent) {
       // 바로 대여 처리 (강남 근무지 + 강남센터 또는 용산 근무지 + 용산센터)
       await rentBook(isbn, currentCenter.value, user.value.uid)
-      await loadNewBooks()
+      await Promise.all([
+        loadNewBooks(),
+        loadMyRentalStatus()
+      ])
       await alert('도서 대여가 완료되었습니다.', { type: 'success' })
     } else {
       // 대여 신청 처리 (그 외 모든 경우)

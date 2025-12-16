@@ -281,6 +281,9 @@ const selectedBooks = ref([])
 const selectAll = ref(false)
 const actionLoading = ref(false)
 
+// 최대 대여 권수
+const MAX_RENT_COUNT = 5
+
 // 대여자/신청자 정보 캐시
 const renterInfoCache = ref({})
 const requesterInfoCache = ref({})
@@ -677,12 +680,43 @@ const handleRentBooks = async () => {
   rentDialog.value = true
 }
 
+// 사용자의 현재 대여 권수 조회
+const getUserRentedCount = async (userId) => {
+  if (!firestore || !userId) return 0
+  
+  try {
+    const { collection, query, where, getDocs } = await import('firebase/firestore')
+    const booksRef = collection(firestore, 'books')
+    const rentedQuery = query(booksRef, where('rentedBy', '==', userId))
+    const snapshot = await getDocs(rentedQuery)
+    // status가 rented 또는 overdue인 도서만 카운트
+    let count = 0
+    snapshot.forEach(doc => {
+      const data = doc.data()
+      if (data.status === 'rented' || data.status === 'overdue') {
+        count++
+      }
+    })
+    return count
+  } catch (error) {
+    console.error('대여 권수 조회 오류:', error)
+    return 0
+  }
+}
+
 // 개별 대여 처리 (다이얼로그 열기)
 const openRentDialog = async (book) => {
   const status = calculateBookStatus(book)
   
   // 대여 신청된 도서인 경우 신청자 정보로 바로 대여 처리
   if (status === 'requested' && book.requestedBy) {
+    // 신청자의 현재 대여 권수 확인
+    const currentRentedCount = await getUserRentedCount(book.requestedBy)
+    if (currentRentedCount >= MAX_RENT_COUNT) {
+      await alert(`신청자가 이미 ${MAX_RENT_COUNT}권을 대여중입니다.\n반납 후 대여 처리해주세요.`, { type: 'warning' })
+      return
+    }
+    
     if (!await confirm(`신청자 정보로 대여 처리하시겠습니까?\n\n도서: ${book.title}\n신청자: ${getRequesterInfo(book)}`)) {
       return
     }
@@ -761,6 +795,21 @@ const confirmRentBooks = async () => {
     
     const targetUser = emailSnapshot.docs[0]
     const targetUserId = targetUser.id
+    
+    // 대여 권수 체크
+    const currentRentedCount = await getUserRentedCount(targetUserId)
+    const booksToRent = rentDialogBooks.value.length
+    const remainingSlots = MAX_RENT_COUNT - currentRentedCount
+    
+    if (remainingSlots <= 0) {
+      rentFormError.value = `해당 사용자가 이미 ${MAX_RENT_COUNT}권을 대여중입니다.`
+      return
+    }
+    
+    if (booksToRent > remainingSlots) {
+      rentFormError.value = `해당 사용자는 ${remainingSlots}권까지만 추가 대여 가능합니다. (현재 ${currentRentedCount}권 대여중)`
+      return
+    }
     
     // 선택된 도서들 대여 처리
     for (const book of rentDialogBooks.value) {

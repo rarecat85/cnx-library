@@ -268,7 +268,15 @@ const loadCurrentRentedCount = async () => {
     )
     
     const snapshot = await getDocs(q)
-    currentRentedCount.value = snapshot.size
+    // status가 rented 또는 overdue인 도서만 카운트 (반납된 도서 제외)
+    let count = 0
+    snapshot.forEach(doc => {
+      const data = doc.data()
+      if (data.status === 'rented' || data.status === 'overdue') {
+        count++
+      }
+    })
+    currentRentedCount.value = count
   } catch (error) {
     console.error('대여중인 도서 수 로드 오류:', error)
     currentRentedCount.value = 0

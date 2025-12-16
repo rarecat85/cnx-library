@@ -299,8 +299,12 @@ const handleNotificationClick = async (notification) => {
   // 알림 타입에 따라 페이지 이동
   switch (notification.type) {
     case 'book_request':
+      // 도서 등록 신청 → 도서 등록 페이지 (신청 목록 확인 및 등록)
+      router.push('/admin/books/register')
+      break
     case 'rent_request':
     case 'overdue_admin':
+      // 대여 신청/연체 → 도서 관리 페이지 (승인/반납 처리)
       router.push('/admin/books')
       break
     case 'book_registered':

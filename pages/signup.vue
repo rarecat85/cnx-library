@@ -95,7 +95,9 @@
           variant="tonal"
           class="success-alert mb-4"
         >
-          <div>{{ successMessage }}</div>
+          <div class="success-message-text">
+            {{ successMessage }}
+          </div>
           <div
             v-if="countdown > 0"
             class="countdown-text mt-2"
@@ -202,7 +204,7 @@ const handleSignup = async () => {
     if (result.warning) {
       successMessage.value = result.warning
     } else {
-      successMessage.value = '회원가입이 완료되었습니다. 이메일을 확인하여 인증을 완료해주세요.'
+      successMessage.value = '회원가입이 완료되었습니다. 이메일을 확인하여 인증을 완료해주세요.\n\n📧 인증 메일은 5~10분 정도 소요될 수 있습니다. 재전송 시 처음부터 다시 기다려야 하니 충분히 기다려주세요.'
     }
     // 폼 초기화
     name.value = ''
@@ -299,6 +301,11 @@ useHead({
   font-size: rem(13);
   font-weight: 500;
   opacity: 0.9;
+}
+
+.success-message-text {
+  white-space: pre-line;
+  line-height: 1.6;
 }
 
 .login-title {

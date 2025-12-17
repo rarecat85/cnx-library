@@ -29,9 +29,28 @@ export const useAuth = () => {
       try {
         const currentUser = auth.currentUser
         if (currentUser) {
-          // 사용자 정보 다시 로드하여 최신 상태 확인
-          await currentUser.reload()
-          user.value = currentUser
+          // Firestore에서 emailVerified 상태 확인
+          const { doc, getDoc } = await import('firebase/firestore')
+          const userRef = doc($firebaseFirestore, 'users', currentUser.uid)
+          const userDoc = await getDoc(userRef)
+          
+          if (userDoc.exists()) {
+            const userData = userDoc.data()
+            
+            // emailVerified가 true인 경우에만 로그인 상태 유지
+            if (userData.emailVerified === true) {
+              await currentUser.reload()
+              user.value = currentUser
+            } else {
+              // 이메일 인증이 완료되지 않은 경우 로그아웃
+              await signOut(auth)
+              user.value = null
+            }
+          } else {
+            // Firestore에 사용자 정보가 없으면 로그아웃
+            await signOut(auth)
+            user.value = null
+          }
           loading.value = false
         }
       } catch (error) {
@@ -52,8 +71,34 @@ export const useAuth = () => {
     let firstCallback = true
     onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // 사용자가 로그인된 경우
-        user.value = firebaseUser
+        // Firestore에서 emailVerified 상태 확인
+        try {
+          const { doc, getDoc } = await import('firebase/firestore')
+          const userRef = doc($firebaseFirestore, 'users', firebaseUser.uid)
+          const userDoc = await getDoc(userRef)
+          
+          if (userDoc.exists()) {
+            const userData = userDoc.data()
+            
+            // emailVerified가 true인 경우에만 로그인 상태 유지
+            if (userData.emailVerified === true) {
+              user.value = firebaseUser
+            } else {
+              // 이메일 인증이 완료되지 않은 경우 로그아웃
+              await signOut(auth)
+              user.value = null
+            }
+          } else {
+            // Firestore에 사용자 정보가 없으면 로그아웃
+            await signOut(auth)
+            user.value = null
+          }
+        } catch (error) {
+          console.error('사용자 인증 상태 확인 오류:', error)
+          // 오류 발생 시 안전하게 로그아웃 처리
+          await signOut(auth)
+          user.value = null
+        }
         loading.value = false
       } else {
         // 사용자가 로그인되지 않은 경우

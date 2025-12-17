@@ -165,7 +165,7 @@ const verifyWithToken = async () => {
       verifying.value = false
       
       // 만료되거나 유효하지 않은 토큰인 경우 재전송 안내
-      if (result.data.errorType === 'invalid_token' || result.data.errorType === 'expired_token') {
+      if (result.data.errorType === 'invalid_token' || result.data.errorType === 'expired_token' || result.data.errorType === 'no_token') {
         canResend.value = true
       }
     }
@@ -173,6 +173,7 @@ const verifyWithToken = async () => {
     console.error('토큰 인증 오류:', err)
     error.value = true
     errorMessage.value = '인증 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
+    canResend.value = true
     verifying.value = false
   }
 }

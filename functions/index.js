@@ -397,6 +397,25 @@ exports.verifyEmailToken = onCall({
 
     const userData = userDoc.data()
 
+    // 이미 인증된 사용자인 경우
+    if (userData.emailVerified === true) {
+      return {
+        success: true,
+        message: '이미 이메일 인증이 완료된 계정입니다.',
+        email: userData.email,
+        alreadyVerified: true
+      }
+    }
+
+    // 토큰이 없는 경우 (회원가입 시 토큰 저장 실패 등)
+    if (!userData.verificationToken) {
+      return {
+        success: false,
+        error: '인증 토큰이 없습니다. 로그인 페이지에서 인증 이메일 재전송을 요청해주세요.',
+        errorType: 'no_token'
+      }
+    }
+
     // 토큰 일치 확인
     if (userData.verificationToken !== token) {
       // 이전 토큰인 경우 (새 토큰이 발급됨)
@@ -431,10 +450,13 @@ exports.verifyEmailToken = onCall({
       updatedAt: FieldValue.serverTimestamp()
     }, { merge: true })
 
-    // Firebase Auth의 emailVerified도 true로 업데이트 (동기화)
-    await auth.updateUser(uid, {
-      emailVerified: true
-    })
+    // Firebase Auth의 emailVerified도 업데이트 시도 (실패해도 무시)
+    try {
+      await auth.updateUser(uid, { emailVerified: true })
+    } catch (authError) {
+      console.log('Firebase Auth emailVerified 업데이트 실패 (무시됨):', authError.message)
+      // Firestore 업데이트가 성공했으므로 계속 진행
+    }
 
     return {
       success: true,

@@ -718,6 +718,14 @@ useHead({
   color: #002C5B;
   line-height: 1.2;
   margin: 0;
+  
+  @media (max-width: 768px) {
+    font-size: rem(24);
+  }
+  
+  @media (max-width: 480px) {
+    font-size: rem(20);
+  }
 }
 
 .section-header {
@@ -757,6 +765,10 @@ useHead({
   font-weight: 600;
   color: #002C5B;
   margin: 0;
+  
+  @media (max-width: 480px) {
+    font-size: rem(18);
+  }
 }
 
 .edit-profile-btn,

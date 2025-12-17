@@ -269,6 +269,14 @@ const handleRent = (book) => {
   color: #002C5B;
   line-height: 1.2;
   margin: 0;
+  
+  @media (max-width: 768px) {
+    font-size: rem(20);
+  }
+  
+  @media (max-width: 480px) {
+    font-size: rem(18);
+  }
 }
 
 .book-list-swiper {

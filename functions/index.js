@@ -852,7 +852,7 @@ exports.onBookRequestApproved = onDocumentUpdated(
  */
 exports.scheduledNotifications = onSchedule(
   {
-    schedule: '0 0 * * *', // 매일 UTC 00:00 (KST 09:00)
+    schedule: '0 9 * * *', // 매일 KST 09:00 (한국 시간 오전 9시)
     timeZone: 'Asia/Seoul',
     region: 'asia-northeast3'
   },

@@ -1,0 +1,14 @@
+# Markdown files
+*.md
+
+# Build outputs
+.output
+.nuxt
+dist
+
+# Dependencies
+node_modules
+
+# Other
+.git
+

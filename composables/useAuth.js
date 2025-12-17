@@ -2,15 +2,10 @@ import {
   signInWithEmailAndPassword, 
   signOut, 
   onAuthStateChanged,
-  createUserWithEmailAndPassword,
-  sendEmailVerification,
-  sendPasswordResetEmail,
-  confirmPasswordReset as firebaseConfirmPasswordReset,
-  checkActionCode
+  createUserWithEmailAndPassword
 } from 'firebase/auth'
 import { getFunctions, httpsCallable } from 'firebase/functions'
 import {
-  collection,
   doc,
   setDoc,
   getDoc,
@@ -38,27 +33,6 @@ export const useAuth = () => {
           await currentUser.reload()
           user.value = currentUser
           loading.value = false
-          
-          // 이메일 인증 완료 시 Firestore 업데이트
-          if (currentUser.emailVerified && firestore) {
-            try {
-              const userRef = doc(firestore, 'users', currentUser.uid)
-              const userDoc = await getDoc(userRef)
-              
-              if (userDoc.exists()) {
-                const userData = userDoc.data()
-                if (!userData.emailVerifiedAt) {
-                  await setDoc(userRef, {
-                    emailVerified: true,
-                    emailVerifiedAt: serverTimestamp(),
-                    updatedAt: serverTimestamp()
-                  }, { merge: true })
-                }
-              }
-            } catch (error) {
-              console.error('이메일 인증 상태 업데이트 실패:', error)
-            }
-          }
         }
       } catch (error) {
         console.error('초기 사용자 확인 실패:', error)
@@ -81,27 +55,6 @@ export const useAuth = () => {
         // 사용자가 로그인된 경우
         user.value = firebaseUser
         loading.value = false
-        
-        // 이메일 인증 완료 시 Firestore 업데이트
-        if (firebaseUser.emailVerified && firestore) {
-          try {
-            const userRef = doc(firestore, 'users', firebaseUser.uid)
-            const userDoc = await getDoc(userRef)
-            
-            if (userDoc.exists()) {
-              const userData = userDoc.data()
-              if (!userData.emailVerifiedAt) {
-                await setDoc(userRef, {
-                  emailVerified: true,
-                  emailVerifiedAt: serverTimestamp(),
-                  updatedAt: serverTimestamp()
-                }, { merge: true })
-              }
-            }
-          } catch (error) {
-            console.error('이메일 인증 상태 업데이트 실패:', error)
-          }
-        }
       } else {
         // 사용자가 로그인되지 않은 경우
         user.value = null
@@ -127,7 +80,7 @@ export const useAuth = () => {
     }
   }
 
-  // 회원가입
+  // 회원가입 (자체 인증 시스템 사용)
   const signup = async (email, password, name, workplace) => {
     if (!auth || !firestore) {
       console.error('Firebase가 초기화되지 않았습니다.')
@@ -141,9 +94,6 @@ export const useAuth = () => {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password)
       const firebaseUser = userCredential.user
       
-      // 이메일 인증 링크 발송
-      await sendEmailVerification(firebaseUser)
-      
       // Firestore에 사용자 정보 저장
       const userRef = doc(firestore, 'users', firebaseUser.uid)
       await setDoc(userRef, {
@@ -156,6 +106,26 @@ export const useAuth = () => {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       })
+      
+      // Firebase Functions를 통해 인증 메일 발송
+      const functions = getFunctions($firebaseApp)
+      const sendSignupVerificationEmail = httpsCallable(functions, 'sendSignupVerificationEmail')
+      
+      try {
+        const result = await sendSignupVerificationEmail({
+          uid: firebaseUser.uid,
+          email: email,
+          name: name
+        })
+        
+        if (!result.data.success) {
+          console.error('인증 메일 발송 실패:', result.data.error)
+          // 인증 메일 발송 실패해도 회원가입은 성공 처리 (나중에 재발송 가능)
+        }
+      } catch (emailError) {
+        console.error('인증 메일 발송 오류:', emailError)
+        // 인증 메일 발송 실패해도 회원가입은 성공 처리
+      }
       
       // 로그아웃 (이메일 인증 완료 전까지는 로그인 상태 유지하지 않음)
       await signOut(auth)
@@ -180,111 +150,35 @@ export const useAuth = () => {
     }
   }
 
-  // 이메일 인증 링크 재발송 (로그인한 사용자용)
-  const resendVerificationEmail = async () => {
-    if (!auth || !auth.currentUser) {
-      return { success: false, error: '로그인이 필요합니다.' }
-    }
-
-    try {
-      await sendEmailVerification(auth.currentUser)
-      return { success: true }
-    } catch (error) {
-      let errorMessage = '이메일 발송에 실패했습니다.'
-      
-      if (error.code === 'auth/too-many-requests') {
-        errorMessage = '너무 많은 요청이 있었습니다. 잠시 후 다시 시도해주세요.'
-      }
-      
-      return { success: false, error: errorMessage }
-    }
-  }
-
-  // 이메일 인증 링크 재발송 (로그인하지 않은 사용자용 - 이메일과 비밀번호 필요)
-  const resendVerificationEmailForLogin = async (email, password) => {
+  // 이메일 인증 링크 재발송 (로그인하지 않은 사용자용 - 자체 인증 시스템)
+  const resendVerificationEmailForLogin = async (email, password, isReauth = false) => {
     if (!auth || !firestore) {
       return { success: false, error: 'Firebase가 초기화되지 않았습니다.' }
     }
 
     try {
-      // 임시로 로그인하여 사용자 확인
+      // 임시로 로그인하여 사용자 확인 (비밀번호 검증)
       const userCredential = await signInWithEmailAndPassword(auth, email, password)
       const firebaseUser = userCredential.user
       
-      // Firestore에서 사용자 정보 확인
-      const userRef = doc(firestore, 'users', firebaseUser.uid)
-      const userDoc = await getDoc(userRef)
-      
-      // 이미 인증된 상태인지 확인 (3개월 재인증이 필요한 경우는 제외)
-      if (userDoc.exists()) {
-        const userData = userDoc.data()
-        // Firestore의 emailVerified가 true이고 Firebase Auth도 인증된 경우
-        // Functions를 통해 재인증 프로세스 시작
-        if (userData.emailVerified === true && firebaseUser.emailVerified) {
-          // Firebase Functions 호출하여 인증 상태 초기화
-          const functions = getFunctions($firebaseApp)
-          const resendVerificationEmailWithReset = httpsCallable(functions, 'resendVerificationEmailWithReset')
-          
-          try {
-            const result = await resendVerificationEmailWithReset({ email, password })
-            if (result.data.success) {
-              // 인증 상태가 초기화되었으므로 다시 로그인하여 최신 상태 가져오기
-              await signOut(auth)
-              const newUserCredential = await signInWithEmailAndPassword(auth, email, password)
-              const newFirebaseUser = newUserCredential.user
-              
-              // 새로운 인증 이메일 발송
-              await sendEmailVerification(newFirebaseUser)
-              
-              await signOut(auth)
-              return { success: true }
-            } else {
-              await signOut(auth)
-              return { success: false, error: result.data.error || '재인증 이메일 발송에 실패했습니다.' }
-            }
-          } catch (functionsError) {
-            await signOut(auth)
-            console.error('Functions 호출 오류:', functionsError)
-            return { success: false, error: '재인증 이메일 발송에 실패했습니다.' }
-          }
-        }
-      } else {
-        // Firestore에 사용자 정보가 없고 Firebase Auth에서 이미 인증된 경우
-        if (firebaseUser.emailVerified) {
-          // Functions를 통해 재인증 프로세스 시작
-          const functions = getFunctions($firebaseApp)
-          const resendVerificationEmailWithReset = httpsCallable(functions, 'resendVerificationEmailWithReset')
-          
-          try {
-            const result = await resendVerificationEmailWithReset({ email, password })
-            if (result.data.success) {
-              await signOut(auth)
-              const newUserCredential = await signInWithEmailAndPassword(auth, email, password)
-              const newFirebaseUser = newUserCredential.user
-              
-              await sendEmailVerification(newFirebaseUser)
-              
-              await signOut(auth)
-              return { success: true }
-            } else {
-              await signOut(auth)
-              return { success: false, error: result.data.error || '재인증 이메일 발송에 실패했습니다.' }
-            }
-          } catch (functionsError) {
-            await signOut(auth)
-            console.error('Functions 호출 오류:', functionsError)
-            return { success: false, error: '재인증 이메일 발송에 실패했습니다.' }
-          }
-        }
-      }
-      
-      // 아직 인증되지 않은 상태이면 일반적인 인증 이메일 발송
-      await sendEmailVerification(firebaseUser)
-      
-      // 로그아웃
+      // 즉시 로그아웃 (인증되지 않은 상태로 유지)
       await signOut(auth)
       
-      return { success: true }
+      // Firebase Functions를 통해 인증 메일 발송
+      const functions = getFunctions($firebaseApp)
+      const resendVerificationEmail = httpsCallable(functions, 'resendVerificationEmail')
+      
+      const result = await resendVerificationEmail({
+        email: email,
+        password: password,
+        isReauth: isReauth
+      })
+      
+      if (result.data.success) {
+        return { success: true, message: result.data.message }
+      } else {
+        return { success: false, error: result.data.error || '인증 이메일 발송에 실패했습니다.' }
+      }
     } catch (error) {
       let errorMessage = '이메일 발송에 실패했습니다.'
       
@@ -295,7 +189,7 @@ export const useAuth = () => {
       } else if (error.code === 'auth/wrong-password') {
         errorMessage = '비밀번호가 올바르지 않습니다.'
       } else if (error.code === 'auth/too-many-requests') {
-        errorMessage = '너무 많은 요청이 있었습니다. 잠시 후 다시 시도해주세요.'
+        errorMessage = '너무 많은 요청이 있습니다. 잠시 후 다시 시도해주세요.'
       }
       
       return { success: false, error: errorMessage }
@@ -385,7 +279,7 @@ export const useAuth = () => {
     localStorage.removeItem('rememberMe')
   }
 
-  // 로그인
+  // 로그인 (Firestore 기반 인증 상태 확인)
   const login = async (email, password, rememberMe = false) => {
     if (!auth || !firestore) {
       console.error('Firebase가 초기화되지 않았습니다.')
@@ -397,44 +291,25 @@ export const useAuth = () => {
       const userCredential = await signInWithEmailAndPassword(auth, email, password)
       const firebaseUser = userCredential.user
       
-      // 사용자 정보 다시 로드 (이메일 인증 상태 최신화)
-      await firebaseUser.reload()
+      // Firestore에서 사용자 정보 확인
+      const userRef = doc(firestore, 'users', firebaseUser.uid)
+      const userDoc = await getDoc(userRef)
       
-      // Firebase Auth의 이메일 인증 여부 확인
-      if (!firebaseUser.emailVerified) {
+      // Firestore에 사용자 정보가 없는 경우
+      if (!userDoc.exists()) {
         await signOut(auth)
         user.value = null
         loading.value = false
         return { 
           success: false, 
-          error: '이메일 인증이 완료되지 않았습니다. 이메일을 확인하여 인증을 완료해주세요.' 
+          error: '사용자 정보를 찾을 수 없습니다. 회원가입을 다시 진행해주세요.' 
         }
-      }
-      
-      // Firestore에서 사용자 정보 확인
-      const userRef = doc(firestore, 'users', firebaseUser.uid)
-      const userDoc = await getDoc(userRef)
-      
-      // Firestore에 사용자 정보가 없는 경우 (미리 생성된 계정)
-      if (!userDoc.exists()) {
-        // Firebase Auth에서 이미 인증된 경우, Firestore에 기본 사용자 정보 생성
-        await setDoc(userRef, {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          emailVerified: true,
-          emailVerifiedAt: serverTimestamp(),
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        })
-        
-        user.value = firebaseUser
-        return { success: true, user: firebaseUser }
       }
       
       const userData = userDoc.data()
       
       // Firestore의 emailVerified 상태 확인 (false이거나 undefined이면 무조건 차단)
-      if (userData.emailVerified === false || userData.emailVerified === undefined) {
+      if (userData.emailVerified !== true) {
         await signOut(auth)
         user.value = null
         loading.value = false
@@ -464,7 +339,7 @@ export const useAuth = () => {
           loading.value = false
           return {
             success: false,
-            error: '이메일 재인증이 필요합니다. 마지막 인증으로부터 3개월이 지났습니다. 재인증 이메일을 발송해주세요.',
+            error: '이메일 재인증이 필요합니다. 마지막 인증으로부터 3개월이 지났습니다.',
             requiresReauth: true
           }
         }
@@ -474,6 +349,7 @@ export const useAuth = () => {
       saveAutoLoginInfo(email, rememberMe)
       
       user.value = firebaseUser
+      loading.value = false
       return { success: true, user: firebaseUser }
     } catch (error) {
       loading.value = false
@@ -513,58 +389,69 @@ export const useAuth = () => {
     }
   }
 
-  // 비밀번호 재설정 이메일 발송
+  // 비밀번호 재설정 이메일 발송 (자체 시스템)
   const sendPasswordResetEmailToUser = async (email) => {
-    if (!auth) {
-      return { success: false, error: 'Firebase Auth가 초기화되지 않았습니다.' }
-    }
-
     try {
-      await sendPasswordResetEmail(auth, email)
-      return { success: true }
-    } catch (error) {
-      let errorMessage = '이메일 발송에 실패했습니다.'
+      // Firebase Functions를 통해 비밀번호 재설정 메일 발송
+      const functions = getFunctions($firebaseApp)
+      const sendPasswordResetEmailFn = httpsCallable(functions, 'sendPasswordResetEmail')
       
-      if (error.code === 'auth/user-not-found') {
-        errorMessage = '등록되지 않은 이메일입니다.'
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = '이메일 형식이 올바르지 않습니다.'
-      } else if (error.code === 'auth/too-many-requests') {
-        errorMessage = '너무 많은 요청이 있었습니다. 잠시 후 다시 시도해주세요.'
+      const result = await sendPasswordResetEmailFn({ email })
+      
+      if (result.data.success) {
+        return { success: true, message: result.data.message }
+      } else {
+        return { success: false, error: result.data.error || '이메일 발송에 실패했습니다.' }
       }
-      
-      return { success: false, error: errorMessage }
+    } catch (error) {
+      console.error('비밀번호 재설정 이메일 발송 오류:', error)
+      return { success: false, error: '이메일 발송에 실패했습니다.' }
     }
   }
 
-  // 비밀번호 재설정 확인 및 적용
-  const confirmPasswordReset = async (oobCode, newPassword) => {
-    if (!auth) {
-      return { success: false, error: 'Firebase Auth가 초기화되지 않았습니다.' }
-    }
-
+  // 비밀번호 재설정 토큰 검증 (자체 시스템)
+  const verifyPasswordResetToken = async (token, uid) => {
     try {
-      // 재설정 코드 유효성 확인
-      await checkActionCode(auth, oobCode)
+      const functions = getFunctions($firebaseApp)
+      const verifyPasswordResetTokenFn = httpsCallable(functions, 'verifyPasswordResetToken')
       
-      // 비밀번호 재설정
-      await firebaseConfirmPasswordReset(auth, oobCode, newPassword)
+      const result = await verifyPasswordResetTokenFn({ token, uid })
       
-      return { success: true }
-    } catch (error) {
-      let errorMessage = '비밀번호 재설정에 실패했습니다.'
-      
-      if (error.code === 'auth/expired-action-code') {
-        errorMessage = '비밀번호 재설정 링크가 만료되었습니다. 새로운 링크를 요청해주세요.'
-      } else if (error.code === 'auth/invalid-action-code') {
-        errorMessage = '유효하지 않은 재설정 링크입니다.'
-      } else if (error.code === 'auth/user-disabled') {
-        errorMessage = '비활성화된 계정입니다.'
-      } else if (error.code === 'auth/weak-password') {
-        errorMessage = '비밀번호가 너무 약합니다.'
+      if (result.data.success) {
+        return { success: true, email: result.data.email }
+      } else {
+        return { 
+          success: false, 
+          error: result.data.error || '유효하지 않은 토큰입니다.',
+          errorType: result.data.errorType
+        }
       }
+    } catch (error) {
+      console.error('토큰 검증 오류:', error)
+      return { success: false, error: '토큰 검증에 실패했습니다.' }
+    }
+  }
+
+  // 비밀번호 재설정 확인 및 적용 (자체 시스템)
+  const confirmPasswordReset = async (token, uid, newPassword) => {
+    try {
+      const functions = getFunctions($firebaseApp)
+      const verifyPasswordResetTokenFn = httpsCallable(functions, 'verifyPasswordResetToken')
       
-      return { success: false, error: errorMessage }
+      const result = await verifyPasswordResetTokenFn({ token, uid, newPassword })
+      
+      if (result.data.success) {
+        return { success: true, message: result.data.message }
+      } else {
+        return { 
+          success: false, 
+          error: result.data.error || '비밀번호 재설정에 실패했습니다.',
+          errorType: result.data.errorType
+        }
+      }
+    } catch (error) {
+      console.error('비밀번호 재설정 오류:', error)
+      return { success: false, error: '비밀번호 재설정에 실패했습니다.' }
     }
   }
 
@@ -578,13 +465,12 @@ export const useAuth = () => {
     signup,
     login,
     logout,
-    resendVerificationEmail,
     resendVerificationEmailForLogin,
     checkEmailVerificationStatus,
     sendPasswordResetEmail: sendPasswordResetEmailToUser,
+    verifyPasswordResetToken,
     confirmPasswordReset,
     getAutoLoginInfo,
     clearAutoLoginInfo
   }
 }
-

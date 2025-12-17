@@ -70,10 +70,32 @@
         <p class="error-text mb-6">
           {{ errorMessage }}
         </p>
+        
+        <!-- 만료되거나 유효하지 않은 토큰인 경우 재요청 안내 -->
+        <div
+          v-if="canRetry"
+          class="mb-6"
+        >
+          <p class="info-text mb-4">
+            새로운 비밀번호 재설정 링크를 받으시려면<br>
+            비밀번호 찾기 페이지에서 다시 요청해주세요.
+          </p>
+        </div>
+        
+        <v-btn
+          v-if="canRetry"
+          block
+          size="large"
+          class="login-btn mb-3"
+          elevation="2"
+          @click="goToForgotPassword"
+        >
+          비밀번호 찾기로 이동
+        </v-btn>
         <v-btn
           block
           size="large"
-          class="login-btn"
+          :class="canRetry ? 'secondary-btn' : 'login-btn'"
           elevation="2"
           @click="goToNextPage"
         >
@@ -155,7 +177,7 @@ definePageMeta({
   middleware: []
 })
 
-const { confirmPasswordReset, loading, user } = useAuth()
+const { verifyPasswordResetToken, confirmPasswordReset, loading, user } = useAuth()
 const router = useRouter()
 const route = useRoute()
 
@@ -170,8 +192,13 @@ const resetPasswordForm = ref()
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
 const isLoggedIn = ref(false)
+const canRetry = ref(false)
 
-// URL 파라미터에서 mode와 oobCode 추출
+// URL 파라미터에서 token과 uid 추출 (자체 시스템)
+const token = route.query.token
+const uid = route.query.uid
+
+// 기존 Firebase 파라미터 (호환용)
 const mode = route.query.mode
 const oobCode = route.query.oobCode
 
@@ -190,13 +217,50 @@ onMounted(async () => {
   // 로그인 상태 확인
   isLoggedIn.value = !!user.value
 
-  if (!mode || !oobCode) {
-    error.value = true
-    errorMessage.value = '잘못된 재설정 링크입니다.'
-    processing.value = false
+  // 자체 시스템 (token과 uid가 있는 경우)
+  if (token && uid) {
+    await verifyWithToken()
+    return
+  }
+  
+  // 기존 Firebase 시스템 (mode와 oobCode가 있는 경우)
+  if (mode && oobCode) {
+    await verifyWithFirebase()
     return
   }
 
+  // 파라미터가 없는 경우
+  error.value = true
+  errorMessage.value = '잘못된 재설정 링크입니다.'
+  canRetry.value = true
+  processing.value = false
+})
+
+// 자체 토큰 검증
+const verifyWithToken = async () => {
+  try {
+    const result = await verifyPasswordResetToken(token, uid)
+    
+    if (result.success) {
+      // 토큰 유효, 폼 표시
+      processing.value = false
+    } else {
+      error.value = true
+      errorMessage.value = result.error || '유효하지 않은 재설정 링크입니다.'
+      canRetry.value = result.errorType === 'invalid_token' || result.errorType === 'expired_token'
+      processing.value = false
+    }
+  } catch (err) {
+    console.error('토큰 검증 오류:', err)
+    error.value = true
+    errorMessage.value = '재설정 링크 검증 중 오류가 발생했습니다.'
+    canRetry.value = true
+    processing.value = false
+  }
+}
+
+// 기존 Firebase 검증 (호환용)
+const verifyWithFirebase = async () => {
   if (mode !== 'resetPassword') {
     error.value = true
     errorMessage.value = '지원하지 않는 재설정 모드입니다.'
@@ -204,9 +268,9 @@ onMounted(async () => {
     return
   }
 
-  // 링크 유효성 확인 완료
+  // 링크 유효성 확인 완료 (Firebase는 제출 시 확인)
   processing.value = false
-})
+}
 
 // 비밀번호 재설정 처리
 const handleResetPassword = async () => {
@@ -216,14 +280,23 @@ const handleResetPassword = async () => {
   const { valid } = await resetPasswordForm.value.validate()
   if (!valid) return
 
-  if (!oobCode) {
-    formError.value = '재설정 코드가 없습니다.'
-    return
-  }
-
   try {
     processing.value = true
-    const result = await confirmPasswordReset(oobCode, newPassword.value)
+    
+    let result
+    
+    // 자체 시스템
+    if (token && uid) {
+      result = await confirmPasswordReset(token, uid, newPassword.value)
+    } 
+    // 기존 Firebase 시스템 (호환용)
+    else if (oobCode) {
+      // Firebase 시스템은 더 이상 지원하지 않음
+      result = { success: false, error: '이 링크는 더 이상 유효하지 않습니다. 새로운 비밀번호 재설정을 요청해주세요.' }
+    }
+    else {
+      result = { success: false, error: '재설정 정보가 없습니다.' }
+    }
     
     if (result.success) {
       success.value = true
@@ -231,11 +304,13 @@ const handleResetPassword = async () => {
     } else {
       error.value = true
       errorMessage.value = result.error || '비밀번호 재설정에 실패했습니다.'
+      canRetry.value = true
       processing.value = false
     }
   } catch (err) {
     error.value = true
     errorMessage.value = err.message || '비밀번호 재설정에 실패했습니다.'
+    canRetry.value = true
     processing.value = false
   }
 }
@@ -247,6 +322,10 @@ const goToNextPage = () => {
   } else {
     router.push('/login')
   }
+}
+
+const goToForgotPassword = () => {
+  router.push('/forgot-password')
 }
 
 // 페이지 메타데이터
@@ -343,6 +422,13 @@ useHead({
   margin: 0;
 }
 
+.info-text {
+  font-size: rem(14);
+  color: #6b7280;
+  margin: 0;
+  line-height: 1.6;
+}
+
 .login-btn,
 .reset-btn {
   height: rem(48);
@@ -354,6 +440,19 @@ useHead({
   
   &:hover:not(:disabled) {
     background-color: #003d7a;
+  }
+}
+
+.secondary-btn {
+  height: rem(48);
+  font-size: rem(16);
+  font-weight: 500;
+  border-radius: rem(8);
+  background-color: #f3f4f6;
+  color: #4b5563;
+  
+  &:hover:not(:disabled) {
+    background-color: #e5e7eb;
   }
 }
 

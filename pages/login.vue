@@ -58,11 +58,11 @@
         variant="tonal"
         closable
         class="error-alert mb-4"
-        @click:close="error = ''"
+        @click:close="clearError"
       >
         <div class="error-content">
           <div class="error-message">
-            {{ error }}
+            {{ displayError }}
             <a
               v-if="showResendButton"
               href="#"
@@ -71,7 +71,14 @@
               :disabled="resending || loading"
               @click.prevent="handleResendVerification"
             >
-              인증 이메일 재전송
+              <v-progress-circular
+                v-if="resending"
+                indeterminate
+                size="14"
+                width="2"
+                class="mr-1"
+              />
+              {{ resending ? '재전송 중...' : '인증 이메일 재전송' }}
             </a>
           </div>
         </div>
@@ -133,6 +140,57 @@ const showPassword = ref(false)
 const showResendButton = ref(false)
 const resending = ref(false)
 const rememberMe = ref(false)
+const rateLimitCountdown = ref(0)
+let countdownInterval = null
+
+// 에러 메시지에서 카운트다운 부분을 제외한 메시지 표시
+const displayError = computed(() => {
+  if (rateLimitCountdown.value > 0) {
+    return `잠시 후 다시 시도해주세요. (${rateLimitCountdown.value}초 후)`
+  }
+  // "(XX초 후)" 패턴 제거
+  return error.value.replace(/\s*\(\d+초 후\)/, '')
+})
+
+// 에러 초기화
+const clearError = () => {
+  error.value = ''
+  rateLimitCountdown.value = 0
+  if (countdownInterval) {
+    clearInterval(countdownInterval)
+    countdownInterval = null
+  }
+}
+
+// 에러 메시지에서 대기 시간 추출 및 카운트다운 시작
+const startRateLimitCountdown = (errorMessage) => {
+  const match = errorMessage.match(/\((\d+)초 후\)/)
+  if (match) {
+    const seconds = parseInt(match[1], 10)
+    rateLimitCountdown.value = seconds
+    
+    if (countdownInterval) {
+      clearInterval(countdownInterval)
+    }
+    
+    countdownInterval = setInterval(() => {
+      rateLimitCountdown.value--
+      if (rateLimitCountdown.value <= 0) {
+        clearInterval(countdownInterval)
+        countdownInterval = null
+        // 카운트다운이 끝나면 에러 메시지 제거
+        error.value = ''
+      }
+    }, 1000)
+  }
+}
+
+// 컴포넌트 언마운트 시 인터벌 정리
+onUnmounted(() => {
+  if (countdownInterval) {
+    clearInterval(countdownInterval)
+  }
+})
 
 // 페이지 로드 시 자동로그인 확인 및 처리
 onMounted(async () => {
@@ -236,7 +294,7 @@ const handleResendVerification = async () => {
   }
 
   resending.value = true
-  error.value = ''
+  clearError()
   
   const result = await resendVerificationEmailForLogin(email.value, password.value)
   
@@ -245,6 +303,10 @@ const handleResendVerification = async () => {
     showResendButton.value = false
   } else {
     error.value = result.error || '이메일 재전송에 실패했습니다.'
+    // rate limit 에러인 경우 카운트다운 시작
+    if (result.error && result.error.includes('초 후')) {
+      startRateLimitCountdown(result.error)
+    }
   }
   
   resending.value = false
@@ -300,17 +362,16 @@ useHead({
 .error-alert {
   min-height: rem(48);
   margin-top: rem(16);
-  position: relative;
 }
 
 .error-alert :deep(.v-alert__content) {
   width: 100%;
+  padding-right: rem(24);
 }
 
-.error-alert :deep(.v-btn--icon.v-alert__close) {
-  position: absolute;
-  top: rem(8);
-  right: rem(8);
+.error-alert :deep(.v-alert__close) {
+  align-self: flex-start;
+  margin-top: rem(2);
 }
 
 .error-content {
@@ -319,10 +380,12 @@ useHead({
 
 .error-message {
   line-height: 1.5;
+  word-break: keep-all;
 }
 
 .resend-link {
-  display: block;
+  display: inline-flex;
+  align-items: center;
   margin-top: rem(8);
   color: #002C5B;
   text-decoration: underline;

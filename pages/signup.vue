@@ -95,7 +95,10 @@
         variant="tonal"
         class="success-alert mb-4"
       >
-        {{ successMessage }}
+        <div>{{ successMessage }}</div>
+        <div v-if="countdown > 0" class="countdown-text mt-2">
+          {{ countdown }}초 뒤 로그인 페이지로 이동합니다.
+        </div>
       </v-alert>
 
       <v-btn
@@ -103,7 +106,7 @@
         block
         size="large"
         :loading="loading"
-        :disabled="loading"
+        :disabled="loading || !!successMessage"
         class="signup-btn"
         elevation="2"
       >
@@ -149,6 +152,8 @@ const successMessage = ref('')
 const signupForm = ref()
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
+const countdown = ref(0)
+let countdownInterval = null
 
 const workplaceOptions = [...WORKPLACES]
 
@@ -196,10 +201,34 @@ const handleSignup = async () => {
     confirmPassword.value = ''
     workplace.value = ''
     signupForm.value.resetValidation()
+    
+    // 5초 카운트다운 후 로그인 페이지로 이동
+    startCountdown()
   } else {
     error.value = result.error || '회원가입에 실패했습니다.'
   }
 }
+
+// 카운트다운 시작
+const startCountdown = () => {
+  countdown.value = 5
+  
+  countdownInterval = setInterval(() => {
+    countdown.value--
+    
+    if (countdown.value <= 0) {
+      clearInterval(countdownInterval)
+      router.push('/login')
+    }
+  }, 1000)
+}
+
+// 컴포넌트 언마운트 시 인터벌 정리
+onUnmounted(() => {
+  if (countdownInterval) {
+    clearInterval(countdownInterval)
+  }
+})
 
 // 페이지 메타데이터
 useHead({
@@ -254,6 +283,12 @@ useHead({
   display: flex;
   align-items: center;
   margin-top: rem(16);
+}
+
+.countdown-text {
+  font-size: rem(13);
+  font-weight: 500;
+  opacity: 0.9;
 }
 
 .login-title {

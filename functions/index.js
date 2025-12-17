@@ -7,6 +7,7 @@ const { getAuth } = require('firebase-admin/auth')
 const { getFirestore, FieldValue } = require('firebase-admin/firestore')
 const functions = require('firebase-functions')
 const nodemailer = require('nodemailer')
+const crypto = require('crypto')
 
 // 환경 변수
 const aladinTtbKey = defineString('ALADIN_TTB_KEY', { default: '' })
@@ -171,20 +172,94 @@ exports.updateEmailVerificationStatus = onCall({
   }
 })
 
+// ==================== 자체 이메일 인증 시스템 ====================
+
+// 인증 토큰 유효 시간 (24시간)
+const VERIFICATION_TOKEN_EXPIRY_HOURS = 24
+
+// 재전송 제한 시간 (1분)
+const RESEND_LIMIT_SECONDS = 60
+
+// 앱 URL (환경에 따라 다름)
+const APP_URL = 'https://rarecat85.github.io/cnx-library'
+
 /**
- * 재인증 이메일 발송 (인증 상태 초기화 후)
+ * 회원가입 시 인증 메일 발송
  * 
- * 이 함수는 재인증 이메일을 발송하기 전에 사용자의 emailVerified 상태를
- * false로 초기화하여 새로운 액션 코드를 생성할 수 있도록 합니다.
+ * 새로운 토큰을 생성하고 인증 메일을 발송합니다.
  */
-exports.resendVerificationEmailWithReset = onCall({
+exports.sendSignupVerificationEmail = onCall({
   cors: [
     'https://rarecat85.github.io',
-    'http://localhost:5001'
+    'http://localhost:5001',
+    'http://localhost:3000'
   ]
 }, async (request) => {
   try {
-    const { email, password } = request.data
+    const { uid, email, name } = request.data
+
+    if (!uid || !email) {
+      return {
+        success: false,
+        error: 'uid와 email이 필요합니다.'
+      }
+    }
+
+    // 새 토큰 생성
+    const token = generateVerificationToken()
+    const now = new Date()
+    const expiresAt = new Date(now.getTime() + VERIFICATION_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000)
+
+    // Firestore에 토큰 저장
+    const userRef = firestore.collection('users').doc(uid)
+    await userRef.set({
+      verificationToken: token,
+      verificationTokenCreatedAt: FieldValue.serverTimestamp(),
+      verificationTokenExpiresAt: expiresAt,
+      updatedAt: FieldValue.serverTimestamp()
+    }, { merge: true })
+
+    // 인증 URL 생성
+    const verificationUrl = `${APP_URL}/verify-email?token=${token}&uid=${uid}`
+
+    // 인증 메일 발송
+    const sent = await sendVerificationEmail(email, 'signup', verificationUrl, name, VERIFICATION_TOKEN_EXPIRY_HOURS)
+
+    if (!sent) {
+      return {
+        success: false,
+        error: '인증 이메일 발송에 실패했습니다.'
+      }
+    }
+
+    return {
+      success: true,
+      message: '인증 이메일이 발송되었습니다.'
+    }
+  } catch (error) {
+    console.error('회원가입 인증 메일 발송 오류:', error)
+    return {
+      success: false,
+      error: error.message || '인증 이메일 발송에 실패했습니다.'
+    }
+  }
+})
+
+/**
+ * 인증 메일 재발송 (로그인하지 않은 사용자용)
+ * 
+ * 이메일과 비밀번호를 확인한 후 새로운 토큰으로 인증 메일을 재발송합니다.
+ * 이전 토큰은 자동으로 무효화됩니다.
+ */
+exports.resendVerificationEmail = onCall({
+  cors: [
+    'https://rarecat85.github.io',
+    'http://localhost:5001',
+    'http://localhost:3000'
+  ]
+}, async (request) => {
+  try {
+    const { email, password, isReauth } = request.data
 
     if (!email || !password) {
       return {
@@ -207,35 +282,599 @@ exports.resendVerificationEmailWithReset = onCall({
       throw error
     }
 
-    // 비밀번호 확인은 클라이언트에서 이미 수행되었으므로
-    // 여기서는 사용자 존재 여부만 확인합니다.
+    // Firestore에서 사용자 정보 확인
+    const userRef = firestore.collection('users').doc(userRecord.uid)
+    const userDoc = await userRef.get()
+
+    if (!userDoc.exists) {
+      return {
+        success: false,
+        error: '사용자 정보를 찾을 수 없습니다.'
+      }
+    }
+
+    const userData = userDoc.data()
+
+    // 재전송 제한 확인 (1분 이내 재요청 방지)
+    if (userData.verificationTokenCreatedAt) {
+      const lastSent = userData.verificationTokenCreatedAt.toDate()
+      const now = new Date()
+      const diffSeconds = Math.floor((now - lastSent) / 1000)
+      
+      if (diffSeconds < RESEND_LIMIT_SECONDS) {
+        const remainingSeconds = RESEND_LIMIT_SECONDS - diffSeconds
+        return {
+          success: false,
+          error: `잠시 후 다시 시도해주세요. (${remainingSeconds}초 후)`
+        }
+      }
+    }
+
+    // 새 토큰 생성 (이전 토큰 자동 무효화)
+    const token = generateVerificationToken()
+    const now = new Date()
+    const expiresAt = new Date(now.getTime() + VERIFICATION_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000)
+
+    // 재인증인 경우 emailVerified를 false로 초기화
+    const updateData = {
+      verificationToken: token,
+      verificationTokenCreatedAt: FieldValue.serverTimestamp(),
+      verificationTokenExpiresAt: expiresAt,
+      updatedAt: FieldValue.serverTimestamp()
+    }
+
+    if (isReauth) {
+      updateData.emailVerified = false
+      updateData.emailVerifiedAt = null
+      
+      // Firebase Auth의 emailVerified도 false로 초기화
+      await auth.updateUser(userRecord.uid, {
+        emailVerified: false
+      })
+    }
+
+    await userRef.set(updateData, { merge: true })
+
+    // 인증 URL 생성
+    const verificationUrl = `${APP_URL}/verify-email?token=${token}&uid=${userRecord.uid}`
+
+    // 인증 메일 발송
+    const mailType = isReauth ? 'reauth' : 'signup'
+    const sent = await sendVerificationEmail(email, mailType, verificationUrl, userData.name, VERIFICATION_TOKEN_EXPIRY_HOURS)
+
+    if (!sent) {
+      return {
+        success: false,
+        error: '인증 이메일 발송에 실패했습니다.'
+      }
+    }
+
+    return {
+      success: true,
+      message: '인증 이메일이 재발송되었습니다.'
+    }
+  } catch (error) {
+    console.error('인증 메일 재발송 오류:', error)
+    return {
+      success: false,
+      error: error.message || '인증 이메일 발송에 실패했습니다.'
+    }
+  }
+})
+
+/**
+ * 인증 토큰 검증 및 이메일 인증 완료
+ * 
+ * 토큰의 유효성을 확인하고 인증을 완료 처리합니다.
+ */
+exports.verifyEmailToken = onCall({
+  cors: [
+    'https://rarecat85.github.io',
+    'http://localhost:5001',
+    'http://localhost:3000'
+  ]
+}, async (request) => {
+  try {
+    const { token, uid } = request.data
+
+    if (!token || !uid) {
+      return {
+        success: false,
+        error: '토큰과 uid가 필요합니다.'
+      }
+    }
+
+    // Firestore에서 사용자 정보 확인
+    const userRef = firestore.collection('users').doc(uid)
+    const userDoc = await userRef.get()
+
+    if (!userDoc.exists) {
+      return {
+        success: false,
+        error: '사용자를 찾을 수 없습니다.'
+      }
+    }
+
+    const userData = userDoc.data()
+
+    // 토큰 일치 확인
+    if (userData.verificationToken !== token) {
+      // 이전 토큰인 경우 (새 토큰이 발급됨)
+      return {
+        success: false,
+        error: '이미 만료된 인증 링크입니다. 새로 발송된 링크를 통해 인증을 진행해주세요.',
+        errorType: 'invalid_token'
+      }
+    }
+
+    // 만료 시간 확인
+    if (userData.verificationTokenExpiresAt) {
+      const expiresAt = userData.verificationTokenExpiresAt.toDate()
+      const now = new Date()
+      
+      if (now > expiresAt) {
+        return {
+          success: false,
+          error: '이미 만료된 인증 링크입니다. 새로 발송된 링크를 통해 인증을 진행해주세요.',
+          errorType: 'expired_token'
+        }
+      }
+    }
+
+    // 인증 완료 처리
+    await userRef.set({
+      emailVerified: true,
+      emailVerifiedAt: FieldValue.serverTimestamp(),
+      verificationToken: null, // 토큰 삭제
+      verificationTokenCreatedAt: null,
+      verificationTokenExpiresAt: null,
+      updatedAt: FieldValue.serverTimestamp()
+    }, { merge: true })
+
+    // Firebase Auth의 emailVerified도 true로 업데이트 (동기화)
+    await auth.updateUser(uid, {
+      emailVerified: true
+    })
+
+    return {
+      success: true,
+      message: '이메일 인증이 완료되었습니다.',
+      email: userData.email
+    }
+  } catch (error) {
+    console.error('토큰 검증 오류:', error)
+    return {
+      success: false,
+      error: error.message || '인증 처리에 실패했습니다.'
+    }
+  }
+})
+
+// ==================== 비밀번호 재설정 시스템 ====================
+
+// 비밀번호 재설정 토큰 유효 시간 (1시간)
+const PASSWORD_RESET_TOKEN_EXPIRY_HOURS = 1
+
+/**
+ * 비밀번호 재설정 메일 템플릿 생성
+ * @param {string} resetUrl - 비밀번호 재설정 링크 URL
+ * @param {string} userName - 사용자 이름
+ * @param {number} expiresInHours - 만료 시간 (시간)
+ * @returns {string} HTML 이메일 템플릿
+ */
+const createPasswordResetEmailTemplate = (resetUrl, userName, expiresInHours = 1) => {
+  return `
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>비밀번호 재설정</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #F2F2F2;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #F2F2F2;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 600px; margin: 0 auto;">
+          
+          <!-- 헤더 -->
+          <tr>
+            <td style="background-color: #002C5B; padding: 32px 40px; border-radius: 16px 16px 0 0;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td>
+                    <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #FFFFFF; letter-spacing: -0.5px;">
+                      CNX Library
+                    </h1>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- 본문 -->
+          <tr>
+            <td style="background-color: #FFFFFF; padding: 40px;">
+              <!-- 배지 -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 24px;">
+                <tr>
+                  <td style="background-color: #dc262615; border-radius: 8px; padding: 8px 16px;">
+                    <span style="font-size: 14px; font-weight: 600; color: #dc2626;">
+                      🔐 비밀번호 재설정
+                    </span>
+                  </td>
+                </tr>
+              </table>
+              
+              <!-- 인사말 -->
+              <h2 style="margin: 0 0 16px 0; font-size: 22px; font-weight: 700; color: #002C5B; line-height: 1.4;">
+                ${userName ? `${userName}님, ` : ''}비밀번호 재설정 안내
+              </h2>
+              
+              <!-- 설명 -->
+              <p style="margin: 0 0 32px 0; font-size: 16px; color: #4b5563; line-height: 1.7;">
+                비밀번호 재설정 요청을 받았습니다. 아래 버튼을 클릭하여 새로운 비밀번호를 설정해주세요.
+              </p>
+              
+              <!-- 재설정 버튼 -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td align="center">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                      <tr>
+                        <td style="border-radius: 8px; background-color: #002C5B;">
+                          <a href="${resetUrl}" target="_blank" style="display: inline-block; padding: 16px 48px; font-size: 16px; font-weight: 600; color: #FFFFFF; text-decoration: none;">
+                            비밀번호 재설정하기
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+              
+              <!-- 안내 메시지 -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 32px; background-color: #fef2f2; border-radius: 12px; padding: 20px;">
+                <tr>
+                  <td>
+                    <p style="margin: 0 0 8px 0; font-size: 13px; color: #dc2626; font-weight: 500;">⏱️ 링크 유효 시간</p>
+                    <p style="margin: 0; font-size: 14px; color: #002C5B; font-weight: 600;">${expiresInHours}시간</p>
+                  </td>
+                </tr>
+              </table>
+              
+              <!-- 경고 메시지 -->
+              <p style="margin: 24px 0 0 0; font-size: 14px; color: #dc2626; line-height: 1.6;">
+                ⚠️ 본인이 요청하지 않은 경우, 이 메일을 무시하시고 계정 보안을 확인해주세요.
+              </p>
+              
+              <!-- 버튼이 작동하지 않는 경우 -->
+              <p style="margin: 32px 0 8px 0; font-size: 13px; color: #9ca3af;">
+                버튼이 작동하지 않으면 아래 링크를 복사하여 브라우저에 붙여넣으세요:
+              </p>
+              <p style="margin: 0; font-size: 12px; color: #6b7280; word-break: break-all; background-color: #f3f4f6; padding: 12px; border-radius: 6px;">
+                ${resetUrl}
+              </p>
+            </td>
+          </tr>
+          
+          <!-- 푸터 -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 24px 40px; border-radius: 0 0 16px 16px; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 8px 0; font-size: 13px; color: #9ca3af; text-align: center;">
+                이 메일은 CNX Library에서 자동 발송되었습니다.
+              </p>
+              <p style="margin: 0; font-size: 13px; color: #9ca3af; text-align: center;">
+                © CNX Library
+              </p>
+            </td>
+          </tr>
+          
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+}
+
+/**
+ * 비밀번호 재설정 이메일 발송
+ * @param {string} to - 수신자 이메일
+ * @param {string} resetUrl - 비밀번호 재설정 링크 URL
+ * @param {string} userName - 사용자 이름
+ * @param {number} expiresInHours - 만료 시간 (시간)
+ * @returns {boolean} 발송 성공 여부
+ */
+const sendPasswordResetEmailToUser = async (to, resetUrl, userName, expiresInHours = 1) => {
+  const transporter = createMailTransporter()
+  
+  if (!transporter) {
+    console.log('이메일 발송 스킵: 트랜스포터 없음')
+    return false
+  }
+  
+  try {
+    const html = createPasswordResetEmailTemplate(resetUrl, userName, expiresInHours)
+    
+    await transporter.sendMail({
+      from: `"CNX Library" <${gmailUser.value()}>`,
+      to,
+      subject: '[CNX Library] 비밀번호 재설정 안내',
+      html
+    })
+    
+    console.log(`비밀번호 재설정 이메일 발송 완료: ${to}`)
+    return true
+  } catch (error) {
+    console.error('비밀번호 재설정 이메일 발송 오류:', error)
+    return false
+  }
+}
+
+/**
+ * 비밀번호 재설정 메일 발송 (자체 시스템)
+ * 
+ * 새로운 토큰을 생성하고 비밀번호 재설정 메일을 발송합니다.
+ */
+exports.sendPasswordResetEmail = onCall({
+  cors: [
+    'https://rarecat85.github.io',
+    'http://localhost:5001',
+    'http://localhost:3000'
+  ]
+}, async (request) => {
+  try {
+    const { email } = request.data
+
+    if (!email) {
+      return {
+        success: false,
+        error: '이메일이 필요합니다.'
+      }
+    }
+
+    // 이메일로 사용자 찾기
+    let userRecord
+    try {
+      userRecord = await auth.getUserByEmail(email)
+    } catch (error) {
+      if (error.code === 'auth/user-not-found') {
+        // 보안을 위해 등록되지 않은 이메일도 성공으로 응답
+        return {
+          success: true,
+          message: '비밀번호 재설정 이메일이 발송되었습니다.'
+        }
+      }
+      throw error
+    }
 
     // Firestore에서 사용자 정보 확인
     const userRef = firestore.collection('users').doc(userRecord.uid)
     const userDoc = await userRef.get()
 
-    if (userDoc.exists) {
-      const userData = userDoc.data()
-      // 이미 인증 완료된 상태이고, 재인증이 필요하지 않은 경우
-      if (userData.emailVerified === true && userRecord.emailVerified) {
-        // 3개월 재인증 체크는 클라이언트에서 처리
-        // 여기서는 무조건 재인증을 허용
+    if (!userDoc.exists) {
+      // Firestore에 사용자 정보가 없어도 발송 시도
+      console.warn('Firestore에 사용자 정보 없음:', email)
+    }
+
+    const userData = userDoc.exists ? userDoc.data() : {}
+
+    // 재전송 제한 확인 (1분 이내 재요청 방지)
+    if (userData.passwordResetTokenCreatedAt) {
+      const lastSent = userData.passwordResetTokenCreatedAt.toDate()
+      const now = new Date()
+      const diffSeconds = Math.floor((now - lastSent) / 1000)
+      
+      if (diffSeconds < RESEND_LIMIT_SECONDS) {
+        const remainingSeconds = RESEND_LIMIT_SECONDS - diffSeconds
+        return {
+          success: false,
+          error: `잠시 후 다시 시도해주세요. (${remainingSeconds}초 후)`
+        }
       }
     }
+
+    // 새 토큰 생성
+    const token = generateVerificationToken()
+    const now = new Date()
+    const expiresAt = new Date(now.getTime() + PASSWORD_RESET_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000)
+
+    // Firestore에 토큰 저장
+    await userRef.set({
+      passwordResetToken: token,
+      passwordResetTokenCreatedAt: FieldValue.serverTimestamp(),
+      passwordResetTokenExpiresAt: expiresAt,
+      updatedAt: FieldValue.serverTimestamp()
+    }, { merge: true })
+
+    // 비밀번호 재설정 URL 생성
+    const resetUrl = `${APP_URL}/reset-password?token=${token}&uid=${userRecord.uid}`
+
+    // 비밀번호 재설정 메일 발송
+    const sent = await sendPasswordResetEmailToUser(email, resetUrl, userData.name, PASSWORD_RESET_TOKEN_EXPIRY_HOURS)
+
+    if (!sent) {
+      return {
+        success: false,
+        error: '비밀번호 재설정 이메일 발송에 실패했습니다.'
+      }
+    }
+
+    return {
+      success: true,
+      message: '비밀번호 재설정 이메일이 발송되었습니다.'
+    }
+  } catch (error) {
+    console.error('비밀번호 재설정 메일 발송 오류:', error)
+    return {
+      success: false,
+      error: error.message || '비밀번호 재설정 이메일 발송에 실패했습니다.'
+    }
+  }
+})
+
+/**
+ * 비밀번호 재설정 토큰 검증 및 비밀번호 변경
+ * 
+ * 토큰의 유효성을 확인하고 비밀번호를 변경합니다.
+ */
+exports.verifyPasswordResetToken = onCall({
+  cors: [
+    'https://rarecat85.github.io',
+    'http://localhost:5001',
+    'http://localhost:3000'
+  ]
+}, async (request) => {
+  try {
+    const { token, uid, newPassword } = request.data
+
+    if (!token || !uid) {
+      return {
+        success: false,
+        error: '토큰과 uid가 필요합니다.'
+      }
+    }
+
+    // Firestore에서 사용자 정보 확인
+    const userRef = firestore.collection('users').doc(uid)
+    const userDoc = await userRef.get()
+
+    if (!userDoc.exists) {
+      return {
+        success: false,
+        error: '사용자를 찾을 수 없습니다.'
+      }
+    }
+
+    const userData = userDoc.data()
+
+    // 토큰 일치 확인
+    if (userData.passwordResetToken !== token) {
+      return {
+        success: false,
+        error: '유효하지 않은 재설정 링크입니다. 새로운 비밀번호 재설정을 요청해주세요.',
+        errorType: 'invalid_token'
+      }
+    }
+
+    // 만료 시간 확인
+    if (userData.passwordResetTokenExpiresAt) {
+      const expiresAt = userData.passwordResetTokenExpiresAt.toDate()
+      const now = new Date()
+      
+      if (now > expiresAt) {
+        return {
+          success: false,
+          error: '재설정 링크가 만료되었습니다. 새로운 비밀번호 재설정을 요청해주세요.',
+          errorType: 'expired_token'
+        }
+      }
+    }
+
+    // 토큰 검증만 하는 경우 (newPassword가 없는 경우)
+    if (!newPassword) {
+      return {
+        success: true,
+        message: '유효한 토큰입니다.',
+        email: userData.email
+      }
+    }
+
+    // 비밀번호 변경
+    await auth.updateUser(uid, {
+      password: newPassword
+    })
+
+    // 토큰 삭제
+    await userRef.set({
+      passwordResetToken: null,
+      passwordResetTokenCreatedAt: null,
+      passwordResetTokenExpiresAt: null,
+      updatedAt: FieldValue.serverTimestamp()
+    }, { merge: true })
+
+    return {
+      success: true,
+      message: '비밀번호가 성공적으로 변경되었습니다.',
+      email: userData.email
+    }
+  } catch (error) {
+    console.error('비밀번호 재설정 오류:', error)
+    return {
+      success: false,
+      error: error.message || '비밀번호 재설정에 실패했습니다.'
+    }
+  }
+})
+
+/**
+ * (구버전 호환용) 재인증 이메일 발송
+ * @deprecated resendVerificationEmail 사용 권장
+ */
+exports.resendVerificationEmailWithReset = onCall({
+  cors: [
+    'https://rarecat85.github.io',
+    'http://localhost:5001'
+  ]
+}, async (request) => {
+  // 새로운 resendVerificationEmail로 리다이렉트
+  const { email, password } = request.data
+  
+  try {
+    // 이메일로 사용자 찾기
+    let userRecord
+    try {
+      userRecord = await auth.getUserByEmail(email)
+    } catch (error) {
+      if (error.code === 'auth/user-not-found') {
+        return {
+          success: false,
+          error: '등록되지 않은 이메일입니다.'
+        }
+      }
+      throw error
+    }
+
+    // Firestore에서 사용자 정보 확인
+    const userRef = firestore.collection('users').doc(userRecord.uid)
+    const userDoc = await userRef.get()
+    const userData = userDoc.exists ? userDoc.data() : {}
+
+    // 새 토큰 생성
+    const token = generateVerificationToken()
+    const now = new Date()
+    const expiresAt = new Date(now.getTime() + VERIFICATION_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000)
 
     // Firebase Auth의 emailVerified를 false로 초기화
     await auth.updateUser(userRecord.uid, {
       emailVerified: false
     })
 
-    // Firestore의 emailVerified도 false로 업데이트
+    // Firestore 업데이트
     await userRef.set({
       emailVerified: false,
       emailVerifiedAt: null,
-      updatedAt: require('firebase-admin/firestore').FieldValue.serverTimestamp()
+      verificationToken: token,
+      verificationTokenCreatedAt: FieldValue.serverTimestamp(),
+      verificationTokenExpiresAt: expiresAt,
+      updatedAt: FieldValue.serverTimestamp()
     }, { merge: true })
 
-    // 성공 반환 (클라이언트에서 sendEmailVerification 호출 필요)
+    // 인증 URL 생성
+    const verificationUrl = `${APP_URL}/verify-email?token=${token}&uid=${userRecord.uid}`
+
+    // 인증 메일 발송
+    const sent = await sendVerificationEmail(email, 'reauth', verificationUrl, userData.name, VERIFICATION_TOKEN_EXPIRY_HOURS)
+
+    if (!sent) {
+      return {
+        success: false,
+        error: '인증 이메일 발송에 실패했습니다.'
+      }
+    }
+
     return {
       success: true,
       uid: userRecord.uid,
@@ -473,6 +1112,191 @@ const createMailTransporter = () => {
     service: 'gmail',
     auth: { user, pass }
   })
+}
+
+/**
+ * 인증 토큰 생성
+ * @returns {string} 32바이트 랜덤 토큰 (hex)
+ */
+const generateVerificationToken = () => {
+  return crypto.randomBytes(32).toString('hex')
+}
+
+/**
+ * 인증 메일 템플릿 생성
+ * @param {string} type - 인증 타입 (signup, reauth)
+ * @param {string} verificationUrl - 인증 링크 URL
+ * @param {string} userName - 사용자 이름
+ * @param {number} expiresInHours - 만료 시간 (시간)
+ * @returns {string} HTML 이메일 템플릿
+ */
+const createVerificationEmailTemplate = (type, verificationUrl, userName, expiresInHours = 24) => {
+  const isReauth = type === 'reauth'
+  const title = isReauth ? '이메일 재인증 안내' : '이메일 인증 안내'
+  const description = isReauth 
+    ? '3개월 주기 재인증이 필요합니다. 아래 버튼을 클릭하여 이메일 인증을 완료해주세요.'
+    : 'CNX Library 가입을 환영합니다! 아래 버튼을 클릭하여 이메일 인증을 완료해주세요.'
+  
+  // 재인증 메일인 경우 이전 링크 만료 안내 추가
+  const reauthWarning = isReauth ? `
+              <!-- 이전 링크 만료 안내 -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 24px; background-color: #fef2f2; border-radius: 12px; padding: 16px 20px;">
+                <tr>
+                  <td>
+                    <p style="margin: 0; font-size: 14px; color: #dc2626; line-height: 1.6;">
+                      ⚠️ <strong>이전에 발송된 인증 메일의 링크는 더 이상 유효하지 않습니다.</strong><br>
+                      반드시 이 메일의 링크를 사용하여 인증을 진행해주세요.
+                    </p>
+                  </td>
+                </tr>
+              </table>` : ''
+  
+  return `
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #F2F2F2;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #F2F2F2;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 600px; margin: 0 auto;">
+          
+          <!-- 헤더 -->
+          <tr>
+            <td style="background-color: #002C5B; padding: 32px 40px; border-radius: 16px 16px 0 0;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td>
+                    <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #FFFFFF; letter-spacing: -0.5px;">
+                      CNX Library
+                    </h1>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- 본문 -->
+          <tr>
+            <td style="background-color: #FFFFFF; padding: 40px;">
+              <!-- 인증 배지 -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 24px;">
+                <tr>
+                  <td style="background-color: ${isReauth ? '#f59e0b15' : '#16a34a15'}; border-radius: 8px; padding: 8px 16px;">
+                    <span style="font-size: 14px; font-weight: 600; color: ${isReauth ? '#f59e0b' : '#16a34a'};">
+                      ${isReauth ? '🔄 재인증 필요' : '✉️ 이메일 인증'}
+                    </span>
+                  </td>
+                </tr>
+              </table>
+              
+              <!-- 인사말 -->
+              <h2 style="margin: 0 0 16px 0; font-size: 22px; font-weight: 700; color: #002C5B; line-height: 1.4;">
+                ${userName ? `${userName}님, ` : ''}${title}
+              </h2>
+              
+              <!-- 설명 -->
+              <p style="margin: 0 0 32px 0; font-size: 16px; color: #4b5563; line-height: 1.7;">
+                ${description}
+              </p>
+              
+              <!-- 인증 버튼 -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td align="center">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                      <tr>
+                        <td style="border-radius: 8px; background-color: #002C5B;">
+                          <a href="${verificationUrl}" target="_blank" style="display: inline-block; padding: 16px 48px; font-size: 16px; font-weight: 600; color: #FFFFFF; text-decoration: none;">
+                            이메일 인증하기
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+              ${reauthWarning}
+              <!-- 안내 메시지 -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 32px; background-color: #f9fafb; border-radius: 12px; padding: 20px;">
+                <tr>
+                  <td>
+                    <p style="margin: 0 0 8px 0; font-size: 13px; color: #6b7280; font-weight: 500;">⏱️ 인증 링크 유효 시간</p>
+                    <p style="margin: 0; font-size: 14px; color: #002C5B; font-weight: 600;">${expiresInHours}시간</p>
+                  </td>
+                </tr>
+              </table>
+              
+              <!-- 버튼이 작동하지 않는 경우 -->
+              <p style="margin: 32px 0 8px 0; font-size: 13px; color: #9ca3af;">
+                버튼이 작동하지 않으면 아래 링크를 복사하여 브라우저에 붙여넣으세요:
+              </p>
+              <p style="margin: 0; font-size: 12px; color: #6b7280; word-break: break-all; background-color: #f3f4f6; padding: 12px; border-radius: 6px;">
+                ${verificationUrl}
+              </p>
+            </td>
+          </tr>
+          
+          <!-- 푸터 -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 24px 40px; border-radius: 0 0 16px 16px; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 8px 0; font-size: 13px; color: #9ca3af; text-align: center;">
+                본인이 요청하지 않은 경우 이 메일을 무시해주세요.
+              </p>
+              <p style="margin: 0; font-size: 13px; color: #9ca3af; text-align: center;">
+                © CNX Library
+              </p>
+            </td>
+          </tr>
+          
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+}
+
+/**
+ * 인증 이메일 발송
+ * @param {string} to - 수신자 이메일
+ * @param {string} type - 인증 타입 (signup, reauth)
+ * @param {string} verificationUrl - 인증 링크 URL
+ * @param {string} userName - 사용자 이름
+ * @param {number} expiresInHours - 만료 시간 (시간)
+ * @returns {boolean} 발송 성공 여부
+ */
+const sendVerificationEmail = async (to, type, verificationUrl, userName, expiresInHours = 24) => {
+  const transporter = createMailTransporter()
+  
+  if (!transporter) {
+    console.log('이메일 발송 스킵: 트랜스포터 없음')
+    return false
+  }
+  
+  try {
+    const isReauth = type === 'reauth'
+    const subject = isReauth ? '[CNX Library] 이메일 재인증 안내' : '[CNX Library] 이메일 인증 안내'
+    const html = createVerificationEmailTemplate(type, verificationUrl, userName, expiresInHours)
+    
+    await transporter.sendMail({
+      from: `"CNX Library" <${gmailUser.value()}>`,
+      to,
+      subject,
+      html
+    })
+    
+    console.log(`인증 이메일 발송 완료: ${to}`)
+    return true
+  } catch (error) {
+    console.error('인증 이메일 발송 오류:', error)
+    return false
+  }
 }
 
 /**

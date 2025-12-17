@@ -190,14 +190,18 @@ const workplaceRules = [
 
 // 회원가입 처리
 const handleSignup = async () => {
+  console.log('[signup.vue] handleSignup 시작!')
   error.value = ''
   successMessage.value = ''
   
   // 폼 검증
   const { valid } = await signupForm.value.validate()
+  console.log('[signup.vue] 폼 검증 결과:', valid)
   if (!valid) return
 
+  console.log('[signup.vue] signup 함수 호출 전')
   const result = await signup(email.value, password.value, name.value, workplace.value)
+  console.log('[signup.vue] signup 함수 결과:', result)
   
   if (result.success) {
     // 메일 발송 실패 경고가 있는 경우

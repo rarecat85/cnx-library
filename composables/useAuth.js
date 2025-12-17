@@ -21,6 +21,7 @@ export const useAuth = () => {
   const user = useState('firebase_user', () => null)
   const loading = useState('auth_loading', () => true)
   const authInitialized = useState('auth_initialized', () => false)
+  const isSigningUp = useState('is_signing_up', () => false)  // 회원가입 진행 중 플래그
 
   // 클라이언트 사이드에서만 Firebase Auth 초기화
   if (process.client && auth) {
@@ -70,6 +71,22 @@ export const useAuth = () => {
     // 인증 상태 변경 감지 (첫 번째 콜백이 실행되면 resolve)
     let firstCallback = true
     onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log('[onAuthStateChanged] 콜백 실행됨, firebaseUser:', firebaseUser?.uid || 'null', ', isSigningUp:', isSigningUp.value)
+      
+      // 회원가입 진행 중이면 처리하지 않음 (교착 상태 방지)
+      if (isSigningUp.value) {
+        console.log('[onAuthStateChanged] 회원가입 진행 중 - 스킵')
+        // loading.value는 변경하지 않음 (회원가입 프로세스가 관리)
+        // 첫 번째 콜백만 resolve
+        if (firstCallback && authStateReadyResolver) {
+          firstCallback = false
+          authInitialized.value = true
+          authStateReadyResolver()
+          authStateReadyResolver = null
+        }
+        return
+      }
+      
       if (firebaseUser) {
         // Firestore에서 emailVerified 상태 확인
         try {
@@ -127,57 +144,103 @@ export const useAuth = () => {
 
   // 회원가입 (자체 인증 시스템 사용)
   const signup = async (email, password, name, workplace) => {
+    console.log('[회원가입] signup 함수 시작')
+    
     if (!auth || !firestore) {
-      console.error('Firebase가 초기화되지 않았습니다.')
+      console.error('[회원가입] Firebase가 초기화되지 않았습니다.')
       return { success: false, error: 'Firebase가 초기화되지 않았습니다.' }
     }
 
     try {
       loading.value = true
+      isSigningUp.value = true  // 회원가입 시작 플래그 설정
+      console.log('[회원가입] Firebase Auth 계정 생성 시작...')
       
       // Firebase Auth 계정 생성
       const userCredential = await createUserWithEmailAndPassword(auth, email, password)
       const firebaseUser = userCredential.user
+      console.log('[회원가입] Firebase Auth 계정 생성 완료:', firebaseUser.uid)
       
       // Firestore에 사용자 정보 저장
-      const userRef = doc(firestore, 'users', firebaseUser.uid)
-      await setDoc(userRef, {
-        uid: firebaseUser.uid,
-        email: email,
-        name: name,
-        workplace: workplace,
-        emailVerified: false,
-        emailVerifiedAt: null,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      })
-      
-      // 먼저 로그아웃 (이메일 인증 완료 전까지는 로그인 상태 유지하지 않음)
-      await signOut(auth)
-      
-      // Firebase Functions를 통해 인증 메일 발송 (타임아웃 10초)
-      const functions = getFunctions($firebaseApp)
-      const sendSignupVerificationEmail = httpsCallable(functions, 'sendSignupVerificationEmail', { timeout: 10000 })
-      
-      let emailSent = false
+      console.log('[회원가입] Firestore 사용자 정보 저장 시작...')
       try {
-        const result = await sendSignupVerificationEmail({
+        const userRef = doc(firestore, 'users', firebaseUser.uid)
+        const userData = {
           uid: firebaseUser.uid,
           email: email,
-          name: name
-        })
+          name: name,
+          workplace: workplace,
+          emailVerified: false,
+          emailVerifiedAt: null,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        }
+        console.log('[회원가입] setDoc 호출 직전, userData:', JSON.stringify({...userData, createdAt: 'timestamp', updatedAt: 'timestamp'}))
         
+        // setDoc에 타임아웃 적용 (10초)
+        const setDocPromise = setDoc(userRef, userData)
+        const setDocTimeout = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('setDoc 타임아웃 (10초)')), 10000)
+        )
+        
+        await Promise.race([setDocPromise, setDocTimeout])
+        console.log('[회원가입] Firestore 사용자 정보 저장 완료')
+      } catch (firestoreError) {
+        console.error('[회원가입] Firestore 저장 에러:', firestoreError)
+        console.error('[회원가입] Firestore 에러 상세:', firestoreError.code, firestoreError.message)
+        throw firestoreError
+      }
+      
+      // 먼저 로그아웃 (이메일 인증 완료 전까지는 로그인 상태 유지하지 않음)
+      console.log('[회원가입] 로그아웃 시작...')
+      await signOut(auth)
+      console.log('[회원가입] 로그아웃 완료')
+      
+      // Firebase Functions를 통해 인증 메일 발송 (타임아웃 5초)
+      console.log('[회원가입] 인증 메일 발송 시작...')
+      const functions = getFunctions($firebaseApp)
+      const sendSignupVerificationEmail = httpsCallable(functions, 'sendSignupVerificationEmail')
+      
+      let emailSent = false
+      let emailError = null
+      
+      // Promise.race를 사용한 타임아웃 구현
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => {
+          console.log('[회원가입] 타임아웃 발생!')
+          reject(new Error('타임아웃: 인증 메일 발송 응답 없음'))
+        }, 5000)
+      )
+      
+      try {
+        console.log('[회원가입] sendSignupVerificationEmail 호출 중...')
+        const result = await Promise.race([
+          sendSignupVerificationEmail({
+            uid: firebaseUser.uid,
+            email: email,
+            name: name
+          }),
+          timeoutPromise
+        ])
+        
+        console.log('[회원가입] 응답 받음:', result)
         if (result.data.success) {
           emailSent = true
+          console.log('[회원가입] 메일 발송 성공')
         } else {
-          console.error('인증 메일 발송 실패:', result.data.error)
+          emailError = result.data.error
+          console.error('[회원가입] 인증 메일 발송 실패:', emailError)
         }
-      } catch (emailError) {
-        console.error('인증 메일 발송 오류:', emailError)
+      } catch (err) {
+        emailError = err.message
+        console.error('[회원가입] 인증 메일 발송 오류:', err)
         // 인증 메일 발송 실패해도 회원가입은 성공 처리 (나중에 재발송 가능)
       }
       
+      console.log('[회원가입] emailSent:', emailSent, 'emailError:', emailError)
+      
       loading.value = false
+      isSigningUp.value = false  // 회원가입 완료 플래그 해제
       
       if (!emailSent) {
         return { 
@@ -190,6 +253,7 @@ export const useAuth = () => {
       return { success: true, user: firebaseUser }
     } catch (error) {
       loading.value = false
+      isSigningUp.value = false  // 회원가입 실패 시에도 플래그 해제
       let errorMessage = '회원가입에 실패했습니다.'
       
       if (error.code === 'auth/email-already-in-use') {

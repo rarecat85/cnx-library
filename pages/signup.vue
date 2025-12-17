@@ -1,132 +1,137 @@
 <template>
   <v-app>
     <PageLayout>
-    <div class="text-center mb-8">
-      <h1 class="login-title mb-2">
-        CNX Library
-      </h1>
-      <p class="login-subtitle">
-        회원가입
-      </p>
-    </div>
-
-    <v-form
-      ref="signupForm"
-      validate-on="submit"
-      @submit.prevent="handleSignup"
-    >
-      <v-text-field
-        v-model="name"
-        label="이름"
-        prepend-inner-icon="mdi-account-outline"
-        variant="outlined"
-        :rules="nameRules"
-        :disabled="loading"
-        class="mb-2"
-        density="comfortable"
-      />
-
-      <v-text-field
-        v-model="email"
-        label="이메일"
-        type="email"
-        prepend-inner-icon="mdi-email-outline"
-        variant="outlined"
-        :rules="emailRules"
-        :disabled="loading"
-        class="mb-2"
-        density="comfortable"
-      />
-
-      <v-text-field
-        v-model="password"
-        label="비밀번호"
-        :type="showPassword ? 'text' : 'password'"
-        prepend-inner-icon="mdi-lock-outline"
-        :append-inner-icon="showPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
-        variant="outlined"
-        :rules="passwordRules"
-        :disabled="loading"
-        class="mb-2"
-        density="comfortable"
-        @click:append-inner="showPassword = !showPassword"
-      />
-
-      <v-text-field
-        v-model="confirmPassword"
-        label="비밀번호 확인"
-        :type="showConfirmPassword ? 'text' : 'password'"
-        prepend-inner-icon="mdi-lock-check-outline"
-        :append-inner-icon="showConfirmPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
-        variant="outlined"
-        :rules="confirmPasswordRules"
-        :disabled="loading"
-        class="mb-2"
-        density="comfortable"
-        @click:append-inner="showConfirmPassword = !showConfirmPassword"
-      />
-
-      <v-select
-        v-model="workplace"
-        label="근무지"
-        :items="workplaceOptions"
-        prepend-inner-icon="mdi-office-building-outline"
-        variant="outlined"
-        :rules="workplaceRules"
-        :disabled="loading"
-        class="mb-2"
-        density="comfortable"
-      />
-
-      <v-alert
-        v-if="error"
-        type="error"
-        variant="tonal"
-        closable
-        class="error-alert mb-4"
-        @click:close="error = ''"
-      >
-        {{ error }}
-      </v-alert>
-
-      <v-alert
-        v-if="successMessage"
-        type="success"
-        variant="tonal"
-        class="success-alert mb-4"
-      >
-        <div>{{ successMessage }}</div>
-        <div v-if="countdown > 0" class="countdown-text mt-2">
-          {{ countdown }}초 뒤 로그인 페이지로 이동합니다.
-        </div>
-      </v-alert>
-
-      <v-btn
-        type="submit"
-        block
-        size="large"
-        :loading="loading"
-        :disabled="loading || !!successMessage"
-        class="signup-btn"
-        elevation="2"
-      >
-        회원가입
-      </v-btn>
-    </v-form>
-
-    <div class="auth-links text-center mt-4">
-      <NuxtLink
-        to="/login"
-        class="auth-link"
-      >로그인</NuxtLink>
-    </div>
-    
-    <div class="logo-bottom text-center mt-6">
-      <div class="logo-with-credit">
-        <ConcentrixLogo />
-        <span class="credit-text">© rarecat</span>
+      <div class="text-center mb-8">
+        <h1 class="login-title mb-2">
+          CNX Library
+        </h1>
+        <p class="login-subtitle">
+          회원가입
+        </p>
       </div>
-    </div>
+
+      <v-form
+        ref="signupForm"
+        validate-on="submit"
+        @submit.prevent="handleSignup"
+      >
+        <v-text-field
+          v-model="name"
+          label="이름"
+          prepend-inner-icon="mdi-account-outline"
+          variant="outlined"
+          :rules="nameRules"
+          :disabled="loading"
+          class="mb-2"
+          density="comfortable"
+        />
+
+        <v-text-field
+          v-model="email"
+          label="이메일"
+          type="email"
+          prepend-inner-icon="mdi-email-outline"
+          variant="outlined"
+          :rules="emailRules"
+          :disabled="loading"
+          class="mb-2"
+          density="comfortable"
+        />
+
+        <v-text-field
+          v-model="password"
+          label="비밀번호"
+          :type="showPassword ? 'text' : 'password'"
+          prepend-inner-icon="mdi-lock-outline"
+          :append-inner-icon="showPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+          variant="outlined"
+          :rules="passwordRules"
+          :disabled="loading"
+          class="mb-2"
+          density="comfortable"
+          @click:append-inner="showPassword = !showPassword"
+        />
+
+        <v-text-field
+          v-model="confirmPassword"
+          label="비밀번호 확인"
+          :type="showConfirmPassword ? 'text' : 'password'"
+          prepend-inner-icon="mdi-lock-check-outline"
+          :append-inner-icon="showConfirmPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+          variant="outlined"
+          :rules="confirmPasswordRules"
+          :disabled="loading"
+          class="mb-2"
+          density="comfortable"
+          @click:append-inner="showConfirmPassword = !showConfirmPassword"
+        />
+
+        <v-select
+          v-model="workplace"
+          label="근무지"
+          :items="workplaceOptions"
+          prepend-inner-icon="mdi-office-building-outline"
+          variant="outlined"
+          :rules="workplaceRules"
+          :disabled="loading"
+          class="mb-2"
+          density="comfortable"
+        />
+
+        <v-alert
+          v-if="error"
+          type="error"
+          variant="tonal"
+          closable
+          class="error-alert mb-4"
+          @click:close="error = ''"
+        >
+          {{ error }}
+        </v-alert>
+
+        <v-alert
+          v-if="successMessage"
+          type="success"
+          variant="tonal"
+          class="success-alert mb-4"
+        >
+          <div>{{ successMessage }}</div>
+          <div
+            v-if="countdown > 0"
+            class="countdown-text mt-2"
+          >
+            {{ countdown }}초 뒤 로그인 페이지로 이동합니다.
+          </div>
+        </v-alert>
+
+        <v-btn
+          type="submit"
+          block
+          size="large"
+          :loading="loading"
+          :disabled="loading || !!successMessage"
+          class="signup-btn"
+          elevation="2"
+        >
+          회원가입
+        </v-btn>
+      </v-form>
+
+      <div class="auth-links text-center mt-4">
+        <NuxtLink
+          to="/login"
+          class="auth-link"
+        >
+          로그인
+        </NuxtLink>
+      </div>
+    
+      <div class="logo-bottom text-center mt-6">
+        <div class="logo-with-credit">
+          <ConcentrixLogo />
+          <span class="credit-text">© rarecat</span>
+        </div>
+      </div>
     </PageLayout>
   </v-app>
 </template>
@@ -193,7 +198,12 @@ const handleSignup = async () => {
   const result = await signup(email.value, password.value, name.value, workplace.value)
   
   if (result.success) {
-    successMessage.value = '회원가입이 완료되었습니다. 이메일을 확인하여 인증을 완료해주세요.'
+    // 메일 발송 실패 경고가 있는 경우
+    if (result.warning) {
+      successMessage.value = result.warning
+    } else {
+      successMessage.value = '회원가입이 완료되었습니다. 이메일을 확인하여 인증을 완료해주세요.'
+    }
     // 폼 초기화
     name.value = ''
     email.value = ''

@@ -152,10 +152,14 @@ export const useAuth = () => {
         updatedAt: serverTimestamp()
       })
       
-      // Firebase Functions를 통해 인증 메일 발송
-      const functions = getFunctions($firebaseApp)
-      const sendSignupVerificationEmail = httpsCallable(functions, 'sendSignupVerificationEmail')
+      // 먼저 로그아웃 (이메일 인증 완료 전까지는 로그인 상태 유지하지 않음)
+      await signOut(auth)
       
+      // Firebase Functions를 통해 인증 메일 발송 (타임아웃 10초)
+      const functions = getFunctions($firebaseApp)
+      const sendSignupVerificationEmail = httpsCallable(functions, 'sendSignupVerificationEmail', { timeout: 10000 })
+      
+      let emailSent = false
       try {
         const result = await sendSignupVerificationEmail({
           uid: firebaseUser.uid,
@@ -163,19 +167,26 @@ export const useAuth = () => {
           name: name
         })
         
-        if (!result.data.success) {
+        if (result.data.success) {
+          emailSent = true
+        } else {
           console.error('인증 메일 발송 실패:', result.data.error)
-          // 인증 메일 발송 실패해도 회원가입은 성공 처리 (나중에 재발송 가능)
         }
       } catch (emailError) {
         console.error('인증 메일 발송 오류:', emailError)
-        // 인증 메일 발송 실패해도 회원가입은 성공 처리
+        // 인증 메일 발송 실패해도 회원가입은 성공 처리 (나중에 재발송 가능)
       }
       
-      // 로그아웃 (이메일 인증 완료 전까지는 로그인 상태 유지하지 않음)
-      await signOut(auth)
-      
       loading.value = false
+      
+      if (!emailSent) {
+        return { 
+          success: true, 
+          user: firebaseUser,
+          warning: '회원가입은 완료되었지만 인증 메일 발송에 실패했습니다. 로그인 페이지에서 인증 메일을 재전송해주세요.'
+        }
+      }
+      
       return { success: true, user: firebaseUser }
     } catch (error) {
       loading.value = false

@@ -10,8 +10,40 @@
         </p>
       </div>
 
+      <!-- 인증 대기 상태 (버튼 클릭 전) -->
       <div
-        v-if="verifying"
+        v-if="pendingVerification"
+        class="text-center"
+      >
+        <v-icon
+          color="primary"
+          size="64"
+          class="mb-4"
+        >
+          mdi-email-check-outline
+        </v-icon>
+        <h2 class="pending-title mb-4">
+          이메일 인증을 진행하시겠습니까?
+        </h2>
+        <p class="pending-text mb-6">
+          아래 버튼을 클릭하여 이메일 인증을 완료해주세요.
+        </p>
+        <v-btn
+          block
+          size="large"
+          class="verify-btn"
+          elevation="2"
+          :loading="verifying"
+          :disabled="verifying"
+          @click="handleVerify"
+        >
+          이메일 인증하기
+        </v-btn>
+      </div>
+
+      <!-- 인증 진행 중 -->
+      <div
+        v-else-if="verifying"
         class="text-center py-8"
       >
         <v-progress-circular
@@ -25,6 +57,7 @@
         </p>
       </div>
 
+      <!-- 인증 성공 -->
       <div
         v-else-if="success"
         class="text-center"
@@ -53,6 +86,7 @@
         </v-btn>
       </div>
 
+      <!-- 인증 실패 -->
       <div
         v-else-if="error"
         class="text-center"
@@ -113,7 +147,8 @@ const { $firebaseApp } = useNuxtApp()
 const router = useRouter()
 const route = useRoute()
 
-const verifying = ref(true)
+const pendingVerification = ref(false)
+const verifying = ref(false)
 const success = ref(false)
 const error = ref(false)
 const errorMessage = ref('')
@@ -127,16 +162,18 @@ const uid = route.query.uid
 const mode = route.query.mode
 const oobCode = route.query.oobCode
 
-onMounted(async () => {
+onMounted(() => {
   // 자체 인증 시스템 (token과 uid가 있는 경우)
   if (token && uid) {
-    await verifyWithToken()
+    // 버튼 클릭을 기다림 (자동 인증 방지)
+    pendingVerification.value = true
     return
   }
   
   // 기존 Firebase 인증 시스템 (mode와 oobCode가 있는 경우)
   if (mode && oobCode) {
-    await verifyWithFirebase()
+    // Firebase 인증도 버튼 클릭을 기다림
+    pendingVerification.value = true
     return
   }
   
@@ -144,8 +181,19 @@ onMounted(async () => {
   error.value = true
   errorMessage.value = '유효하지 않은 인증 링크입니다.'
   canResend.value = true
-  verifying.value = false
 })
+
+// 인증 버튼 클릭 핸들러
+const handleVerify = async () => {
+  pendingVerification.value = false
+  verifying.value = true
+  
+  if (token && uid) {
+    await verifyWithToken()
+  } else if (mode && oobCode) {
+    await verifyWithFirebase()
+  }
+}
 
 // 자체 토큰 인증
 const verifyWithToken = async () => {
@@ -348,6 +396,20 @@ useHead({
   margin: 0;
 }
 
+.pending-title {
+  font-size: rem(24);
+  font-weight: 600;
+  color: #002C5B;
+  margin: 0;
+}
+
+.pending-text {
+  font-size: rem(16);
+  color: #6b7280;
+  margin: 0;
+  line-height: 1.6;
+}
+
 .success-title {
   font-size: rem(24);
   font-weight: 600;
@@ -379,6 +441,19 @@ useHead({
   color: #6b7280;
   margin: 0;
   line-height: 1.6;
+}
+
+.verify-btn {
+  height: rem(48);
+  font-size: rem(16);
+  font-weight: 500;
+  border-radius: rem(8);
+  background-color: #002C5B;
+  color: #FFFFFF;
+  
+  &:hover:not(:disabled) {
+    background-color: #003d7a;
+  }
 }
 
 .login-btn {

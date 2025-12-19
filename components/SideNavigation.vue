@@ -72,6 +72,25 @@
         </NuxtLink>
       </div>
 
+      <!-- 최고관리자 메뉴 (admin 역할만 표시) -->
+      <div
+        v-if="isSuperAdmin"
+        class="menu-section super-admin-section"
+      >
+        <div class="menu-section-title">
+          최고관리자
+        </div>
+
+        <NuxtLink
+          to="/admin/managers"
+          class="menu-item"
+          @click="closeDrawer"
+        >
+          <v-icon>mdi-account-cog</v-icon>
+          <span>매니저 관리</span>
+        </NuxtLink>
+      </div>
+
       <!-- 공통 메뉴 -->
       <div class="menu-section">
         <div
@@ -93,11 +112,13 @@ const { $firebaseFirestore } = useNuxtApp()
 const firestore = $firebaseFirestore
 
 const isAdmin = ref(false)
+const isSuperAdmin = ref(false)
 
 // 사용자 권한 확인
 const checkUserRole = async () => {
   if (!process.client || !user.value || !firestore) {
     isAdmin.value = false
+    isSuperAdmin.value = false
     return
   }
 
@@ -110,12 +131,16 @@ const checkUserRole = async () => {
       const userData = userDoc.data()
       // role이 'admin'이거나 'manager'인 경우 관리자로 판단
       isAdmin.value = userData.role === 'admin' || userData.role === 'manager'
+      // role이 'admin'인 경우 최고관리자로 판단
+      isSuperAdmin.value = userData.role === 'admin'
     } else {
       isAdmin.value = false
+      isSuperAdmin.value = false
     }
   } catch (error) {
     console.error('사용자 권한 확인 실패:', error)
     isAdmin.value = false
+    isSuperAdmin.value = false
   }
 }
 
@@ -125,6 +150,7 @@ watch(() => user.value, async (newUser) => {
     await checkUserRole()
   } else {
     isAdmin.value = false
+    isSuperAdmin.value = false
   }
 }, { immediate: true })
 
@@ -181,6 +207,12 @@ const handleLogout = async () => {
 }
 
 .admin-section {
+  border-top: rem(1) solid rgba(255, 255, 255, 0.1);
+  margin-top: rem(8);
+  padding-top: rem(16);
+}
+
+.super-admin-section {
   border-top: rem(1) solid rgba(255, 255, 255, 0.1);
   margin-top: rem(8);
   padding-top: rem(16);

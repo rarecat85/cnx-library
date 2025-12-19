@@ -9,8 +9,12 @@ service cloud.firestore {
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'manager');
       
-      // 쓰기: 자신의 문서만 쓸 수 있음
+      // 쓰기: 자신의 문서 쓰기 가능
       allow write: if request.auth != null && request.auth.uid == userId;
+      
+      // 업데이트: 최고관리자(admin)는 다른 사용자의 role 필드 수정 가능
+      allow update: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
     
     // books 컬렉션 규칙

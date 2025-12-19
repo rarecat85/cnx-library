@@ -50,6 +50,16 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
     if (userDoc.exists()) {
       const userData = userDoc.data()
       const isAdmin = userData.role === 'admin' || userData.role === 'manager'
+      const isSuperAdmin = userData.role === 'admin'
+
+      // 최고관리자 전용 경로 체크
+      const superAdminOnlyPaths = ['/admin/managers']
+      const isSuperAdminOnlyPath = superAdminOnlyPaths.some(path => to.path.startsWith(path))
+
+      if (isSuperAdminOnlyPath && !isSuperAdmin) {
+        // 최고관리자 전용 경로에 최고관리자가 아닌 경우 홈으로 리다이렉트
+        return navigateTo('/')
+      }
 
       if (!isAdmin) {
         // 관리자 권한이 없으면 홈으로 리다이렉트

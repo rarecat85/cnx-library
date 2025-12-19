@@ -15,6 +15,7 @@
           <li><a href="#manage">도서 관리</a></li>
           <li><a href="#rental-approve">대여 신청 승인</a></li>
           <li><a href="#return">반납 처리</a></li>
+          <li><a href="#manager-admin">매니저 관리 (최고관리자)</a></li>
           <li><a href="#notification">알림 수신</a></li>
           <li><a href="#tips">관리 팁</a></li>
         </ul>
@@ -53,8 +54,8 @@
               <h4>최고 관리자 (admin)</h4>
               <ul>
                 <li>시스템 전체 관리자</li>
-                <li>사용자 권한 관리 (Firestore)</li>
                 <li>관리자 메뉴 접근 가능</li>
+                <li class="highlight">💡 매니저 관리 메뉴 (지정/해제)</li>
                 <li class="note">* 도서 관리는 매니저가 담당</li>
               </ul>
             </div>
@@ -275,6 +276,103 @@
               <li>도서를 분실한 경우 (분실 처리)</li>
               <li>장기 연체 도서 강제 반납</li>
             </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 매니저 관리 (최고관리자 전용) -->
+      <section id="manager-admin" class="guide-section">
+        <h2>👔 매니저 관리 (최고관리자 전용)</h2>
+        <div class="section-content">
+          <p>최고관리자(admin)는 일반 사용자를 매니저로 지정하거나, 기존 매니저의 권한을 해제할 수 있습니다.</p>
+          
+          <div class="warning-box">
+            <h4>⚠️ 접근 권한</h4>
+            <p>이 메뉴는 <strong>최고관리자(admin)</strong>만 접근할 수 있습니다. 매니저(manager)는 접근할 수 없습니다.</p>
+          </div>
+
+          <h3>매니저 관리 페이지 접근</h3>
+          <ol class="step-list">
+            <li>
+              <span class="step-number">1</span>
+              <div class="step-content">
+                <strong>사이드 메뉴에서 "최고관리자" 섹션 확인</strong>
+                <p>최고관리자로 로그인하면 사이드 메뉴 하단에 "최고관리자" 섹션이 표시됩니다.</p>
+              </div>
+            </li>
+            <li>
+              <span class="step-number">2</span>
+              <div class="step-content">
+                <strong>"매니저 관리" 클릭</strong>
+                <p>매니저 관리 페이지로 이동합니다.</p>
+              </div>
+            </li>
+          </ol>
+
+          <h3>매니저 지정하기</h3>
+          <ol class="step-list">
+            <li>
+              <span class="step-number">1</span>
+              <div class="step-content">
+                <strong>사용자 검색</strong>
+                <p>상단 검색창에 사용자 이름 또는 이메일을 입력하고 검색합니다.</p>
+              </div>
+            </li>
+            <li>
+              <span class="step-number">2</span>
+              <div class="step-content">
+                <strong>검색 결과 확인</strong>
+                <p>검색된 사용자 카드에서 현재 역할(일반 사용자/매니저)을 확인합니다.</p>
+              </div>
+            </li>
+            <li>
+              <span class="step-number">3</span>
+              <div class="step-content">
+                <strong>"매니저 지정" 클릭</strong>
+                <p>일반 사용자의 카드에서 "매니저 지정" 버튼을 클릭합니다.</p>
+              </div>
+            </li>
+            <li>
+              <span class="step-number">4</span>
+              <div class="step-content">
+                <strong>센터 자동 배정</strong>
+                <p>매니저 지정 시 사용자의 근무지를 기반으로 센터가 자동 배정됩니다.</p>
+              </div>
+            </li>
+          </ol>
+
+          <h3>매니저 해제하기</h3>
+          <ol class="step-list">
+            <li>
+              <span class="step-number">1</span>
+              <div class="step-content">
+                <strong>매니저 목록 확인</strong>
+                <p>페이지 하단의 "매니저 목록"에서 현재 등록된 매니저를 확인합니다.</p>
+              </div>
+            </li>
+            <li>
+              <span class="step-number">2</span>
+              <div class="step-content">
+                <strong>"해제" 클릭</strong>
+                <p>해제할 매니저 카드의 "해제" 버튼을 클릭합니다.</p>
+              </div>
+            </li>
+            <li>
+              <span class="step-number">3</span>
+              <div class="step-content">
+                <strong>해제 완료</strong>
+                <p>해당 사용자는 일반 사용자로 변경되며, 관리자 메뉴에 접근할 수 없게 됩니다.</p>
+              </div>
+            </li>
+          </ol>
+
+          <div class="info-box">
+            <h4>📍 센터-근무지 매핑</h4>
+            <ul>
+              <li><strong>용산센터:</strong> 용산, 증미, 여의도 근무자</li>
+              <li><strong>강남센터:</strong> 강남, 잠실, 수원, 판교 근무자</li>
+            </ul>
+            <p>매니저로 지정되면 해당 센터의 도서를 관리하게 됩니다.</p>
           </div>
         </div>
       </section>

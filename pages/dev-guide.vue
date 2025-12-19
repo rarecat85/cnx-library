@@ -136,9 +136,13 @@ const WORKPLACE_CENTER_MAP = {
 │   ├── package.json
 │   └── .env                  # 환경 변수 (Git 제외)
 ├── middleware/
-│   ├── admin.js              # 관리자 권한 체크
+│   ├── admin.js              # 관리자/최고관리자 권한 체크
 │   └── auth.js               # 인증 체크
-├── pages/                    # 라우트 페이지들
+├── pages/
+│   ├── admin/
+│   │   ├── managers/         # 매니저 관리 (최고관리자 전용)
+│   │   └── books/            # 도서 등록/관리
+│   └── ...                   # 기타 라우트 페이지들
 ├── plugins/
 │   ├── firebase.client.js    # Firebase 초기화
 │   └── vuetify.js            # Vuetify 설정
@@ -279,13 +283,16 @@ npm run dev
   email: string,
   name: string,
   workplace: string,           // 근무지 (강남, 용산, 잠실 등)
-  role: string,                // 'user' | 'admin' | 'manager'
+  role: string,                // 'user'(기본) | 'manager' | 'admin'
+  center: string,              // 매니저/관리자 소속 센터 (선택)
   emailVerified: boolean,
   receiveEmailNotifications: boolean,  // 이메일 알림 수신
   createdAt: timestamp,
   updatedAt: timestamp
 }</pre>
             </div>
+            <p class="schema-note">* 회원가입 시 <code>role: 'user'</code>가 기본값으로 설정됨</p>
+            <p class="schema-note">* 최고관리자가 매니저 지정 시 <code>center</code> 필드가 자동 배정됨</p>
           </div>
 
           <div class="schema-card">
@@ -674,15 +681,24 @@ npx firebase deploy --only firestore:rules</pre>
               <tr>
                 <td><code>manager</code></td>
                 <td>매니저</td>
-                <td>+ 관리자 메뉴 (모든 센터 도서 관리 가능)</td>
+                <td>+ 관리자 메뉴 (도서 등록/관리, 모든 센터 접근 가능)</td>
               </tr>
               <tr>
                 <td><code>admin</code></td>
                 <td>최고 관리자</td>
-                <td>시스템 관리, 사용자 권한 관리</td>
+                <td>+ 최고관리자 메뉴 (매니저 관리 - 지정/해제)</td>
               </tr>
             </tbody>
           </table>
+
+          <div class="info-box">
+            <h4>💡 역할별 메뉴 접근</h4>
+            <ul>
+              <li><code>/admin/books/*</code> - manager, admin 접근 가능</li>
+              <li><code>/admin/managers</code> - <strong>admin만</strong> 접근 가능</li>
+            </ul>
+            <p>미들웨어(<code>middleware/admin.js</code>)에서 경로별 권한 체크 수행</p>
+          </div>
         </div>
       </section>
     </div>
@@ -1039,6 +1055,20 @@ useHead({
   .code-block {
     margin: 0;
     border-radius: 0 0 8px 8px;
+  }
+  
+  .schema-note {
+    font-size: rem(13);
+    color: #666;
+    margin: rem(8) 0 0 0;
+    padding-left: rem(10);
+    
+    code {
+      background: #e2e8f0;
+      padding: rem(1) rem(4);
+      border-radius: 3px;
+      font-size: rem(12);
+    }
   }
 }
 

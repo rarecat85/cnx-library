@@ -170,6 +170,7 @@ export const useAuth = () => {
           email: email,
           name: name,
           workplace: workplace,
+          role: 'user',
           emailVerified: false,
           emailVerifiedAt: null,
           createdAt: serverTimestamp(),

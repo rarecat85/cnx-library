@@ -15,20 +15,18 @@
 
         <!-- 검색 영역 -->
         <div class="search-section mb-6">
-          <div class="d-flex align-center search-group">
-            <v-text-field
-              v-model="searchQuery"
-              label="사용자 검색 (이름 또는 이메일)"
-              prepend-inner-icon="mdi-magnify"
-              variant="outlined"
-              density="comfortable"
-              hide-details
-              clearable
-              class="search-input"
-              @keyup.enter="handleSearch"
-              @click:clear="clearSearch"
-            />
-          </div>
+          <v-text-field
+            v-model="searchQuery"
+            label="사용자 검색 (이름 또는 이메일)"
+            prepend-inner-icon="mdi-magnify"
+            variant="outlined"
+            density="comfortable"
+            hide-details
+            clearable
+            class="search-input"
+            @keyup.enter="handleSearch"
+            @click:clear="clearSearch"
+          />
         </div>
 
         <!-- 검색 결과 영역 -->
@@ -55,65 +53,75 @@
             />
           </div>
 
-          <div
+          <v-row
             v-else-if="searchResults.length > 0"
             class="users-grid"
           >
-            <div
+            <v-col
               v-for="user in searchResults"
               :key="user.uid"
-              class="user-card"
+              cols="12"
+              sm="6"
             >
-              <div class="user-info">
-                <div class="user-name">
-                  {{ user.name || '이름 없음' }}
-                </div>
-                <div class="user-email text-medium-emphasis">
-                  {{ user.email }}
-                </div>
-                <div class="user-details text-medium-emphasis">
-                  <span class="user-workplace">{{ user.workplace || '-' }}</span>
-                  <span class="user-center">{{ user.center || '-' }}</span>
+              <div class="user-card">
+                <!-- 역할 칩 -->
+                <div class="user-card-header">
                   <v-chip
-                    size="x-small"
                     :color="getRoleColor(user.role)"
-                    class="user-role-chip"
+                    size="x-small"
+                    variant="flat"
+                    class="role-chip"
                   >
                     {{ getRoleLabel(user.role) }}
                   </v-chip>
                 </div>
+
+                <!-- 사용자 정보 -->
+                <div class="user-card-content">
+                  <div class="user-name">
+                    {{ user.name || '이름 없음' }}
+                  </div>
+                  <div class="user-info text-body-2">
+                    <strong>이메일:</strong> {{ user.email }}
+                  </div>
+                  <div class="user-info text-body-2">
+                    <strong>근무지:</strong> {{ user.workplace || '-' }}
+                  </div>
+                </div>
+
+                <!-- 액션 버튼 -->
+                <div class="user-card-action">
+                  <v-btn
+                    v-if="!user.role || user.role === 'user'"
+                    color="primary"
+                    size="small"
+                    class="action-btn"
+                    :loading="actionLoading === user.uid"
+                    @click="handleAssignManager(user)"
+                  >
+                    매니저 지정
+                  </v-btn>
+                  <v-btn
+                    v-else-if="user.role === 'manager'"
+                    size="small"
+                    variant="outlined"
+                    color="error"
+                    class="action-btn"
+                    :loading="actionLoading === user.uid"
+                    @click="handleRevokeManager(user)"
+                  >
+                    해제
+                  </v-btn>
+                  <div
+                    v-else-if="user.role === 'admin'"
+                    class="admin-text text-body-2"
+                  >
+                    최고관리자는 변경할 수 없습니다.
+                  </div>
+                </div>
               </div>
-              <div class="user-actions">
-                <v-btn
-                  v-if="user.role === 'user'"
-                  size="small"
-                  class="action-btn"
-                  variant="flat"
-                  :loading="actionLoading === user.uid"
-                  @click="handleAssignManager(user)"
-                >
-                  매니저 지정
-                </v-btn>
-                <v-btn
-                  v-else-if="user.role === 'manager'"
-                  size="small"
-                  variant="outlined"
-                  color="error"
-                  :loading="actionLoading === user.uid"
-                  @click="handleRevokeManager(user)"
-                >
-                  해제
-                </v-btn>
-                <v-chip
-                  v-else
-                  size="small"
-                  color="warning"
-                >
-                  최고관리자
-                </v-chip>
-              </div>
-            </div>
-          </div>
+            </v-col>
+          </v-row>
 
           <div
             v-else
@@ -151,40 +159,58 @@
             />
           </div>
 
-          <div
+          <v-row
             v-else-if="managers.length > 0"
             class="managers-grid"
           >
-            <div
+            <v-col
               v-for="manager in managers"
               :key="manager.uid"
-              class="manager-card"
+              cols="12"
+              sm="6"
             >
-              <div class="manager-info">
-                <div class="manager-name">
-                  {{ manager.name || '이름 없음' }}
+              <div class="user-card">
+                <!-- 역할 칩 -->
+                <div class="user-card-header">
+                  <v-chip
+                    color="primary"
+                    size="x-small"
+                    variant="flat"
+                    class="role-chip"
+                  >
+                    매니저
+                  </v-chip>
                 </div>
-                <div class="manager-email text-medium-emphasis">
-                  {{ manager.email }}
+
+                <!-- 매니저 정보 -->
+                <div class="user-card-content">
+                  <div class="user-name">
+                    {{ manager.name || '이름 없음' }}
+                  </div>
+                  <div class="user-info text-body-2">
+                    <strong>이메일:</strong> {{ manager.email }}
+                  </div>
+                  <div class="user-info text-body-2">
+                    <strong>근무지:</strong> {{ manager.workplace || '-' }}
+                  </div>
                 </div>
-                <div class="manager-details text-medium-emphasis">
-                  <span class="manager-workplace">{{ manager.workplace || '-' }}</span>
-                  <span class="manager-center">{{ manager.center || '-' }}</span>
+
+                <!-- 해제 버튼 -->
+                <div class="user-card-action">
+                  <v-btn
+                    size="small"
+                    variant="outlined"
+                    color="error"
+                    class="action-btn"
+                    :loading="actionLoading === manager.uid"
+                    @click="handleRevokeManager(manager)"
+                  >
+                    해제
+                  </v-btn>
                 </div>
               </div>
-              <div class="manager-actions">
-                <v-btn
-                  size="small"
-                  variant="outlined"
-                  color="error"
-                  :loading="actionLoading === manager.uid"
-                  @click="handleRevokeManager(manager)"
-                >
-                  해제
-                </v-btn>
-              </div>
-            </div>
-          </div>
+            </v-col>
+          </v-row>
 
           <div
             v-else
@@ -491,12 +517,8 @@ useHead({
 
 // 검색 섹션
 .search-section {
-  .search-group {
-    width: 100%;
-  }
-  
   .search-input {
-    flex: 1;
+    width: 100%;
   }
 }
 
@@ -509,92 +531,80 @@ useHead({
 // 사용자/매니저 그리드
 .users-grid,
 .managers-grid {
-  display: flex;
-  flex-direction: column;
-  gap: rem(12);
-}
-
-.user-card,
-.manager-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: rem(16);
-  background-color: #FFFFFF;
-  border: rem(1) solid #e0e0e0;
-  border-radius: rem(8);
-  gap: rem(16);
+  margin: 0 rem(-8);
   
-  @media (max-width: 480px) {
-    flex-direction: column;
-    align-items: flex-start;
+  .v-col {
+    padding: rem(8);
   }
 }
 
-.user-info,
-.manager-info {
-  flex: 1;
-  min-width: 0;
+// 사용자 카드 (BookCard 스타일 참고)
+.user-card {
+  height: 100%;
+  background-color: #F5F5F5;
+  border-radius: rem(8);
+  padding: rem(24) rem(20);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s, box-shadow 0.2s;
+  
+  &:hover {
+    transform: translateY(rem(-2));
+    box-shadow: 0 rem(4) rem(12) rgba(0, 0, 0, 0.15);
+  }
 }
 
-.user-name,
-.manager-name {
+.user-card-header {
+  margin-bottom: rem(10);
+}
+
+.role-chip {
+  font-size: rem(9);
+  height: rem(16);
+  padding: 0 rem(6);
+  
+  :deep(.v-chip__content) {
+    font-size: rem(9);
+    line-height: 1;
+  }
+}
+
+.user-card-content {
+  flex: 1;
+  margin-bottom: rem(10);
+}
+
+.user-name {
   font-size: rem(16);
   font-weight: 600;
   color: #002C5B;
+  line-height: 1.3;
+  margin-bottom: rem(8);
+}
+
+.user-info {
+  color: #6b7280;
+  line-height: 1.4;
   margin-bottom: rem(4);
-}
-
-.user-email,
-.manager-email {
-  font-size: rem(14);
-  margin-bottom: rem(4);
-  word-break: break-all;
-}
-
-.user-details,
-.manager-details {
-  font-size: rem(13);
-  display: flex;
-  align-items: center;
-  gap: rem(8);
-  flex-wrap: wrap;
-}
-
-.user-workplace,
-.manager-workplace {
-  &::after {
-    content: '·';
-    margin-left: rem(8);
-  }
-}
-
-.user-role-chip {
-  margin-left: rem(4);
-}
-
-.user-actions,
-.manager-actions {
-  flex-shrink: 0;
   
-  @media (max-width: 480px) {
-    width: 100%;
-    display: flex;
-    justify-content: flex-end;
+  &:last-child {
+    margin-bottom: 0;
   }
+}
+
+.user-card-action {
+  margin-top: rem(10);
 }
 
 .action-btn {
-  background-color: #002C5B;
-  color: #FFFFFF;
-  
-  &:hover:not(:disabled) {
-    background-color: #003d7a;
-  }
-  
-  :deep(.v-btn__overlay) {
-    display: none;
-  }
+  width: 100%;
+}
+
+.admin-text {
+  color: #f59e0b;
+  font-weight: 500;
+  text-align: center;
+  padding: rem(8) 0;
 }
 
 // 빈 상태

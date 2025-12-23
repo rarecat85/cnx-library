@@ -257,23 +257,14 @@ const handleCenterChange = async () => {
   await loadNewBooks()
 }
 
-// 신규 도서 로드 (등록일 기준 한 달 이내)
+// 신규 도서 로드 (구매칸에 위치한 도서)
 const loadNewBooks = async () => {
   try {
     newBooksLoading.value = true
     const books = await getBooksByCenter(currentCenter.value)
     
-    // 한 달 이내 등록된 도서만 필터링
-    const oneMonthAgo = new Date()
-    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
-    
-    newBooks.value = books.filter(book => {
-      if (book.registeredAt) {
-        const registeredDate = book.registeredAt?.toDate?.() || new Date(book.registeredAt)
-        return registeredDate >= oneMonthAgo
-      }
-      return false
-    })
+    // 구매칸에 있는 도서만 필터링
+    newBooks.value = books.filter(book => book.location === '구매칸')
   } catch (error) {
     console.error('신규 도서 로드 오류:', error)
     newBooks.value = []

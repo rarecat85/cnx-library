@@ -110,7 +110,7 @@
                 :selectable="false"
                 :show-action="true"
                 :allow-register-requested="true"
-                @register="handleBookRegister"
+                @register="openRegisterDialog"
               />
             </v-col>
           </v-row>
@@ -141,7 +141,7 @@
           :allow-register-requested="true"
           nav-id="bestseller"
           class="mb-8"
-          @register="handleBookRegister"
+          @register="openRegisterDialog"
         />
 
         <!-- 도서 신청 목록 영역 -->
@@ -187,7 +187,7 @@
                   :show-action="true"
                   :action-button-text="`${currentCenter}에 등록하기`"
                   :requester-info="getRequesterInfo(request)"
-                  @register="handleBookRegisterFromRequest"
+                  @register="openRegisterDialogFromRequest"
                 />
               </v-col>
             </v-row>
@@ -224,11 +224,166 @@
         <SideNavigation />
       </div>
     </v-navigation-drawer>
+
+    <!-- 도서 등록 다이얼로그 -->
+    <v-dialog
+      v-model="registerDialogVisible"
+      max-width="600"
+      persistent
+    >
+      <v-card class="register-dialog-card">
+        <v-card-title class="register-dialog-title">
+          도서 등록
+        </v-card-title>
+        
+        <v-card-text class="register-dialog-content">
+          <!-- 도서 정보 표시 -->
+          <div
+            v-if="selectedBook"
+            class="book-info-preview mb-6"
+          >
+            <div class="book-info-preview-inner">
+              <img
+                v-if="selectedBook.cover || selectedBook.image"
+                :src="selectedBook.cover || selectedBook.image"
+                :alt="selectedBook.title"
+                class="book-thumbnail"
+              >
+              <div class="book-meta">
+                <div class="book-title">
+                  {{ selectedBook.title }}
+                </div>
+                <div class="book-author">
+                  {{ selectedBook.author }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 카테고리 선택 -->
+          <v-autocomplete
+            v-model="registerForm.category"
+            :items="categoryOptions"
+            label="카테고리 *"
+            variant="outlined"
+            density="comfortable"
+            :loading="categoriesLoading"
+            :rules="[v => !!v || '카테고리를 선택해주세요']"
+            class="mb-4"
+          />
+          
+          <!-- 새 카테고리 추가 -->
+          <div class="new-category-section mb-4">
+            <v-text-field
+              v-model="newCategoryInput"
+              label="새 카테고리 추가"
+              variant="outlined"
+              density="comfortable"
+              append-inner-icon="mdi-plus"
+              hint="목록에 없는 카테고리를 추가합니다"
+              persistent-hint
+              @click:append-inner="handleAddNewCategory"
+              @keyup.enter="handleAddNewCategory"
+            />
+          </div>
+
+          <!-- 권수 입력 -->
+          <div class="quantity-section mb-4">
+            <v-text-field
+              v-model.number="registerForm.quantity"
+              label="등록 권수"
+              variant="outlined"
+              density="comfortable"
+              type="number"
+              min="1"
+              max="20"
+              :rules="[v => v >= 1 && v <= 20 || '1~20권까지 등록 가능합니다']"
+              hint="같은 도서를 여러 권 등록할 수 있습니다"
+              persistent-hint
+              @update:model-value="handleQuantityChange"
+            />
+          </div>
+
+          <!-- 라벨번호 및 위치 입력 (권수에 따라 동적 생성) -->
+          <div class="copies-section">
+            <div
+              v-for="(copy, index) in registerForm.copies"
+              :key="index"
+              class="copy-entry mb-4"
+            >
+              <div class="copy-header mb-2">
+                <span class="copy-number">{{ index + 1 }}권</span>
+                <span
+                  v-if="copy.labelPreview"
+                  class="copy-label-preview"
+                >
+                  {{ copy.labelPreview }}
+                </span>
+              </div>
+              <div class="copy-inputs">
+                <v-text-field
+                  :model-value="centerCode"
+                  label="센터코드"
+                  variant="outlined"
+                  density="compact"
+                  readonly
+                  disabled
+                  class="center-code-input"
+                />
+                <v-text-field
+                  v-model="copy.fourDigits"
+                  label="4자리 번호 *"
+                  variant="outlined"
+                  density="compact"
+                  maxlength="4"
+                  :rules="fourDigitsRules"
+                  :error-messages="copy.error"
+                  hint="0001~9999"
+                  persistent-hint
+                  class="four-digits-input"
+                  @input="(e) => handleCopyFourDigitsInput(e, index)"
+                  @blur="() => checkCopyLabelNumberDuplicate(index)"
+                />
+                <v-select
+                  v-model="copy.location"
+                  :items="locationOptions"
+                  label="위치 *"
+                  variant="outlined"
+                  density="compact"
+                  :rules="[v => !!v || '위치를 선택해주세요']"
+                  class="location-select"
+                />
+              </div>
+            </div>
+          </div>
+        </v-card-text>
+        
+        <v-card-actions class="register-dialog-actions">
+          <v-spacer />
+          <v-btn
+            variant="text"
+            @click="closeRegisterDialog"
+          >
+            취소
+          </v-btn>
+          <v-btn
+            color="primary"
+            variant="flat"
+            :loading="registering"
+            :disabled="!isRegisterFormValid"
+            @click="handleRegisterBook"
+          >
+            {{ registerForm.quantity > 1 ? `${registerForm.quantity}권 등록` : '등록' }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-app>
 </template>
 
 <script setup>
 import { CENTERS, getCenterByWorkplace } from '@/utils/centerMapping.js'
+import { CENTER_CODE_MAP, createLabelNumber, getLocationSelectOptions } from '@/utils/labelConfig.js'
 
 definePageMeta({
   layout: false,
@@ -238,9 +393,12 @@ definePageMeta({
 const { user } = useAuth()
 const { 
   searchBooks, 
-  registerBook, 
+  registerBookWithLabel,
   getBooksByCenter, 
   getBestsellers,
+  getCategories,
+  addCategory,
+  checkLabelNumberExists,
   loading: booksLoading 
 } = useBooks()
 const { confirm, alert } = useDialog()
@@ -257,24 +415,21 @@ const userWorkplace = ref('')
 
 // 검색 관련
 const searchQuery = ref('')
-const allSearchResults = ref([]) // API에서 가져온 전체 결과 (필터링 완료)
-const displayCount = ref(10) // 현재 표시 중인 개수
+const allSearchResults = ref([])
+const displayCount = ref(10)
 const searchLoading = ref(false)
 const searchError = ref(null)
-const hasSearched = ref(false) // 검색 수행 여부
+const hasSearched = ref(false)
 
-// 화면에 표시할 검색 결과 (displayCount 만큼만)
 const searchResults = computed(() => allSearchResults.value.slice(0, displayCount.value))
-// 전체 결과 수
 const searchTotal = computed(() => allSearchResults.value.length)
-// 더보기 버튼 표시 여부
 const hasMoreResults = computed(() => displayCount.value < allSearchResults.value.length)
 
 // 베스트셀러 관련
 const bestsellers = ref([])
 const bestsellersLoading = ref(false)
 
-// 등록된 도서 관련 (등록 상태 확인용)
+// 등록된 도서 관련
 const registeredBooks = ref([])
 
 // 등록 처리 중인 도서
@@ -292,6 +447,79 @@ const paginatedBookRequests = computed(() => {
   const start = (currentBookRequestsPage.value - 1) * REQUESTS_PER_PAGE
   const end = start + REQUESTS_PER_PAGE
   return bookRequests.value.slice(start, end)
+})
+
+// 등록 다이얼로그 관련
+const registerDialogVisible = ref(false)
+const selectedBook = ref(null)
+const selectedRequestInfo = ref(null)
+const registering = ref(false)
+const categoryOptions = ref([])
+const categoriesLoading = ref(false)
+const newCategoryInput = ref('')
+const labelCheckLoading = ref(false)
+
+const registerForm = ref({
+  category: '',
+  quantity: 1,
+  copies: [{ fourDigits: '', location: '구매칸' }]
+})
+
+// 센터 코드
+const centerCode = computed(() => {
+  return CENTER_CODE_MAP[currentCenter.value] || '1'
+})
+
+// 위치 옵션
+const locationOptions = computed(() => getLocationSelectOptions())
+
+// 4자리 입력 규칙
+const fourDigitsRules = [
+  v => !!v || '4자리 번호를 입력해주세요',
+  v => /^\d{1,4}$/.test(v) || '숫자만 입력해주세요',
+  v => v.length === 4 || '4자리를 입력해주세요'
+]
+
+// 각 권의 라벨번호 미리보기 업데이트
+const updateLabelPreviews = () => {
+  registerForm.value.copies.forEach((copy) => {
+    if (registerForm.value.category && copy.fourDigits && copy.fourDigits.length === 4) {
+      copy.labelPreview = createLabelNumber(registerForm.value.category, currentCenter.value, copy.fourDigits)
+    } else {
+      copy.labelPreview = ''
+    }
+  })
+}
+
+// 카테고리 변경 감시
+watch(() => registerForm.value.category, () => {
+  updateLabelPreviews()
+})
+
+// 등록 폼 유효성
+const isRegisterFormValid = computed(() => {
+  // 카테고리 체크
+  if (!registerForm.value.category) return false
+  
+  // 수량 체크
+  if (!registerForm.value.quantity || registerForm.value.quantity < 1) return false
+  
+  // 각 권의 유효성 체크
+  for (const copy of registerForm.value.copies) {
+    // 4자리 번호 체크
+    if (!copy.fourDigits || copy.fourDigits.length !== 4 || !/^\d{4}$/.test(copy.fourDigits)) {
+      return false
+    }
+    // 위치 체크
+    if (!copy.location) return false
+    // 에러 체크
+    if (copy.error) return false
+  }
+  
+  // 라벨번호 중복 체크 진행 중
+  if (labelCheckLoading.value) return false
+  
+  return true
 })
 
 // 반응형 drawer 너비 계산
@@ -334,7 +562,6 @@ const getUserWorkplace = async () => {
 onMounted(async () => {
   const workplace = await getUserWorkplace()
   userWorkplace.value = workplace
-  // 근무지 기반으로 센터 매핑
   currentCenter.value = workplace ? getCenterByWorkplace(workplace) : centerOptions[0]
   
   await Promise.all([
@@ -352,7 +579,6 @@ const handleCenterChange = async () => {
     loadRegisteredBooks(),
     loadBookRequests()
   ])
-  // 검색 결과는 센터 변경 시 유지 (등록 상태만 업데이트됨)
 }
 
 // 검색 실행
@@ -367,7 +593,6 @@ const handleSearch = async () => {
     displayCount.value = 10
     hasSearched.value = true
     
-    // API 한 번 호출로 필터링된 전체 결과 가져오기
     const result = await searchBooks(searchQuery.value)
     
     allSearchResults.value = result.items || []
@@ -388,7 +613,7 @@ const clearSearch = () => {
   hasSearched.value = false
 }
 
-// 더보기 (API 호출 없이 표시 개수만 증가)
+// 더보기
 const handleLoadMore = () => {
   displayCount.value += 10
 }
@@ -407,7 +632,7 @@ const loadBestsellers = async () => {
   }
 }
 
-// 등록된 도서 로드 (등록 상태 확인용)
+// 등록된 도서 로드
 const loadRegisteredBooks = async () => {
   try {
     const books = await getBooksByCenter(currentCenter.value)
@@ -446,7 +671,6 @@ const loadBookRequests = async () => {
       })
     })
     
-    // 클라이언트에서 requestedAt 기준 내림차순 정렬
     requests.sort((a, b) => {
       const dateA = a.requestedAt?.toDate?.() || new Date(0)
       const dateB = b.requestedAt?.toDate?.() || new Date(0)
@@ -490,9 +714,162 @@ const getRequesterInfo = (request) => {
   return requesterInfoCache.value[request.requestedBy] || ''
 }
 
+// 카테고리 목록 로드
+const loadCategories = async () => {
+  try {
+    categoriesLoading.value = true
+    const categories = await getCategories(currentCenter.value)
+    categoryOptions.value = categories
+  } catch (error) {
+    console.error('카테고리 로드 오류:', error)
+    categoryOptions.value = []
+  } finally {
+    categoriesLoading.value = false
+  }
+}
+
+// 새 카테고리 추가
+const handleAddNewCategory = async () => {
+  const trimmed = newCategoryInput.value.trim()
+  if (!trimmed) return
+  
+  try {
+    await addCategory(currentCenter.value, trimmed)
+    
+    // 카테고리 목록에 추가
+    if (!categoryOptions.value.includes(trimmed)) {
+      categoryOptions.value = [...categoryOptions.value, trimmed].sort((a, b) => a.localeCompare(b, 'ko'))
+    }
+    
+    // 추가한 카테고리 선택
+    registerForm.value.category = trimmed
+    newCategoryInput.value = ''
+  } catch (error) {
+    console.error('카테고리 추가 오류:', error)
+    await alert('카테고리 추가에 실패했습니다.', { type: 'error' })
+  }
+}
+
+// 권수 변경 핸들러
+const handleQuantityChange = (newQuantity) => {
+  const qty = Math.max(1, Math.min(20, newQuantity || 1))
+  const currentCopies = registerForm.value.copies
+  
+  if (qty > currentCopies.length) {
+    // 권수 증가 - 새로운 항목 추가
+    for (let i = currentCopies.length; i < qty; i++) {
+      currentCopies.push({ fourDigits: '', location: '구매칸', error: '', labelPreview: '' })
+    }
+  } else if (qty < currentCopies.length) {
+    // 권수 감소 - 뒤에서 삭제
+    registerForm.value.copies = currentCopies.slice(0, qty)
+  }
+  
+  registerForm.value.quantity = qty
+}
+
+// 각 권의 4자리 입력 핸들러
+const handleCopyFourDigitsInput = (e, index) => {
+  // 숫자만 허용
+  const value = e.target.value.replace(/\D/g, '').slice(0, 4)
+  registerForm.value.copies[index].fourDigits = value
+  registerForm.value.copies[index].error = ''
+  updateLabelPreviews()
+}
+
+// 각 권의 라벨번호 중복 체크
+const checkCopyLabelNumberDuplicate = async (index) => {
+  const copy = registerForm.value.copies[index]
+  
+  if (!registerForm.value.category || !copy.fourDigits || copy.fourDigits.length !== 4) {
+    return
+  }
+  
+  try {
+    labelCheckLoading.value = true
+    const labelNumber = createLabelNumber(registerForm.value.category, currentCenter.value, copy.fourDigits)
+    
+    // DB에서 중복 체크
+    const exists = await checkLabelNumberExists(labelNumber, currentCenter.value)
+    
+    if (exists) {
+      copy.error = '이미 사용중인 라벨번호입니다.'
+      return
+    }
+    
+    // 같은 폼 내에서 중복 체크
+    for (let i = 0; i < registerForm.value.copies.length; i++) {
+      if (i !== index) {
+        const otherCopy = registerForm.value.copies[i]
+        if (otherCopy.fourDigits === copy.fourDigits) {
+          copy.error = '동일한 라벨번호가 이미 입력되어 있습니다.'
+          return
+        }
+      }
+    }
+    
+    copy.error = ''
+  } catch (error) {
+    console.error('라벨번호 중복 체크 오류:', error)
+  } finally {
+    labelCheckLoading.value = false
+  }
+}
+
+// 등록 다이얼로그 열기
+const openRegisterDialog = async (book) => {
+  selectedBook.value = book
+  selectedRequestInfo.value = null
+  
+  // 폼 초기화
+  registerForm.value = {
+    category: '',
+    quantity: 1,
+    copies: [{ fourDigits: '', location: '구매칸', error: '', labelPreview: '' }]
+  }
+  newCategoryInput.value = ''
+  
+  // 카테고리 로드
+  await loadCategories()
+  
+  registerDialogVisible.value = true
+}
+
+// 신청 목록에서 등록 다이얼로그 열기
+const openRegisterDialogFromRequest = async (book) => {
+  selectedBook.value = book
+  selectedRequestInfo.value = book
+  
+  // 폼 초기화
+  registerForm.value = {
+    category: '',
+    quantity: 1,
+    copies: [{ fourDigits: '', location: '구매칸', error: '', labelPreview: '' }]
+  }
+  newCategoryInput.value = ''
+  
+  // 카테고리 로드
+  await loadCategories()
+  
+  registerDialogVisible.value = true
+}
+
+// 등록 다이얼로그 닫기
+const closeRegisterDialog = () => {
+  registerDialogVisible.value = false
+  selectedBook.value = null
+  selectedRequestInfo.value = null
+}
+
 // 도서 등록
-const handleBookRegister = async (book) => {
+const handleRegisterBook = async () => {
+  if (!selectedBook.value || !isRegisterFormValid.value) {
+    return
+  }
+  
+  const book = selectedBook.value
   const isbn = book.isbn13 || book.isbn || ''
+  
   if (!isbn) {
     await alert('ISBN 정보가 없어 등록할 수 없습니다.', { type: 'error' })
     return
@@ -503,11 +880,29 @@ const handleBookRegister = async (book) => {
   }
 
   try {
+    registering.value = true
     registeringBooks.value.add(isbn)
-    await registerBook(book, currentCenter.value, user.value.uid)
+    
+    const registeredLabelNumbers = []
+    
+    // 각 권을 순차적으로 등록
+    for (const copy of registerForm.value.copies) {
+      const labelNumber = createLabelNumber(registerForm.value.category, currentCenter.value, copy.fourDigits)
+      
+      await registerBookWithLabel(
+        book,
+        currentCenter.value,
+        user.value.uid,
+        registerForm.value.category,
+        labelNumber,
+        copy.location
+      )
+      
+      registeredLabelNumbers.push(labelNumber)
+    }
     
     // 신청된 도서인지 확인하고 처리
-    const matchingRequest = bookRequests.value.find(req => {
+    const matchingRequest = selectedRequestInfo.value || bookRequests.value.find(req => {
       const reqIsbn = req.isbn13 || req.isbn || ''
       return reqIsbn === isbn
     })
@@ -546,96 +941,20 @@ const handleBookRegister = async (book) => {
     // 등록된 도서 목록 새로고침
     await loadRegisteredBooks()
     
-    // 성공 메시지
-    await alert('도서가 성공적으로 등록되었습니다.', { type: 'success' })
-  } catch (error) {
-    console.error('도서 등록 오류:', error)
-    await alert(error.message || '도서 등록에 실패했습니다.', { type: 'error' })
-  } finally {
-    registeringBooks.value.delete(isbn)
-  }
-}
-
-// 도서 신청에서 등록 처리
-const handleBookRegisterFromRequest = async (book) => {
-  const isbn = book.isbn13 || book.isbn || ''
-  if (!isbn) {
-    await alert('ISBN 정보가 없어 등록할 수 없습니다.', { type: 'error' })
-    return
-  }
-
-  if (registeringBooks.value.has(isbn)) {
-    return
-  }
-
-  try {
-    registeringBooks.value.add(isbn)
-    await registerBook(book, currentCenter.value, user.value.uid)
+    // 다이얼로그 닫기
+    closeRegisterDialog()
     
-    // 신청 상태 업데이트 (approved로 변경) 및 알림 발송
-    if (firestore) {
-      const { doc, updateDoc, serverTimestamp, collection, query, where, getDocs, addDoc } = await import('firebase/firestore')
-      
-      let requestId = book.id
-      let requestedBy = book.requestedBy
-      
-      // book.id가 없으면 isbn으로 찾기
-      if (!requestId) {
-        const requestsRef = collection(firestore, 'bookRequests')
-        const q = query(
-          requestsRef,
-          where('center', '==', currentCenter.value),
-          where('status', '==', 'pending'),
-          where('isbn13', '==', isbn)
-        )
-        const snapshot = await getDocs(q)
-        if (!snapshot.empty) {
-          requestId = snapshot.docs[0].id
-          requestedBy = snapshot.docs[0].data().requestedBy
-        }
-      }
-      
-      if (requestId) {
-        const requestRef = doc(firestore, 'bookRequests', requestId)
-        await updateDoc(requestRef, {
-          status: 'approved',
-          approvedAt: serverTimestamp(),
-          approvedBy: user.value.uid
-        })
-        
-        // 신청자에게 알림 발송
-        if (requestedBy) {
-          const notificationsRef = collection(firestore, 'notifications')
-          await addDoc(notificationsRef, {
-            userId: requestedBy,
-            type: 'book_registered',
-            title: '신청 도서 등록 완료',
-            message: `신청하신 도서 "${book.title}"이(가) ${currentCenter.value}에 등록되었습니다.`,
-            bookTitle: book.title,
-            bookIsbn: isbn,
-            center: currentCenter.value,
-            isRead: false,
-            createdAt: serverTimestamp()
-          })
-        }
-      }
+    // 성공 메시지
+    if (registeredLabelNumbers.length === 1) {
+      await alert(`도서가 성공적으로 등록되었습니다.\n라벨번호: ${registeredLabelNumbers[0]}`, { type: 'success' })
+    } else {
+      await alert(`${registeredLabelNumbers.length}권의 도서가 성공적으로 등록되었습니다.\n라벨번호:\n${registeredLabelNumbers.join('\n')}`, { type: 'success' })
     }
-    
-    // 로컬 상태에서 즉시 제거 (UI 반응성 향상)
-    bookRequests.value = bookRequests.value.filter(req => {
-      const reqIsbn = req.isbn13 || req.isbn || ''
-      return reqIsbn !== isbn
-    })
-    
-    // 등록된 도서 목록 새로고침
-    await loadRegisteredBooks()
-    
-    // 성공 메시지
-    await alert('도서가 성공적으로 등록되었습니다.', { type: 'success' })
   } catch (error) {
     console.error('도서 등록 오류:', error)
     await alert(error.message || '도서 등록에 실패했습니다.', { type: 'error' })
   } finally {
+    registering.value = false
     registeringBooks.value.delete(isbn)
   }
 }
@@ -711,12 +1030,12 @@ useHead({
     
     .center-select {
       flex: 0 0 auto;
-      width: 100% !important;
-      max-width: 100% !important;
+      width: 100%;
+      max-width: 100%;
       
       :deep(.v-input) {
-        width: 100% !important;
-        max-width: 100% !important;
+        width: 100%;
+        max-width: 100%;
       }
     }
   }
@@ -778,6 +1097,153 @@ useHead({
   }
 }
 
+// 등록 다이얼로그
+.register-dialog-card {
+  border-radius: rem(12);
+}
+
+.register-dialog-title {
+  font-size: rem(20);
+  font-weight: 600;
+  color: #002C5B;
+  padding: rem(20) rem(24) rem(8);
+}
+
+.register-dialog-content {
+  padding: rem(16) rem(24) rem(8);
+}
+
+.book-info-preview {
+  background: #f5f5f5;
+  border-radius: rem(8);
+  padding: rem(12);
+}
+
+.book-info-preview-inner {
+  display: flex;
+  gap: rem(12);
+  align-items: flex-start;
+}
+
+.book-thumbnail {
+  width: rem(60);
+  height: rem(80);
+  object-fit: cover;
+  border-radius: rem(4);
+  flex-shrink: 0;
+}
+
+.book-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.book-title {
+  font-size: rem(14);
+  font-weight: 600;
+  color: #333;
+  line-height: 1.3;
+  margin-bottom: rem(4);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.book-author {
+  font-size: rem(12);
+  color: #666;
+}
+
+// 권수 입력
+.quantity-section {
+  margin-bottom: rem(16);
+}
+
+// 복수 등록 섹션
+.copies-section {
+  max-height: rem(400);
+  overflow-y: auto;
+  padding-right: rem(4);
+}
+
+.copy-entry {
+  background: #fafafa;
+  border-radius: rem(8);
+  padding: rem(16);
+  border: rem(1) solid #e8e8e8;
+  
+  &:not(:last-child) {
+    margin-bottom: rem(12);
+  }
+}
+
+.copy-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: rem(8);
+}
+
+.copy-number {
+  font-size: rem(14);
+  font-weight: 600;
+  color: #002C5B;
+  background: #e3f2fd;
+  padding: rem(4) rem(10);
+  border-radius: rem(4);
+}
+
+.copy-label-preview {
+  font-size: rem(13);
+  color: #666;
+  font-family: monospace;
+  background: #fff;
+  padding: rem(4) rem(8);
+  border-radius: rem(4);
+  border: rem(1) solid #ddd;
+}
+
+.copy-inputs {
+  display: flex;
+  gap: rem(12);
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.center-code-input {
+  flex: 0 0 rem(90);
+  min-width: rem(80);
+}
+
+.four-digits-input {
+  flex: 1;
+  min-width: rem(120);
+}
+
+.location-select {
+  flex: 0 0 rem(130);
+  min-width: rem(110);
+}
+
+@media (max-width: 500px) {
+  .copy-inputs {
+    flex-direction: column;
+    gap: rem(8);
+    
+    .center-code-input,
+    .four-digits-input,
+    .location-select {
+      flex: 0 0 auto;
+      width: 100%;
+    }
+  }
+}
+
+.register-dialog-actions {
+  padding: rem(8) rem(24) rem(20);
+}
+
 .side-navigation {
   z-index: 1000;
 }
@@ -799,14 +1265,12 @@ useHead({
   color: #FFFFFF;
 }
 
-/* 768px 이하: 전체 화면 기준 우측에 붙어서 */
 @media (max-width: 768px) {
   .side-navigation :deep(.v-navigation-drawer) {
     width: rem(280);
   }
 }
 
-/* 769px 이상: 768px 이너 안쪽으로 들어오도록 */
 @media (min-width: 769px) {
   .side-navigation :deep(.v-navigation-drawer) {
     width: rem(360);
@@ -815,10 +1279,8 @@ useHead({
     max-width: rem(768);
   }
   
-  /* 오버레이가 768px 컨테이너 영역만 덮도록 */
   .side-navigation :deep(.v-overlay__scrim) {
     display: none;
   }
 }
 </style>
-

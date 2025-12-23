@@ -53,6 +53,56 @@
         <div class="book-info book-info-publisher text-body-2">
           <strong>출판사:</strong> {{ book.publisher }}
         </div>
+        
+        <!-- 위치 정보 표시 -->
+        <div
+          v-if="showLocation && displayLocation"
+          class="book-location text-body-2"
+          @click.stop="handleLocationClick"
+        >
+          <v-icon
+            size="small"
+            class="mr-1"
+          >
+            mdi-map-marker
+          </v-icon>
+          <span class="location-text">{{ displayLocation }}</span>
+          <v-icon
+            v-if="hasLocationImage"
+            size="small"
+            class="ml-1 location-info-icon"
+          >
+            mdi-information-outline
+          </v-icon>
+        </div>
+        
+        <!-- 수량 정보 표시 (그룹핑 시) -->
+        <div
+          v-if="showQuantity && totalCount > 0"
+          class="book-quantity text-body-2"
+        >
+          <v-icon
+            size="small"
+            class="mr-1"
+          >
+            mdi-book-multiple
+          </v-icon>
+          대여가능 {{ availableCount }}권 / 총 {{ totalCount }}권
+        </div>
+        
+        <!-- 라벨번호 표시 -->
+        <div
+          v-if="showLabelNumber && labelNumber"
+          class="book-label-number text-body-2"
+        >
+          <v-icon
+            size="small"
+            class="mr-1"
+          >
+            mdi-label
+          </v-icon>
+          {{ labelNumber }}
+        </div>
       </div>
     </div>
     
@@ -245,9 +295,20 @@
       </template>
     </div>
   </v-card>
+  
+  <!-- 위치 안내 팝업 -->
+  <LocationGuidePopup
+    v-model="locationPopupVisible"
+    :center="center"
+    :location="singleLocation"
+    :label-number="labelNumber"
+  />
 </template>
 
 <script setup>
+import { formatLocation, formatMultipleLocations } from '@/utils/labelConfig.js'
+import { hasLocationImage as checkHasLocationImage } from '@/utils/locationCoordinates.js'
+
 const props = defineProps({
   book: {
     type: Object,
@@ -269,86 +330,169 @@ const props = defineProps({
     type: Boolean,
     default: true
   },
-  selectable: { // 도서 관리 페이지에서 선택 가능 여부
+  selectable: {
     type: Boolean,
     default: false
   },
-  selected: { // 선택 상태
+  selected: {
     type: Boolean,
     default: false
   },
-  status: { // 도서 상태 (임시 테스트용: 'new', 'rented', 'overdue')
+  status: {
     type: String,
     default: null
   },
-  showStatusFlags: { // 상태 플래그 표시 여부
+  showStatusFlags: {
     type: Boolean,
     default: false
   },
-  disabled: { // 선택 불가 상태
+  disabled: {
     type: Boolean,
     default: false
   },
-  actionButtonText: { // 액션 버튼 텍스트 (기본: "[센터]에 등록하기")
+  actionButtonText: {
     type: String,
     default: ''
   },
-  registeredMessage: { // 등록됨 메시지 (기본: "[센터]에 등록된 도서입니다.")
+  registeredMessage: {
     type: String,
     default: ''
   },
-  requestedBooks: { // 신청된 도서 목록
+  requestedBooks: {
     type: Array,
     default: () => []
   },
-  requestedMessage: { // 신청됨 메시지 (기본: "[센터]에 이미 신청된 도서입니다.")
+  requestedMessage: {
     type: String,
     default: ''
   },
-  hideOverdueStatus: { // 연체중을 대여중으로 표시 (일반 사용자용)
+  hideOverdueStatus: {
     type: Boolean,
     default: false
   },
-  showReturnDate: { // 반납예정일 표시 여부 (마이페이지용)
+  showReturnDate: {
     type: Boolean,
     default: false
   },
-  returnDate: { // 반납예정일
+  returnDate: {
     type: [Date, Object, String],
     default: null
   },
-  showRentButton: { // 대여 신청 버튼 표시 여부 (도서 대여 페이지용)
+  showRentButton: {
     type: Boolean,
     default: false
   },
-  renterInfo: { // 대여자 정보 (관리자 도서 관리 페이지용)
+  renterInfo: {
     type: String,
     default: ''
   },
-  requesterInfo: { // 신청자 정보 (관리자 도서 관리 페이지용)
+  requesterInfo: {
     type: String,
     default: ''
   },
-  showAdminRentButton: { // 관리자용 대여 버튼 표시 (도서 관리 페이지용)
+  showAdminRentButton: {
     type: Boolean,
     default: false
   },
-  showAdminReturnButton: { // 관리자용 반납 버튼 표시 (도서 관리 페이지용)
+  showAdminReturnButton: {
     type: Boolean,
     default: false
   },
-  allowRegisterRequested: { // 신청된 도서도 등록 가능 (관리자용)
+  allowRegisterRequested: {
     type: Boolean,
     default: false
+  },
+  // 새로운 Props
+  showLocation: {
+    type: Boolean,
+    default: false
+  },
+  location: {
+    type: String,
+    default: ''
+  },
+  locations: {
+    type: Array,
+    default: () => []
+  },
+  showQuantity: {
+    type: Boolean,
+    default: false
+  },
+  availableCount: {
+    type: Number,
+    default: 0
+  },
+  totalCount: {
+    type: Number,
+    default: 0
+  },
+  showLabelNumber: {
+    type: Boolean,
+    default: false
+  },
+  labelNumber: {
+    type: String,
+    default: ''
   }
 })
 
-const emit = defineEmits(['register', 'select', 'return', 'rent', 'adminRent', 'adminReturn'])
+const emit = defineEmits(['register', 'select', 'return', 'rent', 'adminRent', 'adminReturn', 'locationClick'])
 
-// 도서 이미지 (알라딘 API는 cover 필드 사용)
+// 위치 안내 팝업
+const locationPopupVisible = ref(false)
+
+// 도서 이미지
 const bookImage = computed(() => {
   return props.book.cover || props.book.image || '/placeholder-book.png'
 })
+
+// 표시할 위치 (단일 또는 다중)
+const displayLocation = computed(() => {
+  if (props.location) {
+    return formatLocation(props.location)
+  }
+  
+  if (props.locations && props.locations.length > 0) {
+    return formatMultipleLocations(props.locations)
+  }
+  
+  if (props.book.location) {
+    return formatLocation(props.book.location)
+  }
+  
+  return ''
+})
+
+// 단일 위치 (팝업용)
+const singleLocation = computed(() => {
+  if (props.location) {
+    return props.location
+  }
+  
+  if (props.locations && props.locations.length > 0) {
+    return props.locations[0]
+  }
+  
+  if (props.book.location) {
+    return props.book.location
+  }
+  
+  return ''
+})
+
+// 위치 안내 이미지 존재 여부
+const hasLocationImage = computed(() => {
+  return checkHasLocationImage(props.center)
+})
+
+// 위치 클릭 핸들러
+const handleLocationClick = () => {
+  if (hasLocationImage.value && singleLocation.value) {
+    locationPopupVisible.value = true
+    emit('locationClick', { center: props.center, location: singleLocation.value })
+  }
+}
 
 // 등록 상태 확인
 const isBookRegistered = computed(() => {
@@ -363,7 +507,6 @@ const isBookRegistered = computed(() => {
   
   return props.registeredBooks.some(registeredBook => {
     const registeredIsbn = registeredBook.isbn13 || registeredBook.isbn || registeredBook.id || ''
-    // ISBN 비교 (앞뒤 공백 제거 및 대소문자 무시)
     const normalizedIsbn = isbn.toString().trim()
     const normalizedRegisteredIsbn = registeredIsbn.toString().trim()
     return normalizedIsbn === normalizedRegisteredIsbn && registeredBook.center === props.center
@@ -398,28 +541,20 @@ const handleRegister = async () => {
     isRegistering.value = true
     emit('register', props.book)
   } finally {
-  // 등록 완료 후 약간의 딜레이를 두고 상태 초기화
-  setTimeout(() => {
-    isRegistering.value = false
-  }, 1000)
-}
+    setTimeout(() => {
+      isRegistering.value = false
+    }, 1000)
+  }
 }
 
-// 등록일 기준 한 달 이내인지 확인
+// 구매칸에 있는 도서인지 확인 (NEW 표시)
 const isNewBook = computed(() => {
-  if (props.book.registeredAt) {
-    const registeredDate = props.book.registeredAt?.toDate?.() || new Date(props.book.registeredAt)
-    const oneMonthAgo = new Date()
-    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
-    
-    return registeredDate >= oneMonthAgo
-  }
-  return false
+  const location = props.location || props.book?.location
+  return location === '구매칸'
 })
 
-// 도서 상태 (대여중, 연체중 등)
+// 도서 상태
 const bookStatus = computed(() => {
-  // props로 상태가 전달된 경우 우선 사용
   if (props.status) {
     return props.status
   }
@@ -429,7 +564,6 @@ const bookStatus = computed(() => {
 const statusText = computed(() => {
   const status = bookStatus.value
   
-  // hideOverdueStatus가 true이면 연체중도 대여중으로 표시 (일반 사용자용)
   if (props.hideOverdueStatus && status === 'overdue') {
     return '대여중'
   }
@@ -446,7 +580,6 @@ const statusText = computed(() => {
 const statusColor = computed(() => {
   const status = bookStatus.value
   
-  // hideOverdueStatus가 true이면 연체중도 대여중 색상 (일반 사용자용)
   if (props.hideOverdueStatus && status === 'overdue') {
     return 'info'
   }
@@ -454,13 +587,13 @@ const statusColor = computed(() => {
   const colorMap = {
     new: 'primary',
     rented: 'info',
-    overdue: 'error', // 연체중은 빨간색 계열
-    requested: 'warning' // 대여신청은 주황색 계열
+    overdue: 'error',
+    requested: 'warning'
   }
   return colorMap[status] || 'primary'
 })
 
-// 대여중인지 확인 (연체중 포함)
+// 대여중인지 확인
 const isRented = computed(() => {
   return bookStatus.value === 'rented' || bookStatus.value === 'overdue'
 })
@@ -516,7 +649,6 @@ const isOverdue = computed(() => {
   const date = props.returnDate?.toDate?.() || new Date(props.returnDate)
   return date < new Date()
 })
-
 </script>
 
 <style lang="scss" scoped>
@@ -561,10 +693,10 @@ const isOverdue = computed(() => {
 
 .status-chip {
   flex: 0 0 auto;
-  font-size: rem(9) !important;
-  height: rem(16) !important;
-  padding: 0 rem(6) !important;
-  min-width: auto !important;
+  font-size: rem(9);
+  height: rem(16);
+  padding: 0 rem(6);
+  min-width: auto;
   
   :deep(.v-chip__content) {
     font-size: rem(9);
@@ -631,6 +763,51 @@ const isOverdue = computed(() => {
   display: block;
   width: 100%;
   max-width: 100%;
+}
+
+// 위치 정보
+.book-location {
+  display: flex;
+  align-items: center;
+  color: #666;
+  margin-top: rem(4);
+  cursor: pointer;
+  transition: color 0.2s;
+  
+  &:hover {
+    color: #002C5B;
+  }
+  
+  .location-text {
+    flex: 0 0 auto;
+  }
+  
+  .location-info-icon {
+    color: #999;
+    transition: color 0.2s;
+  }
+  
+  &:hover .location-info-icon {
+    color: #002C5B;
+  }
+}
+
+// 수량 정보
+.book-quantity {
+  display: flex;
+  align-items: center;
+  color: #10b981;
+  margin-top: rem(4);
+  font-weight: 500;
+}
+
+// 라벨번호
+.book-label-number {
+  display: flex;
+  align-items: center;
+  color: #002C5B;
+  margin-top: rem(4);
+  font-weight: 500;
 }
 
 .book-action-area {
@@ -735,4 +912,3 @@ const isOverdue = computed(() => {
   color: #ef4444;
 }
 </style>
-

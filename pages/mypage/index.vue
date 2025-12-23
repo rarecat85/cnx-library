@@ -93,6 +93,10 @@
                   :show-status-flags="false"
                   :show-return-date="true"
                   :return-date="getReturnDate(book)"
+                  :show-label-number="true"
+                  :label-number="book.labelNumber"
+                  :show-location="true"
+                  :location="book.location"
                   @select="handleBookSelect"
                   @return="handleSingleReturn"
                 />
@@ -109,17 +113,75 @@
 
         <!-- 내가 신청한 책 목록 섹션 -->
         <div class="requested-section mb-8">
-          <BookListSwiper
-            :books="myRequestedBooks"
-            :center="''"
-            :registered-books="[]"
-            :loading="requestedBooksLoading"
-            title="내가 신청한 책"
-            :empty-message="'신청한 도서가 없습니다.'"
-            nav-id="my-requested"
-            :show-action="false"
-            :show-status-flags="false"
-          />
+          <div class="section-header mb-4">
+            <h2 class="section-title">
+              내가 신청한 책
+            </h2>
+          </div>
+          
+          <div
+            v-if="requestedBooksLoading"
+            class="text-center py-8"
+          >
+            <v-progress-circular
+              indeterminate
+              color="primary"
+            />
+          </div>
+          <div
+            v-else-if="myRequestedBooks.length > 0"
+            class="requested-books-grid"
+          >
+            <v-row class="book-list-row">
+              <v-col
+                v-for="(book, index) in myRequestedBooks"
+                :key="`requested-${index}`"
+                cols="12"
+                sm="6"
+                class="book-list-col"
+              >
+                <div class="requested-book-item">
+                  <BookCard
+                    :book="book"
+                    :center="book.center || ''"
+                    :show-action="false"
+                    :selectable="false"
+                    :show-status-flags="false"
+                    :show-label-number="!!book.labelNumber"
+                    :label-number="book.labelNumber"
+                    :show-location="!!book.location"
+                    :location="book.location"
+                  />
+                  <div class="requested-book-actions">
+                    <div class="requested-info">
+                      <v-icon
+                        size="small"
+                        class="mr-1"
+                      >
+                        mdi-clock-outline
+                      </v-icon>
+                      {{ formatRequestedDate(book.requestedAt) }}
+                    </div>
+                    <v-btn
+                      color="error"
+                      variant="outlined"
+                      size="small"
+                      :loading="cancelRequestLoading === book.id"
+                      @click="handleCancelRequest(book)"
+                    >
+                      신청 취소
+                    </v-btn>
+                  </div>
+                </div>
+              </v-col>
+            </v-row>
+          </div>
+          <div
+            v-else
+            class="text-center py-8 text-medium-emphasis empty-state"
+          >
+            신청한 도서가 없습니다.
+          </div>
         </div>
 
         <!-- 읽은 책 목록 섹션 -->
@@ -220,7 +282,7 @@ definePageMeta({
 })
 
 const { user } = useAuth()
-const { returnBook } = useBooks()
+const { returnBook, cancelRentRequest } = useBooks()
 const { confirm, alert } = useDialog()
 const { $firebaseFirestore } = useNuxtApp()
 const firestore = $firebaseFirestore
@@ -239,6 +301,7 @@ const rentedBooksLoading = ref(false)
 // 내가 신청한 도서
 const myRequestedBooks = ref([])
 const requestedBooksLoading = ref(false)
+const cancelRequestLoading = ref(null)
 
 // 센터별 필터링된 대여 도서
 const filteredRentedBooks = computed(() => {
@@ -248,7 +311,7 @@ const filteredRentedBooks = computed(() => {
   return rentedBooks.value.filter(book => book.center === selectedCenter.value)
 })
 
-// 읽은 책 목록 (대여 이력)
+// 읽은 책 목록 (대여 이력) - ISBN 기준 중복 제거
 const rentalHistory = ref([])
 const historyLoading = ref(false)
 
@@ -303,9 +366,7 @@ const getUserWorkplace = async () => {
 
 // 초기화
 onMounted(async () => {
-  // 사용자 근무지 기반 센터 설정
   const workplace = await getUserWorkplace()
-  // 근무지 기반으로 센터 매핑
   selectedCenter.value = workplace ? getCenterByWorkplace(workplace) : centerOptions[0]
   
   await Promise.all([
@@ -315,19 +376,21 @@ onMounted(async () => {
   ])
 })
 
-// 내가 신청한 도서 로드
+// 내가 신청한 도서 로드 (대여신청 상태의 도서)
 const loadMyRequestedBooks = async () => {
   if (!user.value || !firestore) return
 
   try {
     requestedBooksLoading.value = true
     
-    const { collection, query, where, getDocs, orderBy } = await import('firebase/firestore')
-    const requestsRef = collection(firestore, 'bookRequests')
+    const { collection, query, where, getDocs } = await import('firebase/firestore')
+    
+    // books 컬렉션에서 내가 신청한 도서 조회
+    const booksRef = collection(firestore, 'books')
     const q = query(
-      requestsRef,
+      booksRef,
       where('requestedBy', '==', user.value.uid),
-      where('status', '==', 'pending')
+      where('status', '==', 'requested')
     )
     
     const snapshot = await getDocs(q)
@@ -375,7 +438,6 @@ const loadRentedBooks = async () => {
     
     snapshot.forEach((doc) => {
       const data = doc.data()
-      // 대여중이거나 연체중인 도서만
       if (data.rentedAt) {
         books.push({
           id: doc.id,
@@ -400,7 +462,7 @@ const loadRentedBooks = async () => {
   }
 }
 
-// 대여 이력 로드 (반납 완료된 도서)
+// 대여 이력 로드 (반납 완료된 도서) - ISBN 기준 중복 제거
 const loadRentalHistory = async () => {
   if (!user.value || !firestore) return
 
@@ -415,25 +477,39 @@ const loadRentalHistory = async () => {
     )
     
     const snapshot = await getDocs(q)
-    const historyMap = new Map() // bookId 기준 중복 제거
+    // ISBN 기준 중복 제거
+    const historyMap = new Map()
     
     snapshot.forEach((doc) => {
       const data = doc.data()
-      const bookId = data.bookId
+      // ISBN 기준으로 중복 체크 (isbn13 우선, 없으면 isbn)
+      const isbn = data.isbn13 || data.isbn || ''
       
-      // 같은 책이 여러 개 있으면 가장 최근 반납 기록만 유지
-      if (!historyMap.has(bookId)) {
-        historyMap.set(bookId, {
+      if (!isbn) {
+        // ISBN이 없는 경우 bookId로 처리 (기존 데이터 호환)
+        const bookId = data.bookId
+        if (!historyMap.has(bookId)) {
+          historyMap.set(bookId, {
+            id: doc.id,
+            ...data
+          })
+        }
+        return
+      }
+      
+      // 같은 ISBN의 책이 여러 개 있으면 가장 최근 반납 기록만 유지
+      if (!historyMap.has(isbn)) {
+        historyMap.set(isbn, {
           id: doc.id,
           ...data
         })
       } else {
-        const existing = historyMap.get(bookId)
+        const existing = historyMap.get(isbn)
         const existingDate = existing.returnedAt?.toDate?.() || new Date(0)
         const currentDate = data.returnedAt?.toDate?.() || new Date(0)
         
         if (currentDate > existingDate) {
-          historyMap.set(bookId, {
+          historyMap.set(isbn, {
             id: doc.id,
             ...data
           })
@@ -457,6 +533,18 @@ const loadRentalHistory = async () => {
   } finally {
     historyLoading.value = false
   }
+}
+
+// 신청일 포맷
+const formatRequestedDate = (requestedAt) => {
+  if (!requestedAt) return ''
+  
+  const date = requestedAt?.toDate?.() || new Date(requestedAt)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  
+  return `${year}.${month}.${day} 신청`
 }
 
 // 반납예정일 계산 (대여일 + 7일)
@@ -502,6 +590,32 @@ const handleHistoryBookSelect = (record, selected) => {
   }
 }
 
+// 대여 신청 취소
+const handleCancelRequest = async (book) => {
+  if (!user.value || !book) return
+
+  if (!await confirm(`"${book.title}" 대여 신청을 취소하시겠습니까?`)) {
+    return
+  }
+
+  try {
+    cancelRequestLoading.value = book.id
+    
+    const labelNumber = book.labelNumber || book.id.split('_')[0]
+    await cancelRentRequest(labelNumber, book.center, user.value.uid)
+    
+    // 목록에서 제거
+    myRequestedBooks.value = myRequestedBooks.value.filter(b => b.id !== book.id)
+    
+    await alert('대여 신청이 취소되었습니다.', { type: 'success' })
+  } catch (error) {
+    console.error('신청 취소 오류:', error)
+    await alert(error.message || '신청 취소에 실패했습니다.', { type: 'error' })
+  } finally {
+    cancelRequestLoading.value = null
+  }
+}
+
 // 읽은 책 이력 삭제
 const handleDeleteHistory = async () => {
   if (selectedHistoryBooks.value.length === 0 || !user.value) return
@@ -537,7 +651,7 @@ const handleDeleteHistory = async () => {
 const handleReturnBooks = async () => {
   if (selectedBooks.value.length === 0 || !user.value) return
 
-  const bookTitles = selectedBooks.value.map(book => book.title).join(', ')
+  const bookTitles = selectedBooks.value.map(book => `${book.title} (${book.labelNumber || '-'})`).join('\n')
   if (!await confirm(`다음 도서들을 반납하시겠습니까?\n\n${bookTitles}`)) {
     return
   }
@@ -553,15 +667,17 @@ const handleReturnBooks = async () => {
       await updateDoc(bookRef, {
         status: 'available',
         rentedBy: deleteField(),
-        rentedAt: deleteField()
+        rentedAt: deleteField(),
+        expectedReturnDate: deleteField()
       })
       
-      // 2. 대여 이력 확인 (이미 읽은 책인지)
+      // 2. 대여 이력 확인 (ISBN 기준)
       const historyRef = collection(firestore, 'rentalHistory')
+      const isbn = book.isbn13 || book.isbn || ''
       const historyQuery = query(
         historyRef,
         where('userId', '==', user.value.uid),
-        where('bookId', '==', book.id)
+        where('isbn13', '==', isbn)
       )
       const historySnapshot = await getDocs(historyQuery)
       
@@ -569,6 +685,7 @@ const handleReturnBooks = async () => {
         // 새로운 책이면 이력 추가
         await addDoc(historyRef, {
           bookId: book.id,
+          labelNumber: book.labelNumber || '',
           isbn13: book.isbn13 || '',
           isbn: book.isbn || '',
           title: book.title || '',
@@ -613,7 +730,7 @@ const handleReturnBooks = async () => {
 const handleSingleReturn = async (book) => {
   if (!user.value || !book) return
 
-  if (!await confirm(`"${book.title}"을(를) 반납하시겠습니까?`)) {
+  if (!await confirm(`"${book.title}"을(를) 반납하시겠습니까?\n라벨번호: ${book.labelNumber || '-'}`)) {
     return
   }
 
@@ -627,15 +744,17 @@ const handleSingleReturn = async (book) => {
     await updateDoc(bookRef, {
       status: 'available',
       rentedBy: deleteField(),
-      rentedAt: deleteField()
+      rentedAt: deleteField(),
+      expectedReturnDate: deleteField()
     })
     
-    // 2. 대여 이력 확인 (이미 읽은 책인지)
+    // 2. 대여 이력 확인 (ISBN 기준)
     const historyRef = collection(firestore, 'rentalHistory')
+    const isbn = book.isbn13 || book.isbn || ''
     const historyQuery = query(
       historyRef,
       where('userId', '==', user.value.uid),
-      where('bookId', '==', book.id)
+      where('isbn13', '==', isbn)
     )
     const historySnapshot = await getDocs(historyQuery)
     
@@ -643,6 +762,7 @@ const handleSingleReturn = async (book) => {
       // 새로운 책이면 이력 추가
       await addDoc(historyRef, {
         bookId: book.id,
+        labelNumber: book.labelNumber || '',
         isbn13: book.isbn13 || '',
         isbn: book.isbn || '',
         title: book.title || '',
@@ -786,10 +906,6 @@ useHead({
     color: #9e9e9e;
     opacity: 1;
   }
-  
-  :deep(.v-btn__overlay) {
-    display: none;
-  }
 }
 
 .rental-section,
@@ -798,21 +914,33 @@ useHead({
   padding-top: rem(16);
 }
 
-.requested-section {
-  border-top: rem(1) solid #e0e0e0;
-  
-  :deep(.book-list-swiper-section) {
-    padding-top: 0;
-    border-top: none;
-  }
-  
-  :deep(.section-title) {
-    font-size: rem(20);
-  }
-}
-
+.requested-section,
 .history-section {
   border-top: rem(1) solid #e0e0e0;
+}
+
+// 신청 도서 아이템
+.requested-book-item {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.requested-book-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: rem(12) rem(16);
+  background: #f5f5f5;
+  border-radius: 0 0 rem(8) rem(8);
+  margin-top: rem(-8);
+}
+
+.requested-info {
+  display: flex;
+  align-items: center;
+  font-size: rem(12);
+  color: #666;
 }
 
 .empty-state {
@@ -855,14 +983,12 @@ useHead({
   color: #FFFFFF;
 }
 
-/* 768px 이하: 전체 화면 기준 우측에 붙어서 */
 @media (max-width: 768px) {
   .side-navigation :deep(.v-navigation-drawer) {
     width: rem(280);
   }
 }
 
-/* 769px 이상: 768px 이너 안쪽으로 들어오도록 */
 @media (min-width: 769px) {
   .side-navigation :deep(.v-navigation-drawer) {
     width: rem(360);
@@ -871,10 +997,8 @@ useHead({
     max-width: rem(768);
   }
   
-  /* 오버레이가 768px 컨테이너 영역만 덮도록 */
   .side-navigation :deep(.v-overlay__scrim) {
     display: none;
   }
 }
 </style>
-

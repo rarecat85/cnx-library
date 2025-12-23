@@ -89,6 +89,7 @@
             :hide-overdue-status="hideOverdueStatus"
             :disabled="isBookDisabled(book)"
             :allow-register-requested="allowRegisterRequested"
+            :allow-additional-register="allowAdditionalRegister"
             @register="handleRegister"
             @rent="handleRent"
           />
@@ -210,6 +211,11 @@ const props = defineProps({
   },
   // 신청된 도서도 등록 가능 (관리자용, BookCard에 전달)
   allowRegisterRequested: {
+    type: Boolean,
+    default: false
+  },
+  // 이미 등록된 도서도 추가 등록 가능 (관리자용, BookCard에 전달)
+  allowAdditionalRegister: {
     type: Boolean,
     default: false
   }

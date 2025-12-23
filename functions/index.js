@@ -11,6 +11,8 @@ const crypto = require('crypto')
 
 // 환경 변수
 const aladinTtbKey = defineString('ALADIN_TTB_KEY', { default: '' })
+const naverClientId = defineString('NAVER_CLIENT_ID', { default: '' })
+const naverClientSecret = defineString('NAVER_CLIENT_SECRET', { default: '' })
 const gmailUser = defineString('GMAIL_USER', { default: '' })
 const gmailAppPassword = defineString('GMAIL_APP_PASSWORD', { default: '' })
 
@@ -62,9 +64,9 @@ const isSetProduct = (item) => {
   
   const title = item.title.toLowerCase()
   const setKeywords = [
+    // 한글 키워드
     '세트',
     '전집',
-    'box',
     '박스',
     '시리즈',
     '전권',
@@ -73,7 +75,15 @@ const isSetProduct = (item) => {
     '모음',
     '선집',
     '문고판 세트',
-    '문고세트'
+    '문고세트',
+    // 영문 키워드
+    'box',
+    'boxed set',
+    'box set',
+    'collection',
+    'complete',
+    'omnibus',
+    'bundle'
   ]
   
   // 제목에 세트 관련 키워드가 포함되어 있는지 확인
@@ -1008,6 +1018,132 @@ exports.searchAladinBooks = onCall({
     }
   } catch (error) {
     console.error('알라딘 도서 검색 오류:', error)
+    return {
+      success: false,
+      error: error.message || '도서 검색에 실패했습니다.'
+    }
+  }
+})
+
+/**
+ * HTML 태그 제거 헬퍼 함수
+ * @param {string} str - HTML 태그가 포함된 문자열
+ * @returns {string} 태그가 제거된 문자열
+ */
+const stripHtmlTags = (str) => {
+  if (!str) return ''
+  return str.replace(/<[^>]*>/g, '')
+}
+
+/**
+ * 네이버 ISBN에서 ISBN13 추출
+ * @param {string} isbn - 네이버 ISBN 문자열 (예: "8901234567 9788901234567")
+ * @returns {string} ISBN13 또는 원본 ISBN
+ */
+const extractIsbn13 = (isbn) => {
+  if (!isbn) return ''
+  const parts = isbn.split(' ')
+  // ISBN13은 978 또는 979로 시작하는 13자리
+  const isbn13 = parts.find(p => p.length === 13 && (p.startsWith('978') || p.startsWith('979')))
+  return isbn13 || parts[parts.length - 1] || isbn
+}
+
+/**
+ * 네이버 도서 검색 API 호출
+ * 
+ * 이 함수는 네이버 Open API를 사용하여 도서를 검색합니다.
+ */
+exports.searchNaverBooks = onCall({
+  cors: [
+    'https://rarecat85.github.io',
+    'http://localhost:5001'
+  ]
+}, async (request) => {
+  try {
+    const { query, start = 1, display = 50 } = request.data
+
+    if (!query || query.trim() === '') {
+      return {
+        success: false,
+        error: '검색어를 입력해주세요.'
+      }
+    }
+
+    // 네이버 API 인증 정보 가져오기
+    const clientId = naverClientId.value()
+    const clientSecret = naverClientSecret.value()
+    
+    if (!clientId || !clientSecret) {
+      return {
+        success: false,
+        error: '네이버 API 인증 정보가 설정되지 않았습니다.'
+      }
+    }
+
+    // 네이버 도서 검색 API 호출
+    const apiUrl = 'https://openapi.naver.com/v1/search/book.json'
+    const params = new URLSearchParams({
+      query: query.trim(),
+      display: Math.min(display, 100).toString(), // 최대 100개
+      start: start.toString(),
+      sort: 'sim' // 정확도순
+    })
+
+    const response = await fetch(`${apiUrl}?${params.toString()}`, {
+      method: 'GET',
+      headers: {
+        'X-Naver-Client-Id': clientId,
+        'X-Naver-Client-Secret': clientSecret
+      }
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('네이버 API 오류:', response.status, errorText)
+      return {
+        success: false,
+        error: `네이버 API 호출 실패: ${response.status}`
+      }
+    }
+
+    const data = await response.json()
+
+    // 에러 체크
+    if (data.errorCode) {
+      console.error('네이버 API 오류:', data.errorCode, data.errorMessage)
+      return {
+        success: false,
+        error: data.errorMessage || `네이버 API 오류가 발생했습니다. (코드: ${data.errorCode})`
+      }
+    }
+
+    // 응답 데이터 매핑 (알라딘 형식에 맞춤)
+    const mappedItems = (data.items || []).map(item => ({
+      title: stripHtmlTags(item.title),
+      author: stripHtmlTags(item.author),
+      publisher: stripHtmlTags(item.publisher),
+      isbn13: extractIsbn13(item.isbn),
+      isbn: item.isbn,
+      cover: item.image,
+      description: stripHtmlTags(item.description),
+      priceSales: item.discount ? parseInt(item.discount, 10) : 0,
+      priceStandard: item.price ? parseInt(item.price, 10) : 0,
+      link: item.link,
+      pubDate: item.pubdate
+    }))
+
+    // 세트 상품 제외
+    const filteredItems = mappedItems.filter(item => !isSetProduct(item))
+
+    return {
+      success: true,
+      data: {
+        total: filteredItems.length,
+        items: filteredItems
+      }
+    }
+  } catch (error) {
+    console.error('네이버 도서 검색 오류:', error)
     return {
       success: false,
       error: error.message || '도서 검색에 실패했습니다.'

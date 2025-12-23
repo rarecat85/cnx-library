@@ -110,6 +110,7 @@
                 :selectable="false"
                 :show-action="true"
                 :allow-register-requested="true"
+                :allow-additional-register="true"
                 @register="openRegisterDialog"
               />
             </v-col>
@@ -139,6 +140,7 @@
           :loading="bestsellersLoading"
           :empty-message="'베스트셀러를 불러올 수 없습니다.'"
           :allow-register-requested="true"
+          :allow-additional-register="true"
           nav-id="bestseller"
           class="mb-8"
           @register="openRegisterDialog"
@@ -261,29 +263,24 @@
           </div>
 
           <!-- 카테고리 선택 -->
-          <v-autocomplete
-            v-model="registerForm.category"
-            :items="categoryOptions"
-            label="카테고리 *"
-            variant="outlined"
-            density="comfortable"
-            :loading="categoriesLoading"
-            :rules="[v => !!v || '카테고리를 선택해주세요']"
-            class="mb-4"
-          />
-          
-          <!-- 새 카테고리 추가 -->
-          <div class="new-category-section mb-4">
-            <v-text-field
-              v-model="newCategoryInput"
-              label="새 카테고리 추가"
+          <div class="category-section mb-4">
+            <div class="category-header mb-1">
+              <a
+                href="#"
+                class="category-manage-link"
+                @click.prevent="handleCategoryManageClick"
+              >
+                카테고리 관리
+              </a>
+            </div>
+            <v-select
+              v-model="registerForm.category"
+              :items="categoryOptions"
+              label="카테고리 *"
               variant="outlined"
               density="comfortable"
-              append-inner-icon="mdi-plus"
-              hint="목록에 없는 카테고리를 추가합니다"
-              persistent-hint
-              @click:append-inner="handleAddNewCategory"
-              @keyup.enter="handleAddNewCategory"
+              :loading="categoriesLoading"
+              :rules="[v => !!v || '카테고리를 선택해주세요']"
             />
           </div>
 
@@ -397,7 +394,6 @@ const {
   getBooksByCenter, 
   getBestsellers,
   getCategories,
-  addCategory,
   checkLabelNumberExists,
   loading: booksLoading 
 } = useBooks()
@@ -456,7 +452,6 @@ const selectedRequestInfo = ref(null)
 const registering = ref(false)
 const categoryOptions = ref([])
 const categoriesLoading = ref(false)
-const newCategoryInput = ref('')
 const labelCheckLoading = ref(false)
 
 const registerForm = ref({
@@ -469,6 +464,11 @@ const registerForm = ref({
 const centerCode = computed(() => {
   return CENTER_CODE_MAP[currentCenter.value] || '1'
 })
+
+// 카테고리 관리 클릭 핸들러
+const handleCategoryManageClick = async () => {
+  await alert('카테고리 관리 기능은 준비 중입니다.', { type: 'info' })
+}
 
 // 위치 옵션
 const locationOptions = computed(() => getLocationSelectOptions())
@@ -728,27 +728,6 @@ const loadCategories = async () => {
   }
 }
 
-// 새 카테고리 추가
-const handleAddNewCategory = async () => {
-  const trimmed = newCategoryInput.value.trim()
-  if (!trimmed) return
-  
-  try {
-    await addCategory(currentCenter.value, trimmed)
-    
-    // 카테고리 목록에 추가
-    if (!categoryOptions.value.includes(trimmed)) {
-      categoryOptions.value = [...categoryOptions.value, trimmed].sort((a, b) => a.localeCompare(b, 'ko'))
-    }
-    
-    // 추가한 카테고리 선택
-    registerForm.value.category = trimmed
-    newCategoryInput.value = ''
-  } catch (error) {
-    console.error('카테고리 추가 오류:', error)
-    await alert('카테고리 추가에 실패했습니다.', { type: 'error' })
-  }
-}
 
 // 권수 변경 핸들러
 const handleQuantityChange = (newQuantity) => {
@@ -827,7 +806,6 @@ const openRegisterDialog = async (book) => {
     quantity: 1,
     copies: [{ fourDigits: '', location: '구매칸', error: '', labelPreview: '' }]
   }
-  newCategoryInput.value = ''
   
   // 카테고리 로드
   await loadCategories()
@@ -846,7 +824,6 @@ const openRegisterDialogFromRequest = async (book) => {
     quantity: 1,
     copies: [{ fourDigits: '', location: '구매칸', error: '', labelPreview: '' }]
   }
-  newCategoryInput.value = ''
   
   // 카테고리 로드
   await loadCategories()
@@ -1153,6 +1130,25 @@ useHead({
 .book-author {
   font-size: rem(12);
   color: #666;
+}
+
+// 카테고리 섹션
+.category-section {
+  .category-header {
+    display: flex;
+    justify-content: flex-end;
+  }
+  
+  .category-manage-link {
+    font-size: rem(13);
+    color: #666;
+    text-decoration: none;
+    
+    &:hover {
+      color: #002C5B;
+      text-decoration: underline;
+    }
+  }
 }
 
 // 권수 입력

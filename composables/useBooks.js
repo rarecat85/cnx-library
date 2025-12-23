@@ -114,14 +114,16 @@ export const useBooks = () => {
    * @returns {Promise<Array>} 카테고리 목록
    */
   const getCategories = async (center) => {
+    // 기본 카테고리는 항상 반환
+    const categories = [...DEFAULT_CATEGORIES]
+    
     if (!firestore) {
-      throw new Error('Firebase가 초기화되지 않았습니다.')
+      console.warn('Firebase가 초기화되지 않았습니다. 기본 카테고리만 반환합니다.')
+      return categories.sort((a, b) => a.localeCompare(b, 'ko'))
     }
 
     try {
-      // 기본 카테고리 + 추가된 카테고리
-      const categories = [...DEFAULT_CATEGORIES]
-      
+      // 추가된 카테고리 조회
       const categoriesRef = collection(firestore, 'categories')
       const q = query(categoriesRef, where('center', '==', center))
       const snapshot = await getDocs(q)
@@ -132,15 +134,14 @@ export const useBooks = () => {
           categories.push(data.name)
         }
       })
-      
-      // 가나다순 정렬
-      categories.sort((a, b) => a.localeCompare(b, 'ko'))
-      
-      return categories
     } catch (err) {
-      console.error('카테고리 목록 조회 오류:', err)
-      throw err
+      console.error('추가 카테고리 조회 오류 (기본 카테고리는 사용 가능):', err)
     }
+    
+    // 가나다순 정렬
+    categories.sort((a, b) => a.localeCompare(b, 'ko'))
+    
+    return categories
   }
 
   /**
@@ -208,9 +209,9 @@ export const useBooks = () => {
       error.value = null
 
       const functions = getFunctions($firebaseApp)
-      const searchAladinBooks = httpsCallable(functions, 'searchAladinBooks')
+      const searchNaverBooks = httpsCallable(functions, 'searchNaverBooks')
 
-      const result = await searchAladinBooks({
+      const result = await searchNaverBooks({
         query: searchQuery,
         start,
         display

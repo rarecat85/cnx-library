@@ -245,11 +245,27 @@
       :class="{ 'book-action-area-admin': (requesterInfo || (isBookRequested && allowRegisterRequested)) && !isBookRegistered }"
     >
       <div
-        v-if="isBookRegistered"
+        v-if="isBookRegistered && !allowAdditionalRegister"
         class="registered-text text-body-2"
       >
         {{ registeredMessage || `${center}에 등록된 도서입니다.` }}
       </div>
+      <template v-else-if="isBookRegistered && allowAdditionalRegister">
+        <div class="registered-text text-body-2 mb-2">
+          {{ registeredMessage || `${center}에 등록된 도서입니다.` }}
+        </div>
+        <v-btn
+          color="secondary"
+          size="small"
+          variant="outlined"
+          :loading="isRegistering"
+          :disabled="isRegistering"
+          class="register-btn"
+          @click.stop="handleRegister"
+        >
+          추가 등록
+        </v-btn>
+      </template>
       <div
         v-else-if="isBookRequested && !allowRegisterRequested"
         class="requested-text text-body-2"
@@ -399,6 +415,10 @@ const props = defineProps({
     default: false
   },
   allowRegisterRequested: {
+    type: Boolean,
+    default: false
+  },
+  allowAdditionalRegister: {
     type: Boolean,
     default: false
   },

@@ -36,21 +36,34 @@
     <div class="book-card-inner">
       <div class="book-image-wrapper">
         <v-img
+          v-if="hasBookImage"
           :src="bookImage"
           :alt="book.title"
           height="100%"
           cover
           class="book-image"
         />
+        <div
+          v-else
+          class="book-image-placeholder"
+        >
+          <span>No Image</span>
+        </div>
       </div>
       <div class="book-card-content">
         <div class="book-title mb-2">
           {{ book.title }}
         </div>
-        <div class="book-info text-body-2 mb-1">
+        <div
+          v-if="book.author"
+          class="book-info text-body-2 mb-1"
+        >
           <strong>저자:</strong> {{ book.author }}
         </div>
-        <div class="book-info book-info-publisher text-body-2">
+        <div
+          v-if="book.publisher"
+          class="book-info book-info-publisher text-body-2"
+        >
           <strong>출판사:</strong> {{ book.publisher }}
         </div>
         
@@ -58,7 +71,6 @@
         <div
           v-if="showLocation && displayLocation"
           class="book-location text-body-2"
-          @click.stop="handleLocationClick"
         >
           <v-icon
             size="small"
@@ -70,7 +82,8 @@
           <v-icon
             v-if="hasLocationImage"
             size="small"
-            class="ml-1 location-info-icon"
+            class="ml-1 location-info-icon clickable"
+            @click.stop="handleLocationClick"
           >
             mdi-information-outline
           </v-icon>
@@ -242,7 +255,10 @@
     <div
       v-else-if="showAction"
       class="book-action-area"
-      :class="{ 'book-action-area-admin': (requesterInfo || (isBookRequested && allowRegisterRequested)) && !isBookRegistered }"
+      :class="{ 
+        'book-action-area-admin': (requesterInfo || (isBookRequested && allowRegisterRequested)) && !isBookRegistered,
+        'book-action-area-column': isBookRegistered && allowAdditionalRegister
+      }"
     >
       <div
         v-if="isBookRegistered && !allowAdditionalRegister"
@@ -251,7 +267,7 @@
         {{ registeredMessage || `${center}에 등록된 도서입니다.` }}
       </div>
       <template v-else-if="isBookRegistered && allowAdditionalRegister">
-        <div class="registered-text text-body-2 mb-2">
+        <div class="registered-text text-body-2">
           {{ registeredMessage || `${center}에 등록된 도서입니다.` }}
         </div>
         <v-btn
@@ -463,8 +479,12 @@ const emit = defineEmits(['register', 'select', 'return', 'rent', 'adminRent', '
 const locationPopupVisible = ref(false)
 
 // 도서 이미지
+const hasBookImage = computed(() => {
+  return !!(props.book.cover || props.book.image)
+})
+
 const bookImage = computed(() => {
-  return props.book.cover || props.book.image || '/placeholder-book.png'
+  return props.book.cover || props.book.image || ''
 })
 
 // 표시할 위치 (단일 또는 다중)
@@ -745,6 +765,22 @@ const isOverdue = computed(() => {
   border-radius: rem(4);
 }
 
+.book-image-placeholder {
+  width: 100%;
+  height: 100%;
+  background-color: #666;
+  border-radius: rem(4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  span {
+    color: #fff;
+    font-size: rem(11);
+    font-weight: 500;
+  }
+}
+
 .book-card-content {
   flex: 1;
   display: flex;
@@ -768,9 +804,7 @@ const isOverdue = computed(() => {
 .book-info {
   color: #6b7280;
   line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -805,10 +839,14 @@ const isOverdue = computed(() => {
   .location-info-icon {
     color: #999;
     transition: color 0.2s;
-  }
-  
-  &:hover .location-info-icon {
-    color: #002C5B;
+    
+    &.clickable {
+      cursor: pointer;
+      
+      &:hover {
+        color: #002C5B;
+      }
+    }
   }
 }
 
@@ -872,6 +910,12 @@ const isOverdue = computed(() => {
 .book-action-area-admin {
   flex-direction: column;
   gap: rem(4);
+}
+
+.book-action-area-column {
+  flex-direction: column;
+  gap: rem(4);
+  margin-top: 0;
 }
 
 .admin-info-text {

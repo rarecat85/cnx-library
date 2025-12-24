@@ -1138,7 +1138,7 @@ exports.searchNaverBooks = onCall({
     return {
       success: true,
       data: {
-        total: filteredItems.length,
+        total: data.total || filteredItems.length,
         items: filteredItems
       }
     }

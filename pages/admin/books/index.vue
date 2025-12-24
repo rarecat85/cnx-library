@@ -68,6 +68,17 @@
                 @update:model-value="handleSelectAll"
               />
               <div class="d-flex action-buttons">
+                <!-- 위치별보기 선택 시 칸 선택 셀렉트박스 -->
+                <v-select
+                  v-if="sortBy === 'location'"
+                  v-model="selectedLocationFilter"
+                  :items="locationFilterOptions"
+                  label="위치"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  class="location-filter-select"
+                />
                 <v-btn
                   class="action-btn"
                   variant="flat"
@@ -113,230 +124,169 @@
           </div>
           <div
             v-else-if="filteredGroupedBooks.length > 0"
-            class="registered-books-grid"
+            class="registered-books-section"
           >
-            <!-- ISBN 그룹핑된 도서 목록 -->
-            <div
-              v-for="(group, index) in filteredGroupedBooks"
-              :key="`group-${index}`"
-              class="book-group"
-            >
-              <!-- 그룹 헤더 (클릭 시 펼침/접힘) -->
+            <div class="registered-books-grid">
+              <!-- ISBN 그룹핑된 도서 목록 -->
               <div
-                class="book-group-header"
-                :class="{ 'has-copies': group.copies.length > 1 }"
-                @click="group.copies.length > 1 && toggleGroupExpand(group.isbn)"
+                v-for="(group, index) in displayedGroupedBooks"
+                :key="`group-${index}`"
+                class="book-card"
+                :class="{ 'book-card-selected': isGroupSelected(group) || isGroupPartiallySelected(group) }"
               >
-                <div class="book-group-info">
-                  <v-checkbox
-                    :model-value="isGroupSelected(group)"
-                    :indeterminate="isGroupPartiallySelected(group)"
-                    hide-details
-                    class="group-checkbox"
-                    @click.stop
-                    @update:model-value="handleGroupSelect(group, $event)"
-                  />
+                <!-- 책 정보 영역 (클릭 시 전체 선택) -->
+                <div
+                  class="book-card-header"
+                  @click="handleGroupHeaderClick(group)"
+                >
                   <img
                     v-if="group.image"
                     :src="group.image"
                     :alt="group.title"
-                    class="group-thumbnail"
+                    class="book-thumbnail"
                   >
-                  <div class="group-meta">
-                    <div class="group-title">
+                  <div
+                    v-else
+                    class="book-thumbnail-placeholder"
+                  >
+                    <span>NO IMAGE</span>
+                  </div>
+                  <div class="book-meta">
+                    <div class="book-title">
                       {{ group.title }}
                     </div>
-                    <div class="group-author">
-                      {{ group.author }} | {{ group.publisher }}
-                    </div>
-                    <div class="group-stats">
-                      <span class="stat-total">{{ group.totalCount }}권</span>
-                      <span
-                        v-if="group.availableCount > 0"
-                        class="stat-available"
-                      >대여가능 {{ group.availableCount }}권</span>
-                      <span
-                        v-if="group.rentedCount > 0"
-                        class="stat-rented"
-                      >대여중 {{ group.rentedCount }}권</span>
-                      <span
-                        v-if="group.requestedCount > 0"
-                        class="stat-requested"
-                      >신청 {{ group.requestedCount }}권</span>
+                    <div
+                      v-if="group.author"
+                      class="book-author"
+                    >
+                      <strong>저자:</strong> {{ group.author }}
                     </div>
                     <div
-                      v-if="group.locations.length > 0"
-                      class="group-locations"
+                      v-if="group.publisher"
+                      class="book-publisher"
                     >
-                      <v-icon
-                        size="small"
-                        class="mr-1"
-                      >
-                        mdi-map-marker
-                      </v-icon>
-                      {{ formatGroupLocations(group.locations) }}
+                      <strong>출판사:</strong> {{ group.publisher }}
+                    </div>
+                    <div class="book-count">
+                      등록 {{ group.totalCount }}권
                     </div>
                   </div>
                 </div>
-                <v-icon
-                  v-if="group.copies.length > 1"
-                  class="expand-icon"
-                  :class="{ 'expanded': expandedGroups.has(group.isbn) }"
-                >
-                  mdi-chevron-down
-                </v-icon>
-              </div>
 
-              <!-- 개별 도서 목록 (펼침 시 표시) -->
-              <v-expand-transition>
-                <div
-                  v-if="group.copies.length === 1 || expandedGroups.has(group.isbn)"
-                  class="book-copies-list"
-                >
+                <!-- 라벨별 도서 정보 (항상 표시) -->
+                <div class="book-copies-list">
                   <div
                     v-for="book in group.copies"
                     :key="book.id"
                     class="book-copy-item"
                     :class="{ 'selected': isBookSelected(book) }"
+                    @click="handleCopyItemClick(book)"
                   >
-                    <v-checkbox
-                      :model-value="isBookSelected(book)"
-                      hide-details
-                      class="copy-checkbox"
-                      @update:model-value="handleBookSelect(book, $event)"
-                    />
-                    <div class="copy-info">
-                      <div class="copy-label-number">
-                        <v-icon
-                          size="small"
-                          class="mr-1"
+                    <div class="copy-content">
+                      <!-- 1줄: 상태 플래그 + 정보수정 링크 -->
+                      <div class="copy-row-top">
+                        <div class="copy-status">
+                          <v-chip
+                            v-if="getBookStatus(book) === 'rented'"
+                            size="x-small"
+                            color="primary"
+                            variant="flat"
+                          >
+                            대여중
+                          </v-chip>
+                          <v-chip
+                            v-else-if="getBookStatus(book) === 'overdue'"
+                            size="x-small"
+                            color="error"
+                            variant="flat"
+                          >
+                            연체중
+                          </v-chip>
+                          <v-chip
+                            v-else-if="getBookStatus(book) === 'requested'"
+                            size="x-small"
+                            color="warning"
+                            variant="flat"
+                          >
+                            대여신청
+                          </v-chip>
+                          <v-chip
+                            v-else
+                            size="x-small"
+                            color="success"
+                            variant="outlined"
+                          >
+                            대여가능
+                          </v-chip>
+                          <span
+                            v-if="getRenterInfo(book) || getRequesterInfo(book)"
+                            class="copy-user-info"
+                          >
+                            {{ getRenterInfo(book) || getRequesterInfo(book) }}
+                          </span>
+                        </div>
+                        <a
+                          href="#"
+                          class="copy-edit-link"
+                          @click.prevent.stop="openEditDialog(book)"
                         >
-                          mdi-label
-                        </v-icon>
-                        {{ book.labelNumber || '라벨없음' }}
+                          정보수정
+                        </a>
                       </div>
-                      <div class="copy-location">
-                        <v-icon
-                          size="small"
-                          class="mr-1"
-                        >
-                          mdi-map-marker
-                        </v-icon>
-                        {{ formatLocation(book.location) || '위치없음' }}
+                      <!-- 2줄: 라벨번호 | 위치 -->
+                      <div class="copy-info-row">
+                        <span class="copy-label-number">{{ book.labelNumber || '라벨없음' }}</span>
+                        <span class="copy-divider">|</span>
+                        <span class="copy-location">
+                          <v-icon
+                            size="small"
+                            class="mr-1"
+                          >
+                            mdi-map-marker
+                          </v-icon>
+                          {{ formatLocation(book.location) || '위치없음' }}
+                        </span>
                       </div>
-                      <div class="copy-category">
-                        {{ book.category || '-' }}
+                      <!-- 3줄: 대여/반납 버튼 -->
+                      <div class="copy-actions">
+                        <v-btn
+                          v-if="getBookStatus(book) === 'rented' || getBookStatus(book) === 'overdue'"
+                          color="primary"
+                          size="small"
+                          variant="flat"
+                          @click.stop="handleSingleReturn(book)"
+                        >
+                          반납처리
+                        </v-btn>
+                        <v-btn
+                          v-else
+                          color="primary"
+                          size="small"
+                          variant="flat"
+                          @click.stop="openRentDialog(book)"
+                        >
+                          {{ getBookStatus(book) === 'requested' ? '대여승인' : '대여처리' }}
+                        </v-btn>
                       </div>
-                    </div>
-                    <div class="copy-status">
-                      <v-chip
-                        v-if="getBookStatus(book) === 'rented'"
-                        size="small"
-                        color="primary"
-                        variant="flat"
-                      >
-                        대여중
-                      </v-chip>
-                      <v-chip
-                        v-else-if="getBookStatus(book) === 'overdue'"
-                        size="small"
-                        color="error"
-                        variant="flat"
-                      >
-                        연체중
-                      </v-chip>
-                      <v-chip
-                        v-else-if="getBookStatus(book) === 'requested'"
-                        size="small"
-                        color="warning"
-                        variant="flat"
-                      >
-                        대여신청
-                      </v-chip>
-                      <v-chip
-                        v-else
-                        size="small"
-                        color="success"
-                        variant="outlined"
-                      >
-                        대여가능
-                      </v-chip>
-                    </div>
-                    <div
-                      v-if="getRenterInfo(book) || getRequesterInfo(book)"
-                      class="copy-user-info"
-                    >
-                      <template v-if="getRenterInfo(book)">
-                        <v-icon
-                          size="small"
-                          class="mr-1"
-                        >
-                          mdi-account
-                        </v-icon>
-                        {{ getRenterInfo(book) }}
-                      </template>
-                      <template v-else-if="getRequesterInfo(book)">
-                        <v-icon
-                          size="small"
-                          class="mr-1"
-                        >
-                          mdi-account-clock
-                        </v-icon>
-                        {{ getRequesterInfo(book) }}
-                      </template>
-                    </div>
-                    <div class="copy-actions">
-                      <v-btn
-                        icon
-                        variant="text"
-                        size="small"
-                        title="수정"
-                        @click="openEditDialog(book)"
-                      >
-                        <v-icon size="small">
-                          mdi-pencil
-                        </v-icon>
-                      </v-btn>
-                      <v-btn
-                        v-if="getBookStatus(book) === 'rented' || getBookStatus(book) === 'overdue'"
-                        icon
-                        variant="text"
-                        size="small"
-                        title="반납 처리"
-                        @click="handleSingleReturn(book)"
-                      >
-                        <v-icon size="small">
-                          mdi-book-arrow-left
-                        </v-icon>
-                      </v-btn>
-                      <v-btn
-                        v-else-if="getBookStatus(book) === 'requested'"
-                        icon
-                        variant="text"
-                        size="small"
-                        title="대여 승인"
-                        @click="openRentDialog(book)"
-                      >
-                        <v-icon size="small">
-                          mdi-check
-                        </v-icon>
-                      </v-btn>
-                      <v-btn
-                        v-else
-                        icon
-                        variant="text"
-                        size="small"
-                        title="대여 처리"
-                        @click="openRentDialog(book)"
-                      >
-                        <v-icon size="small">
-                          mdi-book-arrow-right
-                        </v-icon>
-                      </v-btn>
                     </div>
                   </div>
                 </div>
-              </v-expand-transition>
+              </div>
+            </div>
+            
+            <!-- 더보기 버튼 -->
+            <div
+              v-if="hasMoreBooks"
+              class="load-more-section"
+            >
+              <v-btn
+                variant="outlined"
+                color="primary"
+                class="load-more-btn"
+                @click="loadMoreBooks"
+              >
+                더보기 ({{ remainingBooksCount }}개 더)
+              </v-btn>
             </div>
           </div>
           <div
@@ -440,7 +390,7 @@
           <!-- 도서 정보 표시 -->
           <div
             v-if="editingBook"
-            class="book-info-preview mb-6"
+            class="book-info-preview mb-4"
           >
             <div class="book-info-preview-inner">
               <img
@@ -449,12 +399,27 @@
                 :alt="editingBook.title"
                 class="book-thumbnail"
               >
+              <div
+                v-else
+                class="book-thumbnail-placeholder"
+              >
+                <span>No Image</span>
+              </div>
               <div class="book-meta">
                 <div class="book-title">
                   {{ editingBook.title }}
                 </div>
-                <div class="book-author">
-                  {{ editingBook.author }}
+                <div class="book-current-label">
+                  {{ editingBook.labelNumber || '라벨없음' }}
+                </div>
+                <div class="book-current-location">
+                  <v-icon
+                    size="small"
+                    class="mr-1"
+                  >
+                    mdi-map-marker
+                  </v-icon>
+                  {{ formatLocation(editingBook.location) || '위치없음' }}
                 </div>
               </div>
             </div>
@@ -468,40 +433,33 @@
             variant="outlined"
             density="comfortable"
             :loading="categoriesLoading"
-            class="mb-4"
+            class="mb-3"
           />
 
           <!-- 라벨번호 입력 -->
-          <div class="label-number-section mb-4">
-            <div class="label-number-preview mb-2">
-              <span class="label-preview-text">
-                라벨번호: <strong>{{ editLabelNumberPreview || '(미입력)' }}</strong>
-              </span>
-            </div>
-            <div class="label-number-inputs">
-              <v-text-field
-                :model-value="editCenterCode"
-                label="센터코드"
-                variant="outlined"
-                density="comfortable"
-                readonly
-                disabled
-                class="center-code-input"
-              />
-              <v-text-field
-                v-model="editForm.fourDigits"
-                label="4자리 번호 *"
-                variant="outlined"
-                density="comfortable"
-                maxlength="4"
-                :error-messages="editLabelNumberError"
-                hint="0001~9999"
-                persistent-hint
-                class="four-digits-input"
-                @input="handleEditFourDigitsInput"
-                @blur="checkEditLabelNumberDuplicate"
-              />
-            </div>
+          <div class="label-number-inputs mb-3">
+            <v-text-field
+              :model-value="editCenterCode"
+              label="센터코드"
+              variant="outlined"
+              density="comfortable"
+              readonly
+              disabled
+              class="center-code-input"
+            />
+            <v-text-field
+              v-model="editForm.fourDigits"
+              label="4자리 번호 *"
+              variant="outlined"
+              density="comfortable"
+              maxlength="4"
+              :error-messages="editLabelNumberError"
+              hint="0001~9999"
+              persistent-hint
+              class="four-digits-input"
+              @input="handleEditFourDigitsInput"
+              @blur="checkEditLabelNumberDuplicate"
+            />
           </div>
 
           <!-- 위치 선택 -->
@@ -574,26 +532,38 @@ const userWorkplace = ref('')
 const registeredBooks = ref([])
 const registeredBooksLoading = ref(false)
 const registeredBooksSearchQuery = ref('')
-const sortBy = ref('title')
+const sortBy = ref('label')
+const selectedLocationFilter = ref('')
 const sortOptions = [
-  { title: '제목순', value: 'title' },
-  { title: '등록일순', value: 'date' },
+  { title: '라벨번호순', value: 'label' },
   { title: '대여중도서', value: 'rented' },
   { title: '연체중도서', value: 'overdue' },
   { title: '대여신청도서', value: 'requested' },
-  { title: '신규등록도서', value: 'new' }
+  { title: '위치별로 보기', value: 'location' }
 ]
+
+// 라벨번호에서 뒷자리 숫자만 추출하는 함수 (예: IT_10001 → 0001)
+const extractLabelNumber = (labelNumber) => {
+  if (!labelNumber) return 9999
+  const parts = labelNumber.split('_')
+  if (parts.length < 2) return 9999
+  const numPart = parts[1] // 예: 10001
+  return parseInt(numPart.slice(-4)) || 9999 // 뒤 4자리 숫자
+}
 
 // 도서 선택 관련
 const selectedBooks = ref([])
 const selectAll = ref(false)
 const actionLoading = ref(false)
 
-// 그룹 펼침 상태
-const expandedGroups = ref(new Set())
+// 더보기 페이지네이션
+const displayCount = ref(10)
+const ITEMS_PER_PAGE = 10
 
 // 최대 대여 권수
 const MAX_RENT_COUNT = 5
+
+// 그룹 펼침 상태 (기본: 접힘)
 
 // 대여자/신청자 정보 캐시
 const renterInfoCache = ref({})
@@ -622,6 +592,14 @@ const editForm = ref({
 
 // 위치 옵션
 const locationOptions = computed(() => getLocationSelectOptions())
+
+// 칸별보기 필터 옵션
+const locationFilterOptions = computed(() => {
+  return [
+    { title: '전체', value: '' },
+    ...getLocationSelectOptions()
+  ]
+})
 
 // 센터 코드 (수정용)
 const editCenterCode = computed(() => {
@@ -695,7 +673,6 @@ onMounted(async () => {
 
 // 센터 변경 처리
 const handleCenterChange = async () => {
-  expandedGroups.value.clear()
   selectedBooks.value = []
   await loadRegisteredBooks()
 }
@@ -856,17 +833,12 @@ const filteredGroupedBooks = computed(() => {
   }
 
   // 정렬
-  if (sortBy.value === 'title') {
+  if (sortBy.value === 'label') {
     groups.sort((a, b) => {
-      const titleA = (a.title || '').toLowerCase()
-      const titleB = (b.title || '').toLowerCase()
-      return titleA.localeCompare(titleB, 'ko')
-    })
-  } else if (sortBy.value === 'date') {
-    groups.sort((a, b) => {
-      const dateA = a.copies[0]?.registeredAt?.toDate?.() || new Date(0)
-      const dateB = b.copies[0]?.registeredAt?.toDate?.() || new Date(0)
-      return dateB - dateA
+      // 그룹 내 첫 번째 복사본의 라벨번호로 정렬
+      const labelA = extractLabelNumber(a.copies[0]?.labelNumber)
+      const labelB = extractLabelNumber(b.copies[0]?.labelNumber)
+      return labelA - labelB
     })
   } else if (sortBy.value === 'rented') {
     groups = groups.filter(group => group.rentedCount > 0)
@@ -876,14 +848,39 @@ const filteredGroupedBooks = computed(() => {
     })
   } else if (sortBy.value === 'requested') {
     groups = groups.filter(group => group.requestedCount > 0)
-  } else if (sortBy.value === 'new') {
-    // 구매칸에 위치한 도서가 있는 그룹만 필터링
+  } else if (sortBy.value === 'location' && selectedLocationFilter.value) {
+    // 칸별보기 - 선택한 칸에 위치한 도서가 있는 그룹만 필터링
     groups = groups.filter(group => {
-      return group.copies.some(book => book.location === '구매칸')
+      return group.copies.some(book => book.location === selectedLocationFilter.value)
     })
   }
 
   return groups
+})
+
+// 화면에 표시할 도서 목록 (더보기 페이지네이션)
+const displayedGroupedBooks = computed(() => {
+  return filteredGroupedBooks.value.slice(0, displayCount.value)
+})
+
+// 더보기 가능 여부
+const hasMoreBooks = computed(() => {
+  return displayCount.value < filteredGroupedBooks.value.length
+})
+
+// 남은 도서 수
+const remainingBooksCount = computed(() => {
+  return filteredGroupedBooks.value.length - displayCount.value
+})
+
+// 더보기 로드
+const loadMoreBooks = () => {
+  displayCount.value += ITEMS_PER_PAGE
+}
+
+// 검색이나 정렬 변경 시 displayCount 리셋
+watch([() => registeredBooksSearchQuery.value, () => sortBy.value, () => selectedLocationFilter.value], () => {
+  displayCount.value = ITEMS_PER_PAGE
 })
 
 // 총 도서 수
@@ -918,15 +915,6 @@ const getBookStatus = (book) => {
 }
 
 // 그룹 펼침/접힘
-const toggleGroupExpand = (isbn) => {
-  if (expandedGroups.value.has(isbn)) {
-    expandedGroups.value.delete(isbn)
-  } else {
-    expandedGroups.value.add(isbn)
-  }
-  // 반응성을 위해 새로운 Set 생성
-  expandedGroups.value = new Set(expandedGroups.value)
-}
 
 // 그룹 위치 포맷
 const formatGroupLocations = (locations) => {
@@ -975,6 +963,18 @@ const handleGroupSelect = (group, selected) => {
   }
   
   updateSelectAllState()
+}
+
+// 그룹 헤더 클릭 핸들러 (전체 선택)
+const handleGroupHeaderClick = (group) => {
+  // 전체 선택/해제 토글
+  const isCurrentlySelected = isGroupSelected(group)
+  handleGroupSelect(group, !isCurrentlySelected)
+}
+
+// 개별 라벨 항목 클릭 핸들러
+const handleCopyItemClick = (book) => {
+  handleBookSelect(book, !isBookSelected(book))
 }
 
 const handleSelectAll = (value) => {
@@ -1600,6 +1600,26 @@ useHead({
   }
 }
 
+.location-filter-select {
+  width: rem(100);
+  min-width: rem(80);
+  
+  :deep(.v-field) {
+    font-size: rem(12);
+    min-height: rem(28);
+  }
+  
+  :deep(.v-field__input) {
+    padding: rem(4) rem(8);
+    min-height: rem(28);
+    font-size: rem(12);
+  }
+  
+  :deep(.v-field-label) {
+    font-size: rem(12);
+  }
+}
+
 .action-buttons {
   gap: rem(5);
 }
@@ -1613,185 +1633,245 @@ useHead({
   }
   
   &:disabled {
-    background-color: #F5F5F5;
-    color: #002C5B;
+    background-color: #fafafa;
+    color: #bdbdbd;
     opacity: 1;
   }
 }
 
-// 그룹핑된 도서 목록 스타일
-.book-group {
-  border: rem(1) solid #e0e0e0;
-  border-radius: rem(8);
-  margin-bottom: rem(12);
-  overflow: hidden;
+// 그룹핑된 도서 목록 섹션
+.registered-books-section {
+  display: flex;
+  flex-direction: column;
+  gap: rem(24);
 }
 
-.book-group-header {
+.load-more-section {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: rem(12) rem(16);
-  background: #fafafa;
+  justify-content: center;
+  padding: rem(16) 0;
+}
+
+.load-more-btn {
+  min-width: rem(200);
+}
+
+// 그룹핑된 도서 목록 스타일
+.registered-books-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: rem(16);
+  align-items: start;
   
-  &.has-copies {
-    cursor: pointer;
-    
-    &:hover {
-      background: #f0f0f0;
-    }
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
   }
 }
 
-.book-group-info {
+// 북카드 스타일 (다른 페이지와 동일)
+.book-card {
+  background-color: #F5F5F5;
+  border-radius: rem(8);
+  border: rem(2) solid #e0e0e0;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  overflow: hidden;
+  
+  &:hover {
+    box-shadow: 0 rem(2) rem(8) rgba(0, 0, 0, 0.1);
+  }
+}
+
+.book-card-selected {
+  border-color: #002C5B;
+}
+
+.book-card-header {
   display: flex;
-  align-items: center;
-  gap: rem(12);
-  flex: 1;
-  min-width: 0;
+  gap: rem(16);
+  padding: rem(16);
+  cursor: pointer;
+  transition: background 0.2s;
+  
+  &:hover {
+    background: #ebebeb;
+  }
 }
 
-.group-checkbox {
-  flex-shrink: 0;
-}
-
-.group-thumbnail {
-  width: rem(50);
-  height: rem(70);
+.book-thumbnail {
+  width: rem(80);
+  height: rem(110);
   object-fit: cover;
   border-radius: rem(4);
   flex-shrink: 0;
 }
 
-.group-meta {
-  flex: 1;
-  min-width: 0;
+.book-thumbnail-placeholder {
+  width: rem(80);
+  height: rem(110);
+  background-color: #666;
+  border-radius: rem(4);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  span {
+    color: #fff;
+    font-size: rem(11);
+    font-weight: 500;
+  }
 }
 
-.group-title {
-  font-size: rem(14);
+.book-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.book-title {
+  font-size: rem(15);
   font-weight: 600;
-  color: #333;
+  color: #002C5B;
   line-height: 1.3;
-  margin-bottom: rem(2);
+  margin-bottom: rem(4);
   display: -webkit-box;
-  -webkit-line-clamp: 1;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-.group-author {
-  font-size: rem(12);
-  color: #666;
-  margin-bottom: rem(4);
+.book-author {
+  font-size: rem(13);
+  color: #6b7280;
+  margin-bottom: rem(2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.group-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: rem(8);
-  font-size: rem(11);
-  
-  .stat-total {
-    color: #002C5B;
-    font-weight: 600;
-  }
-  
-  .stat-available {
-    color: #4caf50;
-  }
-  
-  .stat-rented {
-    color: #1976d2;
-  }
-  
-  .stat-requested {
-    color: #f59e0b;
-  }
+.book-publisher {
+  font-size: rem(13);
+  color: #6b7280;
+  margin-bottom: rem(6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.group-locations {
-  display: flex;
-  align-items: center;
-  font-size: rem(11);
-  color: #666;
-  margin-top: rem(4);
-}
-
-.expand-icon {
-  transition: transform 0.3s;
-  color: #666;
-  
-  &.expanded {
-    transform: rotate(180deg);
-  }
+.book-count {
+  font-size: rem(13);
+  font-weight: 600;
+  color: #002C5B;
+  margin-top: auto;
 }
 
 .book-copies-list {
   border-top: rem(1) solid #e0e0e0;
+  background: #fff;
 }
 
 .book-copy-item {
   display: flex;
   align-items: center;
-  gap: rem(12);
+  gap: rem(8);
   padding: rem(12) rem(16);
   border-bottom: rem(1) solid #f0f0f0;
+  border-left: rem(3) solid transparent;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
   
   &:last-child {
     border-bottom: none;
   }
   
+  &:hover {
+    background: #f9f9f9;
+  }
+  
   &.selected {
     background: #e3f2fd;
+    border-left-color: #002C5B;
+    
+    &:hover {
+      background: #d0e8fc;
+    }
   }
 }
 
-.copy-checkbox {
-  flex-shrink: 0;
-}
-
-.copy-info {
+.copy-content {
   flex: 1;
   display: flex;
-  flex-wrap: wrap;
-  gap: rem(8) rem(16);
+  flex-direction: column;
+  gap: rem(4);
   min-width: 0;
 }
 
-.copy-label-number,
-.copy-location,
-.copy-category {
+.copy-row-top {
   display: flex;
   align-items: center;
-  font-size: rem(12);
-  color: #666;
-}
-
-.copy-label-number {
-  color: #002C5B;
-  font-weight: 600;
+  justify-content: space-between;
+  gap: rem(8);
 }
 
 .copy-status {
-  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: rem(8);
 }
 
 .copy-user-info {
-  display: flex;
-  align-items: center;
   font-size: rem(11);
   color: #666;
-  max-width: rem(150);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.copy-edit-link {
+  font-size: rem(12);
+  color: #666;
+  text-decoration: none;
+  flex-shrink: 0;
+  
+  &:hover {
+    color: #002C5B;
+    text-decoration: underline;
+  }
+}
+
+.copy-info-row {
+  display: flex;
+  align-items: center;
+  gap: rem(6);
+}
+
+.copy-label-number {
+  font-size: rem(13);
+  font-weight: 600;
+  color: #002C5B;
+}
+
+.copy-divider {
+  font-size: rem(12);
+  color: #ccc;
+}
+
+.copy-location {
+  display: inline-flex;
+  align-items: center;
+  font-size: rem(12);
+  color: #666;
+  
+  .v-icon {
+    vertical-align: middle;
+  }
 }
 
 .copy-actions {
-  display: flex;
-  gap: rem(4);
-  flex-shrink: 0;
+  margin-top: rem(4);
+  
+  .v-btn {
+    width: 100%;
+  }
 }
 
 // 수정 다이얼로그 스타일
@@ -1823,11 +1903,28 @@ useHead({
 }
 
 .book-thumbnail {
-  width: rem(60);
-  height: rem(80);
+  width: rem(80);
+  height: rem(110);
   object-fit: cover;
   border-radius: rem(4);
   flex-shrink: 0;
+}
+
+.book-thumbnail-placeholder {
+  width: rem(80);
+  height: rem(110);
+  background-color: #666;
+  border-radius: rem(4);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  span {
+    color: #fff;
+    font-size: rem(11);
+    font-weight: 500;
+  }
 }
 
 .book-meta {
@@ -1838,38 +1935,28 @@ useHead({
 .book-title {
   font-size: rem(14);
   font-weight: 600;
-  color: #333;
+  color: #002C5B;
   line-height: 1.3;
-  margin-bottom: rem(4);
+  margin-bottom: rem(6);
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-.book-author {
+.book-current-label {
+  font-size: rem(13);
+  font-weight: 600;
+  color: #002C5B;
+  margin-bottom: rem(4);
+}
+
+.book-current-location {
+  display: flex;
+  align-items: center;
   font-size: rem(12);
   color: #666;
-}
-
-.label-number-section {
-  background: #fafafa;
-  border-radius: rem(8);
-  padding: rem(16);
-}
-
-.label-number-preview {
-  text-align: center;
-}
-
-.label-preview-text {
-  font-size: rem(14);
-  color: #666;
-  
-  strong {
-    color: #002C5B;
-    font-size: rem(16);
-  }
 }
 
 .label-number-inputs {
@@ -1912,24 +1999,6 @@ useHead({
 }
 
 // 반응형
-@media (max-width: 600px) {
-  .book-copy-item {
-    flex-wrap: wrap;
-  }
-  
-  .copy-info {
-    order: 1;
-    width: 100%;
-    margin-top: rem(8);
-  }
-  
-  .copy-user-info {
-    order: 2;
-    width: 100%;
-    max-width: none;
-    margin-top: rem(4);
-  }
-}
 
 .side-navigation {
   z-index: 1000;

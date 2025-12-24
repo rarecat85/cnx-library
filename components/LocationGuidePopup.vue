@@ -29,14 +29,7 @@
             :src="imageInfo.imagePath"
             :alt="`${center} 서가 이미지`"
             class="shelf-image"
-            @load="onImageLoad"
           >
-          <!-- 하이라이트 영역 -->
-          <div
-            v-if="imageLoaded && imageInfo.area"
-            class="location-highlight"
-            :style="highlightStyle"
-          />
         </div>
         
         <!-- 이미지가 없는 경우 -->
@@ -115,8 +108,6 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue'])
 
-const imageLoaded = ref(false)
-
 // 다이얼로그 표시 상태
 const dialogVisible = computed({
   get: () => props.modelValue,
@@ -151,37 +142,10 @@ const formattedLocation = computed(() => {
   return formatLocation(props.location)
 })
 
-// 하이라이트 스타일
-const highlightStyle = computed(() => {
-  if (!imageInfo.value?.area) {
-    return {}
-  }
-  
-  const { x, y, width, height } = imageInfo.value.area
-  
-  return {
-    left: `${x}%`,
-    top: `${y}%`,
-    width: `${width}%`,
-    height: `${height}%`
-  }
-})
-
-// 이미지 로드 완료
-const onImageLoad = () => {
-  imageLoaded.value = true
-}
-
 // 다이얼로그 닫기
 const close = () => {
   dialogVisible.value = false
-  imageLoaded.value = false
 }
-
-// props 변경 시 이미지 로드 상태 초기화
-watch(() => [props.center, props.location], () => {
-  imageLoaded.value = false
-})
 </script>
 
 <style lang="scss" scoped>
@@ -223,26 +187,6 @@ watch(() => [props.center, props.location], () => {
   display: block;
   width: 100%;
   height: auto;
-}
-
-.location-highlight {
-  position: absolute;
-  border: rem(3) solid #FF5722;
-  background: rgba(255, 87, 34, 0.25);
-  border-radius: rem(4);
-  animation: pulse 1.5s ease-in-out infinite;
-  pointer-events: none;
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-    box-shadow: 0 0 0 0 rgba(255, 87, 34, 0.4);
-  }
-  50% {
-    opacity: 0.8;
-    box-shadow: 0 0 rem(8) rem(4) rgba(255, 87, 34, 0.3);
-  }
 }
 
 .no-image-message {
@@ -298,4 +242,5 @@ watch(() => [props.center, props.location], () => {
   }
 }
 </style>
+
 

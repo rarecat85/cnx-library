@@ -36,6 +36,7 @@
               <v-text-field
                 v-model="registeredBooksSearchQuery"
                 label="도서 검색"
+                placeholder="도서명 또는 ISBN-13으로 검색"
                 prepend-inner-icon="mdi-magnify"
                 variant="outlined"
                 density="comfortable"
@@ -115,8 +116,6 @@
                   :disabled="isGroupUnavailable(group)"
                   :hide-overdue-status="true"
                   :show-rent-button="true"
-                  :show-location="true"
-                  :locations="group.locations"
                   :show-quantity="group.totalCount > 1"
                   :available-count="group.availableCount"
                   :total-count="group.totalCount"
@@ -271,58 +270,67 @@
             <p>아래 정보를 확인 후 대여해주세요.</p>
           </div>
           
+          <!-- 도서 정보 카드 (라벨번호, 위치 포함) -->
           <div
             v-if="selectedBookForRent"
-            class="book-info-preview mb-4"
+            class="rent-book-card"
           >
-            <div class="book-info-preview-inner">
+            <div class="rent-book-card-inner">
               <img
                 v-if="selectedBookForRent.image"
                 :src="selectedBookForRent.image"
                 :alt="selectedBookForRent.title"
-                class="book-thumbnail"
+                class="rent-book-thumbnail"
               >
-              <div class="book-meta">
-                <div class="book-title">
+              <div
+                v-else
+                class="rent-book-thumbnail-placeholder"
+              >
+                <span>NO IMAGE</span>
+              </div>
+              <div class="rent-book-meta">
+                <div class="rent-book-title">
                   {{ selectedBookForRent.title }}
                 </div>
-                <div class="book-author">
-                  {{ selectedBookForRent.author }}
+                <div
+                  v-if="selectedBookForRent.author"
+                  class="rent-book-author"
+                >
+                  <strong>저자:</strong> {{ selectedBookForRent.author }}
+                </div>
+                <div
+                  v-if="selectedBookForRent.publisher"
+                  class="rent-book-publisher"
+                >
+                  <strong>출판사:</strong> {{ selectedBookForRent.publisher }}
+                </div>
+                <div class="rent-book-details">
+                  <span class="detail-item">
+                    <v-icon
+                      size="x-small"
+                      class="mr-1"
+                    >mdi-label</v-icon>
+                    {{ selectedLabelNumber }}
+                  </span>
+                  <span class="detail-item">
+                    <v-icon
+                      size="x-small"
+                      class="mr-1"
+                    >mdi-map-marker</v-icon>
+                    {{ formatLocation(selectedLocation) }}
+                    <v-btn
+                      v-if="hasLocationImageForCenter"
+                      variant="text"
+                      size="x-small"
+                      color="primary"
+                      class="location-btn"
+                      @click="showLocationPopup"
+                    >
+                      위치 보기
+                    </v-btn>
+                  </span>
                 </div>
               </div>
-            </div>
-          </div>
-          
-          <div class="rent-details">
-            <div class="detail-item">
-              <v-icon
-                size="small"
-                class="mr-2"
-              >
-                mdi-label
-              </v-icon>
-              <span class="detail-label">라벨번호:</span>
-              <span class="detail-value">{{ selectedLabelNumber }}</span>
-            </div>
-            <div class="detail-item">
-              <v-icon
-                size="small"
-                class="mr-2"
-              >
-                mdi-map-marker
-              </v-icon>
-              <span class="detail-label">위치:</span>
-              <span class="detail-value">{{ formatLocation(selectedLocation) }}</span>
-              <v-btn
-                v-if="hasLocationImageForCenter"
-                variant="text"
-                size="small"
-                color="primary"
-                class="ml-2"
-                @click="showLocationPopup"
-              >
-                위치 보기
-              </v-btn>
             </div>
           </div>
           
@@ -351,6 +359,114 @@
             @click="confirmRent"
           >
             대여하기
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- 다권 대여 확인 다이얼로그 -->
+    <v-dialog
+      v-model="multiRentConfirmDialog"
+      max-width="500"
+      persistent
+    >
+      <v-card class="rent-confirm-card">
+        <v-card-title class="rent-confirm-title">
+          대여 확인
+        </v-card-title>
+        
+        <v-card-text class="rent-confirm-content">
+          <div class="rent-confirm-info mb-4">
+            <p>아래 도서들을 대여하시겠습니까?</p>
+            <p
+              v-if="!isDirectRentMode"
+              class="text-caption text-grey mt-1"
+            >
+              관리자 승인 후 대여가 완료됩니다.
+            </p>
+          </div>
+          
+          <div class="multi-rent-book-list">
+            <div
+              v-for="(item, index) in selectedBooks"
+              :key="index"
+              class="rent-book-card"
+            >
+              <div class="rent-book-card-inner">
+                <img
+                  v-if="item.book?.image"
+                  :src="item.book.image"
+                  :alt="item.book?.title"
+                  class="rent-book-thumbnail"
+                >
+                <div
+                  v-else
+                  class="rent-book-thumbnail-placeholder"
+                >
+                  <span>NO IMAGE</span>
+                </div>
+                <div class="rent-book-meta">
+                  <div class="rent-book-title">
+                    {{ item.book?.title }}
+                  </div>
+                  <div
+                    v-if="item.book?.author"
+                    class="rent-book-author"
+                  >
+                    <strong>저자:</strong> {{ item.book.author }}
+                  </div>
+                  <div
+                    v-if="item.book?.publisher"
+                    class="rent-book-publisher"
+                  >
+                    <strong>출판사:</strong> {{ item.book.publisher }}
+                  </div>
+                  <div class="rent-book-details">
+                    <span class="detail-item">
+                      <v-icon
+                        size="x-small"
+                        class="mr-1"
+                      >mdi-label</v-icon>
+                      {{ item.labelNumber }}
+                    </span>
+                    <span class="detail-item">
+                      <v-icon
+                        size="x-small"
+                        class="mr-1"
+                      >mdi-map-marker</v-icon>
+                      {{ formatLocation(item.location) }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <v-alert
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mt-4"
+          >
+            위치와 라벨번호를 확인 후 해당 도서를 가져가주세요.
+          </v-alert>
+        </v-card-text>
+        
+        <v-card-actions class="rent-confirm-actions">
+          <v-spacer />
+          <v-btn
+            variant="text"
+            @click="closeMultiRentConfirmDialog"
+          >
+            취소
+          </v-btn>
+          <v-btn
+            color="primary"
+            variant="flat"
+            :loading="rentRequestLoading"
+            @click="confirmMultiRent"
+          >
+            {{ isDirectRentMode ? '대여하기' : '대여 신청' }}
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -425,6 +541,10 @@ const isDialogForMultiSelect = ref(false)
 
 // 대여 확인 다이얼로그 관련
 const rentConfirmDialog = ref(false)
+
+// 다권 대여 확인 다이얼로그 관련
+const multiRentConfirmDialog = ref(false)
+const isDirectRentMode = ref(false)
 
 // 위치 안내 팝업
 const locationPopupVisible = ref(false)
@@ -875,20 +995,23 @@ const handleRentRequest = async () => {
     }
   }
 
-  const bookTitles = selectedBooks.value.map(item => `${item.book.title} (${item.labelNumber})`).join('\n')
-  const confirmMessage = isDirectRent 
-    ? `다음 도서들을 대여하시겠습니까?\n\n${bookTitles}`
-    : `대여 신청하시겠습니까?\n(관리자 승인 후 대여 가능)\n\n${bookTitles}`
-  
-  if (!await confirm(confirmMessage)) {
-    return
-  }
+  // 다권 대여 확인 다이얼로그 열기
+  isDirectRentMode.value = isDirectRent
+  multiRentConfirmDialog.value = true
+}
 
+// 다권 대여 확인 다이얼로그 닫기
+const closeMultiRentConfirmDialog = () => {
+  multiRentConfirmDialog.value = false
+}
+
+// 다권 대여 확정
+const confirmMultiRent = async () => {
   try {
     rentRequestLoading.value = true
     const bookCount = selectedBooks.value.length
     
-    if (isDirectRent) {
+    if (isDirectRentMode.value) {
       for (const item of selectedBooks.value) {
         await rentBook(item.labelNumber, currentCenter.value, user.value.uid, item.isbn)
       }
@@ -898,6 +1021,7 @@ const handleRentRequest = async () => {
         loadCurrentRentedCount()
       ])
       
+      closeMultiRentConfirmDialog()
       await alert(`${bookCount}권의 도서 대여가 완료되었습니다.`, { type: 'success' })
     } else {
       for (const item of selectedBooks.value) {
@@ -906,6 +1030,7 @@ const handleRentRequest = async () => {
       
       await loadRegisteredBooks()
       
+      closeMultiRentConfirmDialog()
       await alert(`${bookCount}권의 도서 대여가 신청되었습니다.\n관리자 승인 후 대여가 완료됩니다.`, { type: 'success' })
     }
     
@@ -1194,6 +1319,97 @@ useHead({
   color: #666;
 }
 
+// 개별 대여 도서 카드 스타일
+.rent-book-card {
+  background: #f5f5f5;
+  border-radius: rem(8);
+  border: rem(2) solid #e0e0e0;
+  overflow: hidden;
+}
+
+.rent-book-card-inner {
+  display: flex;
+  gap: rem(16);
+  padding: rem(16);
+}
+
+.rent-book-thumbnail {
+  width: rem(80);
+  height: rem(110);
+  object-fit: cover;
+  border-radius: rem(4);
+  flex-shrink: 0;
+}
+
+.rent-book-thumbnail-placeholder {
+  width: rem(80);
+  height: rem(110);
+  background-color: #666;
+  border-radius: rem(4);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  span {
+    color: #fff;
+    font-size: rem(11);
+    font-weight: 500;
+  }
+}
+
+.rent-book-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.rent-book-title {
+  font-size: rem(15);
+  font-weight: 600;
+  color: #002C5B;
+  line-height: 1.3;
+  margin-bottom: rem(4);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.rent-book-author,
+.rent-book-publisher {
+  font-size: rem(13);
+  color: #6b7280;
+  margin-bottom: rem(2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rent-book-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: rem(12);
+  font-size: rem(12);
+  color: #666;
+  margin-top: rem(8);
+  
+  .detail-item {
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 0;
+  }
+  
+  .location-btn {
+    margin-left: rem(4);
+    padding: 0 rem(4);
+    min-width: auto;
+    height: auto;
+  }
+}
+
 .rent-details {
   background: #f5f5f5;
   border-radius: rem(8);
@@ -1224,6 +1440,19 @@ useHead({
 
 .rent-confirm-actions {
   padding: rem(8) rem(24) rem(20);
+}
+
+// 다권 대여 목록 스타일
+.multi-rent-book-list {
+  max-height: rem(350);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: rem(12);
+  
+  .rent-book-card {
+    flex-shrink: 0;
+  }
 }
 
 .side-navigation {

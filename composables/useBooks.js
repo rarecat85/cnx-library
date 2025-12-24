@@ -880,8 +880,8 @@ export const useBooks = () => {
 
         await updateDoc(oldBookRef, updateData)
 
-        return {
-          success: true
+      return {
+        success: true
         }
       }
     } catch (err) {

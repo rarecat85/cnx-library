@@ -29,6 +29,7 @@
           <v-text-field
             v-model="searchQuery"
             label="도서 검색"
+            placeholder="도서명 또는 ISBN-13으로 검색"
             prepend-inner-icon="mdi-magnify"
             variant="outlined"
             density="comfortable"

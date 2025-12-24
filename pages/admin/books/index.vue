@@ -68,6 +68,17 @@
                 @update:model-value="handleSelectAll"
               />
               <div class="d-flex action-buttons">
+                <!-- 라벨번호순 또는 위치별보기 선택 시 오름차순/내림차순 셀렉트박스 -->
+                <v-select
+                  v-if="sortBy === 'label' || sortBy === 'location'"
+                  v-model="sortOrder"
+                  :items="sortOrderOptions"
+                  label="정렬"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  class="sort-order-select"
+                />
                 <!-- 위치별보기 선택 시 칸 선택 셀렉트박스 -->
                 <v-select
                   v-if="sortBy === 'location'"
@@ -274,19 +285,19 @@
               </div>
             </div>
             
-            <!-- 더보기 버튼 -->
+            <!-- 페이지네이션 -->
             <div
-              v-if="hasMoreBooks"
-              class="load-more-section"
+              v-if="totalPages > 1"
+              class="pagination-section"
             >
-              <v-btn
-                variant="outlined"
-                color="primary"
-                class="load-more-btn"
-                @click="loadMoreBooks"
-              >
-                더보기 ({{ remainingBooksCount }}개 더)
-              </v-btn>
+              <v-pagination
+                v-model="currentPage"
+                :length="totalPages"
+                :total-visible="5"
+                density="compact"
+                size="small"
+                class="pagination"
+              />
             </div>
           </div>
           <div
@@ -370,6 +381,100 @@
             @click="confirmRentBooks"
           >
             대여 처리
+          </v-btn>
+        </div>
+      </v-card>
+    </v-dialog>
+
+    <!-- 반납 처리 다이얼로그 -->
+    <v-dialog
+      v-model="returnDialog"
+      max-width="450"
+      persistent
+    >
+      <v-card class="rent-dialog-card">
+        <div class="rent-dialog-title text-h6">
+          반납 확인
+        </div>
+        <div class="rent-dialog-content">
+          <div class="mb-4 text-body-2 text-medium-emphasis">
+            반납 처리할 도서: {{ returnDialogBooks.length }}권
+          </div>
+          
+          <div class="return-book-list">
+            <div
+              v-for="book in returnDialogBooks"
+              :key="book.id"
+              class="return-book-item"
+            >
+              <div class="return-book-info">
+                <template v-if="book.image">
+                  <img
+                    :src="book.image"
+                    :alt="book.title"
+                    class="return-book-thumbnail"
+                  >
+                </template>
+                <template v-else>
+                  <div class="return-book-thumbnail no-image-placeholder">
+                    NO IMAGE
+                  </div>
+                </template>
+                <div class="return-book-meta">
+                  <div class="return-book-title">
+                    {{ book.title }}
+                  </div>
+                  <div class="return-book-details">
+                    <span class="detail-item">
+                      <v-icon
+                        size="x-small"
+                        class="mr-1"
+                      >mdi-label</v-icon>
+                      {{ book.labelNumber || '라벨없음' }}
+                    </span>
+                    <span class="detail-item">
+                      <v-icon
+                        size="x-small"
+                        class="mr-1"
+                      >mdi-map-marker</v-icon>
+                      {{ formatLocation(book.location) || '위치없음' }}
+                    </span>
+                  </div>
+                  <div
+                    v-if="getRenterInfo(book)"
+                    class="return-book-renter"
+                  >
+                    대여자: {{ getRenterInfo(book) }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <v-alert
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mt-4"
+          >
+            위치와 라벨번호를 확인 후 해당 위치에 도서를 반납해주세요.
+          </v-alert>
+        </div>
+        <div class="rent-dialog-actions">
+          <v-spacer />
+          <v-btn
+            variant="text"
+            @click="closeReturnDialog"
+          >
+            취소
+          </v-btn>
+          <v-btn
+            color="primary"
+            variant="flat"
+            :loading="returnDialogLoading"
+            @click="confirmReturnBooks"
+          >
+            반납 처리
           </v-btn>
         </div>
       </v-card>
@@ -534,6 +639,11 @@ const registeredBooksLoading = ref(false)
 const registeredBooksSearchQuery = ref('')
 const sortBy = ref('label')
 const selectedLocationFilter = ref('')
+const sortOrder = ref('asc') // 오름차순/내림차순
+const sortOrderOptions = [
+  { title: '오름차순', value: 'asc' },
+  { title: '내림차순', value: 'desc' }
+]
 const sortOptions = [
   { title: '라벨번호순', value: 'label' },
   { title: '대여중도서', value: 'rented' },
@@ -556,8 +666,8 @@ const selectedBooks = ref([])
 const selectAll = ref(false)
 const actionLoading = ref(false)
 
-// 더보기 페이지네이션
-const displayCount = ref(10)
+// 페이지네이션
+const currentPage = ref(1)
 const ITEMS_PER_PAGE = 10
 
 // 최대 대여 권수
@@ -576,6 +686,11 @@ const rentDialogLoading = ref(false)
 const rentFormCenter = ref('')
 const rentFormEmail = ref('')
 const rentFormError = ref('')
+
+// 반납 다이얼로그 관련
+const returnDialog = ref(false)
+const returnDialogBooks = ref([])
+const returnDialogLoading = ref(false)
 
 // 수정 다이얼로그 관련
 const editDialog = ref(false)
@@ -838,7 +953,7 @@ const filteredGroupedBooks = computed(() => {
       // 그룹 내 첫 번째 복사본의 라벨번호로 정렬
       const labelA = extractLabelNumber(a.copies[0]?.labelNumber)
       const labelB = extractLabelNumber(b.copies[0]?.labelNumber)
-      return labelA - labelB
+      return sortOrder.value === 'asc' ? labelA - labelB : labelB - labelA
     })
   } else if (sortBy.value === 'rented') {
     groups = groups.filter(group => group.rentedCount > 0)
@@ -848,39 +963,39 @@ const filteredGroupedBooks = computed(() => {
     })
   } else if (sortBy.value === 'requested') {
     groups = groups.filter(group => group.requestedCount > 0)
-  } else if (sortBy.value === 'location' && selectedLocationFilter.value) {
-    // 칸별보기 - 선택한 칸에 위치한 도서가 있는 그룹만 필터링
-    groups = groups.filter(group => {
-      return group.copies.some(book => book.location === selectedLocationFilter.value)
+  } else if (sortBy.value === 'location') {
+    // 위치별보기 - 선택한 칸에 위치한 도서가 있는 그룹만 필터링
+    if (selectedLocationFilter.value) {
+      groups = groups.filter(group => {
+        return group.copies.some(book => book.location === selectedLocationFilter.value)
+      })
+    }
+    // 라벨번호순 정렬 적용
+    groups.sort((a, b) => {
+      const labelA = extractLabelNumber(a.copies[0]?.labelNumber)
+      const labelB = extractLabelNumber(b.copies[0]?.labelNumber)
+      return sortOrder.value === 'asc' ? labelA - labelB : labelB - labelA
     })
   }
 
   return groups
 })
 
-// 화면에 표시할 도서 목록 (더보기 페이지네이션)
+// 화면에 표시할 도서 목록 (페이지네이션)
 const displayedGroupedBooks = computed(() => {
-  return filteredGroupedBooks.value.slice(0, displayCount.value)
+  const start = (currentPage.value - 1) * ITEMS_PER_PAGE
+  const end = start + ITEMS_PER_PAGE
+  return filteredGroupedBooks.value.slice(start, end)
 })
 
-// 더보기 가능 여부
-const hasMoreBooks = computed(() => {
-  return displayCount.value < filteredGroupedBooks.value.length
+// 총 페이지 수
+const totalPages = computed(() => {
+  return Math.ceil(filteredGroupedBooks.value.length / ITEMS_PER_PAGE)
 })
 
-// 남은 도서 수
-const remainingBooksCount = computed(() => {
-  return filteredGroupedBooks.value.length - displayCount.value
-})
-
-// 더보기 로드
-const loadMoreBooks = () => {
-  displayCount.value += ITEMS_PER_PAGE
-}
-
-// 검색이나 정렬 변경 시 displayCount 리셋
+// 검색이나 정렬 변경 시 페이지 리셋
 watch([() => registeredBooksSearchQuery.value, () => sortBy.value, () => selectedLocationFilter.value], () => {
-  displayCount.value = ITEMS_PER_PAGE
+  currentPage.value = 1
 })
 
 // 총 도서 수
@@ -1320,7 +1435,7 @@ const confirmRentBooks = async () => {
   }
 }
 
-// 도서 반납 처리
+// 도서 반납 처리 - 다이얼로그 열기
 const handleReturnBooks = async () => {
   if (selectedBooks.value.length === 0) return
 
@@ -1334,16 +1449,26 @@ const handleReturnBooks = async () => {
     return
   }
 
-  if (!await confirm(`선택한 ${rentedBooks.length}권의 도서를 반납 처리하시겠습니까?`)) {
-    return
-  }
+  returnDialogBooks.value = rentedBooks
+  returnDialog.value = true
+}
+
+// 반납 다이얼로그 닫기
+const closeReturnDialog = () => {
+  returnDialog.value = false
+  returnDialogBooks.value = []
+}
+
+// 반납 확인 처리
+const confirmReturnBooks = async () => {
+  if (returnDialogBooks.value.length === 0) return
 
   try {
-    actionLoading.value = true
+    returnDialogLoading.value = true
     
     const { doc, updateDoc, collection, addDoc, query, where, getDocs, serverTimestamp, deleteField } = await import('firebase/firestore')
     
-    for (const book of rentedBooks) {
+    for (const book of returnDialogBooks.value) {
       const labelNumber = book.labelNumber || book.id.split('_')[0]
       const bookId = book.id
       const rentedBy = book.rentedBy
@@ -1400,18 +1525,22 @@ const handleReturnBooks = async () => {
       }
     }
     
-    selectedBooks.value = []
+    const returnedCount = returnDialogBooks.value.length
+    selectedBooks.value = selectedBooks.value.filter(book => 
+      !returnDialogBooks.value.some(rb => rb.id === book.id)
+    )
+    closeReturnDialog()
     await loadRegisteredBooks()
-    await alert(`${rentedBooks.length}권의 도서가 반납 처리되었습니다.`, { type: 'success' })
+    await alert(`${returnedCount}권의 도서가 반납 처리되었습니다.`, { type: 'success' })
   } catch (error) {
     console.error('도서 반납 오류:', error)
     await alert('도서 반납에 실패했습니다.', { type: 'error' })
   } finally {
-    actionLoading.value = false
+    returnDialogLoading.value = false
   }
 }
 
-// 개별 도서 반납 처리
+// 개별 도서 반납 처리 - 다이얼로그 열기
 const handleSingleReturn = async (book) => {
   const status = calculateBookStatus(book)
   if (status !== 'rented' && status !== 'overdue') {
@@ -1419,10 +1548,12 @@ const handleSingleReturn = async (book) => {
     return
   }
 
-  if (!await confirm(`"${book.title}" 도서를 반납 처리하시겠습니까?\n라벨번호: ${book.labelNumber || '-'}`)) {
-    return
-  }
+  returnDialogBooks.value = [book]
+  returnDialog.value = true
+}
 
+// 개별 도서 반납 처리 (기존 로직 - 삭제됨, confirmReturnBooks에서 처리)
+const handleSingleReturnLegacy = async (book) => {
   try {
     actionLoading.value = true
     
@@ -1600,6 +1731,26 @@ useHead({
   }
 }
 
+.sort-order-select {
+  width: rem(110);
+  min-width: rem(100);
+  
+  :deep(.v-field) {
+    font-size: rem(12);
+    min-height: rem(28);
+  }
+  
+  :deep(.v-field__input) {
+    padding: rem(4) rem(8);
+    min-height: rem(28);
+    font-size: rem(12);
+  }
+  
+  :deep(.v-field-label) {
+    font-size: rem(12);
+  }
+}
+
 .location-filter-select {
   width: rem(100);
   min-width: rem(80);
@@ -1646,14 +1797,40 @@ useHead({
   gap: rem(24);
 }
 
-.load-more-section {
+.pagination-section {
   display: flex;
   justify-content: center;
-  padding: rem(16) 0;
+  align-items: center;
+  padding: rem(16) 0 rem(8);
 }
 
-.load-more-btn {
-  min-width: rem(200);
+.pagination {
+  :deep(.v-pagination__list) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: rem(2);
+  }
+  
+  :deep(.v-pagination__item),
+  :deep(.v-pagination__prev),
+  :deep(.v-pagination__next) {
+    font-size: rem(12);
+    min-width: rem(28);
+    height: rem(28);
+    
+    .v-btn {
+      min-width: rem(28);
+      height: rem(28);
+    }
+  }
+  
+  :deep(.v-pagination__item--is-active) {
+    .v-btn {
+      background-color: #002C5B;
+      color: #fff;
+    }
+  }
 }
 
 // 그룹핑된 도서 목록 스타일
@@ -1996,6 +2173,81 @@ useHead({
   display: flex;
   justify-content: flex-end;
   gap: rem(8);
+}
+
+// 반납 도서 목록 스타일
+.return-book-list {
+  max-height: rem(300);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: rem(12);
+}
+
+.return-book-item {
+  border: rem(1) solid #e0e0e0;
+  border-radius: rem(8);
+  padding: rem(12);
+  background-color: #f5f5f5;
+}
+
+.return-book-info {
+  display: flex;
+  gap: rem(12);
+}
+
+.return-book-thumbnail {
+  width: rem(50);
+  height: rem(70);
+  object-fit: cover;
+  border-radius: rem(4);
+  flex-shrink: 0;
+  
+  &.no-image-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #666;
+    color: #fff;
+    font-size: rem(10);
+  }
+}
+
+.return-book-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.return-book-title {
+  font-size: rem(14);
+  font-weight: 600;
+  color: #002C5B;
+  line-height: 1.3;
+  margin-bottom: rem(4);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.return-book-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: rem(8);
+  font-size: rem(11);
+  color: #666;
+  margin-bottom: rem(4);
+  
+  .detail-item {
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+.return-book-renter {
+  font-size: rem(11);
+  color: #999;
 }
 
 // 반응형

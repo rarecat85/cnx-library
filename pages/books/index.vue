@@ -173,21 +173,36 @@
         <v-card-text class="label-select-content">
           <div
             v-if="selectedGroup"
-            class="book-info-preview mb-4"
+            class="rent-book-card mb-4"
           >
-            <div class="book-info-preview-inner">
+            <div class="rent-book-card-inner">
               <img
                 v-if="selectedGroup.image"
                 :src="selectedGroup.image"
                 :alt="selectedGroup.title"
-                class="book-thumbnail"
+                class="rent-book-thumbnail"
               >
-              <div class="book-meta">
-                <div class="book-title">
+              <div
+                v-else
+                class="rent-book-thumbnail-placeholder"
+              >
+                <span>NO IMAGE</span>
+              </div>
+              <div class="rent-book-meta">
+                <div class="rent-book-title">
                   {{ selectedGroup.title }}
                 </div>
-                <div class="book-author">
-                  {{ selectedGroup.author }}
+                <div
+                  v-if="selectedGroup.author"
+                  class="rent-book-author"
+                >
+                  <strong>저자:</strong> {{ selectedGroup.author }}
+                </div>
+                <div
+                  v-if="selectedGroup.publisher"
+                  class="rent-book-publisher"
+                >
+                  <strong>출판사:</strong> {{ selectedGroup.publisher }}
                 </div>
               </div>
             </div>
@@ -1196,48 +1211,6 @@ useHead({
 
 .label-select-content {
   padding: rem(16) rem(24);
-}
-
-.book-info-preview {
-  background: #f5f5f5;
-  border-radius: rem(8);
-  padding: rem(12);
-}
-
-.book-info-preview-inner {
-  display: flex;
-  gap: rem(12);
-  align-items: flex-start;
-}
-
-.book-thumbnail {
-  width: rem(50);
-  height: rem(70);
-  object-fit: cover;
-  border-radius: rem(4);
-  flex-shrink: 0;
-}
-
-.book-meta {
-  flex: 1;
-  min-width: 0;
-}
-
-.book-title {
-  font-size: rem(14);
-  font-weight: 600;
-  color: #333;
-  line-height: 1.3;
-  margin-bottom: rem(4);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.book-author {
-  font-size: rem(12);
-  color: #666;
 }
 
 .label-select-header {

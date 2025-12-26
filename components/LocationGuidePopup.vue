@@ -141,12 +141,25 @@ onMounted(() => {
   })
 })
 
-// 이미지 정보
+// Nuxt 앱 설정에서 baseURL 가져오기
+const config = useRuntimeConfig()
+const baseURL = config.app.baseURL || '/'
+
+// 이미지 정보 (baseURL 적용)
 const imageInfo = computed(() => {
   if (!hasLocationImage(props.center)) {
     return null
   }
-  return getLocationImageInfo(props.center, props.location)
+  const info = getLocationImageInfo(props.center, props.location)
+  if (info) {
+    // baseURL이 '/'로 끝나면 중복 슬래시 방지
+    const base = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL
+    return {
+      ...info,
+      imagePath: `${base}${info.imagePath}`
+    }
+  }
+  return null
 })
 
 // 포맷된 위치

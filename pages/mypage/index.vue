@@ -249,39 +249,21 @@
                 sm="6"
                 class="book-list-col"
               >
-                <div class="requested-book-item">
-                  <BookCard
-                    :book="book"
-                    :center="book.center || ''"
-                    :show-action="false"
-                    :selectable="false"
-                    :show-status-flags="false"
-                    :show-label-number="!!book.labelNumber"
-                    :label-number="book.labelNumber"
-                    :show-location="!!book.location"
-                    :location="book.location"
-                  />
-                  <div class="requested-book-actions">
-                    <div class="requested-info">
-                      <v-icon
-                        size="small"
-                        class="mr-1"
-                      >
-                        mdi-clock-outline
-                      </v-icon>
-                      {{ formatRequestedDate(book.requestedAt) }}
-                    </div>
-                    <v-btn
-                      color="error"
-                      variant="outlined"
-                      size="small"
-                      :loading="cancelRequestLoading === book.id"
-                      @click="handleCancelRequest(book)"
-                    >
-                      신청 취소
-                    </v-btn>
-                  </div>
-                </div>
+                <BookCard
+                  :book="book"
+                  :center="book.center || ''"
+                  :show-action="false"
+                  :selectable="false"
+                  :show-status-flags="false"
+                  :show-label-number="!!book.labelNumber"
+                  :label-number="book.labelNumber"
+                  :show-location="!!book.location"
+                  :location="book.location"
+                  :show-requested-info="true"
+                  :requested-date="book.requestedAt"
+                  :cancel-loading="cancelRequestLoading === book.id"
+                  @cancel-request="handleCancelRequest"
+                />
               </v-col>
             </v-row>
           </div>

@@ -223,6 +223,32 @@
       </div>
     </div>
     
+    <!-- 신청일 및 신청취소 버튼 (마이페이지 신청 도서용) -->
+    <div
+      v-else-if="showRequestedInfo && requestedDate"
+      class="book-action-area book-action-area-mypage"
+    >
+      <v-btn
+        color="error"
+        variant="outlined"
+        size="small"
+        class="cancel-request-btn"
+        :loading="cancelLoading"
+        @click.stop="handleCancelRequest"
+      >
+        신청 취소
+      </v-btn>
+      <div class="requested-date-text text-body-2">
+        <v-icon
+          size="small"
+          class="mr-1"
+        >
+          mdi-clock-outline
+        </v-icon>
+        신청일: {{ formattedRequestedDate }}
+      </div>
+    </div>
+    
     <!-- 대여 신청 버튼 (도서 대여 페이지용) -->
     <div
       v-else-if="showRentButton"
@@ -476,10 +502,23 @@ const props = defineProps({
   locationPopupMode: {
     type: String,
     default: 'rent'
+  },
+  // 신청 정보 표시 (마이페이지 신청 도서용)
+  showRequestedInfo: {
+    type: Boolean,
+    default: false
+  },
+  requestedDate: {
+    type: [Date, Object, String],
+    default: null
+  },
+  cancelLoading: {
+    type: Boolean,
+    default: false
   }
 })
 
-const emit = defineEmits(['register', 'select', 'return', 'rent', 'adminRent', 'adminReturn', 'locationClick'])
+const emit = defineEmits(['register', 'select', 'return', 'rent', 'adminRent', 'adminReturn', 'locationClick', 'cancelRequest'])
 
 // 위치 안내 팝업
 const locationPopupVisible = ref(false)
@@ -695,6 +734,23 @@ const isOverdue = computed(() => {
   const date = props.returnDate?.toDate?.() || new Date(props.returnDate)
   return date < new Date()
 })
+
+// 신청일 포맷
+const formattedRequestedDate = computed(() => {
+  if (!props.requestedDate) return ''
+  
+  const date = props.requestedDate?.toDate?.() || new Date(props.requestedDate)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  
+  return `${year}.${month}.${day}`
+})
+
+// 신청 취소 처리
+const handleCancelRequest = () => {
+  emit('cancelRequest', props.book)
+}
 </script>
 
 <style lang="scss" scoped>
@@ -980,5 +1036,21 @@ const isOverdue = computed(() => {
 
 .return-date-overdue {
   color: #ef4444;
+}
+
+.cancel-request-btn {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.requested-date-text {
+  color: #6b7280;
+  font-weight: 500;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: rem(28);
+  box-sizing: border-box;
 }
 </style>

@@ -90,19 +90,12 @@
                 />
               </div>
               <div class="progress-stats">
-                <span class="stat pass">✅ {{ session.progress?.pass || 0 }}</span>
-                <span class="stat fail">❌ {{ session.progress?.fail || 0 }}</span>
-                <span class="stat partial">⚠️ {{ session.progress?.partial || 0 }}</span>
-                <span class="stat skip">⏭️ {{ session.progress?.skip || 0 }}</span>
+                <span class="stat pass">✅ {{ session.validProgress?.pass || 0 }}</span>
+                <span class="stat fail">❌ {{ session.validProgress?.fail || 0 }}</span>
+                <span class="stat partial">⚠️ {{ session.validProgress?.partial || 0 }}</span>
+                <span class="stat skip">⏭️ {{ session.validProgress?.skip || 0 }}</span>
                 <span class="stat total">
-                  {{ Math.min(session.progress?.completed || 0, getTotalTestCount()) }}/{{ getTotalTestCount() }}
-                </span>
-                <span
-                  v-if="(session.progress?.completed || 0) > getTotalTestCount()"
-                  class="stat outdated"
-                  title="시나리오가 변경되어 진행률이 맞지 않습니다. 세션에 진입하면 자동으로 수정됩니다."
-                >
-                  ⚠️
+                  {{ session.validProgress?.completed || 0 }}/{{ getTotalTestCount() }}
                 </span>
               </div>
             </div>
@@ -148,8 +141,10 @@ const { confirm, alert } = useDialog()
 const {
   createSession,
   getSessions,
+  getSession,
   deleteSession,
   getTotalTestCount,
+  getAllTestIds,
   loading
 } = useTestScenario()
 
@@ -160,9 +155,71 @@ onMounted(async () => {
   await loadSessions()
 })
 
+// 유효한 테스트 ID 목록
+const validTestIds = new Set(getAllTestIds())
+
+// 결과에서 유효한 테스트만 집계
+const calculateValidProgress = (results) => {
+  let pass = 0
+  let fail = 0
+  let partial = 0
+  let skip = 0
+  let completed = 0
+
+  Object.entries(results).forEach(([testId, data]) => {
+    // 현재 시나리오에 존재하는 ID만 집계
+    if (!validTestIds.has(testId)) {
+      return
+    }
+    
+    if (data.result) {
+      completed++
+      switch (data.result) {
+        case 'pass':
+          pass++
+          break
+        case 'fail':
+          fail++
+          break
+        case 'partial':
+          partial++
+          break
+        case 'skip':
+          skip++
+          break
+      }
+    }
+  })
+
+  return { pass, fail, partial, skip, completed }
+}
+
 const loadSessions = async () => {
   try {
-    sessions.value = await getSessions()
+    const sessionList = await getSessions()
+    
+    // 각 세션의 결과를 가져와서 유효한 진행률 계산
+    const sessionsWithValidProgress = await Promise.all(
+      sessionList.map(async (session) => {
+        try {
+          const { results } = await getSession(session.id)
+          const validProgress = calculateValidProgress(results)
+          return {
+            ...session,
+            validProgress
+          }
+        } catch (err) {
+          console.error(`세션 ${session.id} 결과 로드 오류:`, err)
+          // 에러 시 서버에 저장된 progress 사용
+          return {
+            ...session,
+            validProgress: session.progress
+          }
+        }
+      })
+    )
+    
+    sessions.value = sessionsWithValidProgress
   } catch (err) {
     console.error('세션 목록 로드 오류:', err)
     await alert('세션 목록을 불러오는데 실패했습니다.', { type: 'error' })
@@ -234,7 +291,7 @@ const formatDate = (date) => {
 const getProgressPercent = (session) => {
   const total = getTotalTestCount()
   if (!total) return 0
-  const completed = session.progress?.completed || 0
+  const completed = session.validProgress?.completed || 0
   return Math.min(100, Math.round((completed / total) * 100))
 }
 </script>

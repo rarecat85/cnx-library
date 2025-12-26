@@ -401,7 +401,7 @@ definePageMeta({
 })
 
 const { user } = useAuth()
-const { returnBook, cancelRentRequest } = useBooks()
+const { returnBook } = useBooks()
 const { confirm, alert } = useDialog()
 const { $firebaseFirestore } = useNuxtApp()
 const firestore = $firebaseFirestore
@@ -515,7 +515,7 @@ onMounted(async () => {
   ])
 })
 
-// 내가 신청한 도서 로드 (대여신청 상태의 도서)
+// 내가 신청한 도서 로드 (bookRequests 컬렉션에서 조회)
 const loadMyRequestedBooks = async () => {
   if (!user.value || !firestore) return
 
@@ -524,12 +524,12 @@ const loadMyRequestedBooks = async () => {
     
     const { collection, query, where, getDocs } = await import('firebase/firestore')
     
-    // books 컬렉션에서 내가 신청한 도서 조회
-    const booksRef = collection(firestore, 'books')
+    // bookRequests 컬렉션에서 내가 신청한 도서 조회
+    const requestsRef = collection(firestore, 'bookRequests')
     const q = query(
-      booksRef,
+      requestsRef,
       where('requestedBy', '==', user.value.uid),
-      where('status', '==', 'requested')
+      where('status', '==', 'pending')
     )
     
     const snapshot = await getDocs(q)
@@ -729,24 +729,26 @@ const handleHistoryBookSelect = (record, selected) => {
   }
 }
 
-// 대여 신청 취소
+// 도서 등록 신청 취소 (bookRequests 컬렉션에서 삭제)
 const handleCancelRequest = async (book) => {
   if (!user.value || !book) return
 
-  if (!await confirm(`"${book.title}" 대여 신청을 취소하시겠습니까?`)) {
+  if (!await confirm(`"${book.title}" 도서 신청을 취소하시겠습니까?`)) {
     return
   }
 
   try {
     cancelRequestLoading.value = book.id
     
-    const labelNumber = book.labelNumber || book.id.split('_')[0]
-    await cancelRentRequest(labelNumber, book.center, user.value.uid)
+    const { doc, deleteDoc } = await import('firebase/firestore')
+    
+    // bookRequests 컬렉션에서 해당 문서 삭제
+    await deleteDoc(doc(firestore, 'bookRequests', book.id))
     
     // 목록에서 제거
     myRequestedBooks.value = myRequestedBooks.value.filter(b => b.id !== book.id)
     
-    await alert('대여 신청이 취소되었습니다.', { type: 'success' })
+    await alert('도서 신청이 취소되었습니다.', { type: 'success' })
   } catch (error) {
     console.error('신청 취소 오류:', error)
     await alert(error.message || '신청 취소에 실패했습니다.', { type: 'error' })

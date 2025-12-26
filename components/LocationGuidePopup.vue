@@ -62,10 +62,16 @@
         </div>
         
         <div
-          v-if="labelNumber"
+          v-if="labelNumber && mode === 'rent'"
           class="location-confirm-text"
         >
           위치와 라벨번호를 확인 후 대여해주세요.
+        </div>
+        <div
+          v-else-if="labelNumber && mode === 'return'"
+          class="location-confirm-text"
+        >
+          위치와 라벨번호를 확인 후 반납해주세요.
         </div>
       </div>
       
@@ -103,6 +109,12 @@ const props = defineProps({
   labelNumber: {
     type: String,
     default: ''
+  },
+  // 'rent': 대여 안내, 'return': 반납 안내, 'info': 위치만 표시
+  mode: {
+    type: String,
+    default: 'rent',
+    validator: (value) => ['rent', 'return', 'info'].includes(value)
   }
 })
 

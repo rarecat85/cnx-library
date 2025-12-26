@@ -89,8 +89,8 @@
               <span class="step-number">2</span>
               <div class="step-content">
                 <strong>도서 검색</strong>
-                <p>상단 검색창에 등록할 도서명을 입력하고 검색합니다.</p>
-                <p class="note">* 알라딘 API를 통해 도서 정보를 검색합니다.</p>
+                <p>상단 검색창에 도서명 또는 ISBN-13을 입력하고 검색합니다.</p>
+                <p class="note">* 네이버 도서 API를 통해 국내/외국 도서를 검색합니다.</p>
               </div>
             </li>
             <li>
@@ -103,8 +103,60 @@
             <li>
               <span class="step-number">4</span>
               <div class="step-content">
+                <strong>등록 정보 입력</strong>
+                <p>카테고리, 권수, 각 권별 라벨번호와 위치를 설정합니다.</p>
+              </div>
+            </li>
+            <li>
+              <span class="step-number">5</span>
+              <div class="step-content">
                 <strong>등록 완료</strong>
                 <p>소속 센터에 도서가 등록됩니다.</p>
+              </div>
+            </li>
+          </ol>
+          
+          <div class="info-box">
+            <h4>📚 다권 등록 기능</h4>
+            <ul>
+              <li>같은 도서를 여러 권 한번에 등록할 수 있습니다.</li>
+              <li>권수를 설정하면 각 권별로 라벨번호와 위치를 개별 지정합니다.</li>
+              <li>라벨번호는 자동 생성되며, 필요시 수정 가능합니다.</li>
+            </ul>
+          </div>
+          
+          <div class="info-box">
+            <h4>🏷️ 라벨번호 체계</h4>
+            <ul>
+              <li>형식: <code>카테고리_센터코드+4자리숫자</code></li>
+              <li>예시: <code>소설_YS0001</code>, <code>IT_GN0042</code></li>
+              <li>센터코드: YS(용산), GN(강남)</li>
+            </ul>
+          </div>
+          
+          <h3>직접 등록</h3>
+          <p>검색 결과가 없는 도서는 직접 정보를 입력하여 등록할 수 있습니다.</p>
+          <ol class="step-list">
+            <li>
+              <span class="step-number">1</span>
+              <div class="step-content">
+                <strong>검색 결과 없음 화면에서 "직접 등록하기" 클릭</strong>
+                <p>ISBN 조회 버튼으로 외부 사이트에서 ISBN을 먼저 확인할 수 있습니다.</p>
+              </div>
+            </li>
+            <li>
+              <span class="step-number">2</span>
+              <div class="step-content">
+                <strong>도서 정보 입력</strong>
+                <p>도서명, 저자, 출판사, ISBN을 직접 입력합니다.</p>
+                <p class="note">* 표지 이미지는 기본 이미지로 대체됩니다.</p>
+              </div>
+            </li>
+            <li>
+              <span class="step-number">3</span>
+              <div class="step-content">
+                <strong>등록 정보 설정 후 등록</strong>
+                <p>카테고리, 권수, 라벨번호, 위치를 설정하고 등록합니다.</p>
               </div>
             </li>
           </ol>
@@ -112,9 +164,10 @@
           <div class="warning-box">
             <h4>⚠️ 주의사항</h4>
             <ul>
-              <li>이미 등록된 도서는 "등록됨" 표시가 됩니다.</li>
+              <li>이미 등록된 도서는 "등록됨" 표시와 함께 "추가 등록" 버튼이 표시됩니다.</li>
               <li>세트 상품, 전집류는 자동으로 필터링됩니다.</li>
               <li>도서는 관리자 본인의 소속 센터에 등록됩니다.</li>
+              <li>라벨번호는 고유해야 하며 중복 등록이 불가합니다.</li>
             </ul>
           </div>
 
@@ -139,8 +192,8 @@
             <li>
               <span class="step-number">3</span>
               <div class="step-content">
-                <strong>신청자 알림</strong>
-                <p>등록 완료 시 신청자에게 자동으로 알림이 발송됩니다.</p>
+                <strong>등록 정보 입력 및 완료</strong>
+                <p>카테고리, 권수, 라벨번호, 위치 설정 후 등록합니다. 신청자에게 알림이 발송됩니다.</p>
               </div>
             </li>
           </ol>
@@ -157,32 +210,76 @@
           <div class="feature-grid">
             <div class="feature-card">
               <h4>🔍 도서 검색</h4>
-              <p>검색창에서 도서명으로 빠르게 검색할 수 있습니다.</p>
+              <p>검색창에서 도서명 또는 라벨번호로 빠르게 검색할 수 있습니다.</p>
             </div>
             <div class="feature-card">
-              <h4>📊 상태 확인</h4>
-              <p>각 도서의 대여 상태와 대여자 정보를 확인할 수 있습니다.</p>
+              <h4>📊 정렬 기능</h4>
+              <p>라벨번호순, 위치별로 보기 등으로 정렬할 수 있습니다.</p>
             </div>
             <div class="feature-card">
-              <h4>🗑️ 도서 삭제</h4>
-              <p>대여중이 아닌 도서를 삭제할 수 있습니다.</p>
+              <h4>✏️ 정보 수정</h4>
+              <p>도서의 카테고리, 라벨번호, 위치를 수정할 수 있습니다.</p>
             </div>
             <div class="feature-card">
-              <h4>↩️ 반납 처리</h4>
-              <p>대여중인 도서를 관리자가 직접 반납 처리할 수 있습니다.</p>
+              <h4>↩️ 반납/대여 처리</h4>
+              <p>관리자가 직접 대여 및 반납 처리할 수 있습니다.</p>
             </div>
+          </div>
+          
+          <h3>정렬 및 필터</h3>
+          <div class="info-box">
+            <h4>📋 정렬 옵션</h4>
+            <ul>
+              <li><strong>라벨번호순:</strong> 라벨번호 숫자 기준 오름차순/내림차순 정렬</li>
+              <li><strong>위치별로 보기:</strong> 특정 위치(칸)의 도서만 필터링</li>
+            </ul>
+            <p>오름차순/내림차순 선택이 가능합니다.</p>
           </div>
 
-          <h3>도서 카드 정보</h3>
+          <h3>도서 카드 구성</h3>
           <div class="info-box">
-            <h4>대여중인 도서 카드에 표시되는 정보:</h4>
+            <h4>도서 카드에 표시되는 정보:</h4>
             <ul>
-              <li><strong>대여자 근무지:</strong> 대여한 사용자의 근무지</li>
-              <li><strong>대여자 이름 (이메일):</strong> 대여자 식별 정보</li>
-              <li><strong>반납예정일:</strong> 대여일로부터 7일 후</li>
-              <li><strong>반납 처리 버튼:</strong> 관리자 반납 처리용</li>
+              <li><strong>도서 정보:</strong> 표지, 제목, 저자, 출판사, 총 권수</li>
+              <li><strong>라벨별 정보:</strong> 상태, 라벨번호, 위치, 대여자 정보</li>
+              <li><strong>액션 버튼:</strong> 정보수정, 대여처리/반납처리</li>
             </ul>
           </div>
+          
+          <h3>도서 선택</h3>
+          <ul>
+            <li><strong>도서 정보 영역 클릭:</strong> 해당 도서의 모든 권 선택</li>
+            <li><strong>라벨별 정보 영역 클릭:</strong> 개별 권 선택</li>
+            <li><strong>전체 선택:</strong> 상단 체크박스로 모든 도서 선택</li>
+          </ul>
+          
+          <h3>정보 수정</h3>
+          <ol class="step-list">
+            <li>
+              <span class="step-number">1</span>
+              <div class="step-content">
+                <strong>"정보수정" 링크 클릭</strong>
+                <p>수정할 도서의 정보수정 링크를 클릭합니다.</p>
+              </div>
+            </li>
+            <li>
+              <span class="step-number">2</span>
+              <div class="step-content">
+                <strong>정보 수정</strong>
+                <p>카테고리, 라벨번호, 위치를 수정할 수 있습니다.</p>
+              </div>
+            </li>
+            <li>
+              <span class="step-number">3</span>
+              <div class="step-content">
+                <strong>저장</strong>
+                <p>수정 완료 버튼을 클릭하여 저장합니다.</p>
+              </div>
+            </li>
+          </ol>
+          
+          <h3>페이지네이션</h3>
+          <p>도서 목록은 10개씩 표시되며, 하단 페이지네이션으로 이동합니다.</p>
         </div>
       </section>
 
@@ -236,6 +333,7 @@
         <div class="section-content">
           <p>관리자는 도서를 직접 반납 처리할 수 있습니다.</p>
           
+          <h3>개별 반납 처리</h3>
           <ol class="step-list">
             <li>
               <span class="step-number">1</span>
@@ -247,15 +345,33 @@
             <li>
               <span class="step-number">2</span>
               <div class="step-content">
-                <strong>"반납 처리" 버튼 클릭</strong>
-                <p>도서 카드 하단의 "반납 처리" 버튼을 클릭합니다.</p>
+                <strong>"반납처리" 버튼 클릭</strong>
+                <p>해당 도서의 "반납처리" 버튼을 클릭합니다.</p>
               </div>
             </li>
             <li>
               <span class="step-number">3</span>
               <div class="step-content">
-                <strong>반납 완료</strong>
-                <p>도서 상태가 "대여가능"으로 변경됩니다.</p>
+                <strong>반납 확인</strong>
+                <p>반납 확인 다이얼로그에서 도서 정보와 위치를 확인한 후 처리합니다.</p>
+              </div>
+            </li>
+          </ol>
+          
+          <h3>다권 반납 처리</h3>
+          <ol class="step-list">
+            <li>
+              <span class="step-number">1</span>
+              <div class="step-content">
+                <strong>반납할 도서들 선택</strong>
+                <p>도서 카드 또는 라벨별 정보를 클릭하여 선택합니다.</p>
+              </div>
+            </li>
+            <li>
+              <span class="step-number">2</span>
+              <div class="step-content">
+                <strong>상단 "반납 처리" 버튼 클릭</strong>
+                <p>선택한 도서들을 한번에 반납 처리합니다.</p>
               </div>
             </li>
           </ol>
@@ -264,7 +380,7 @@
             <h4>⚠️ 반납 처리 전 확인사항</h4>
             <ul>
               <li><strong>실물 도서 확인:</strong> 대여자로부터 실제 도서를 반납받았는지 확인하세요.</li>
-              <li><strong>반납 방법:</strong> 직접 반납 또는 센터 간 배송 등 반납 방법을 대여자와 확인하세요.</li>
+              <li><strong>위치 확인:</strong> 반납 확인 다이얼로그에서 원래 위치를 확인하세요.</li>
             </ul>
             <p>시스템상 반납 처리는 실물 도서 반납 후에 진행해주세요.</p>
           </div>
@@ -900,4 +1016,5 @@ useHead({
   }
 }
 </style>
+
 

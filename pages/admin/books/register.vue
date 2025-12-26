@@ -263,7 +263,6 @@
     <v-dialog
       v-model="registerDialogVisible"
       max-width="600"
-      persistent
     >
       <v-card class="register-dialog-card">
         <v-card-title class="register-dialog-title">
@@ -427,7 +426,6 @@
     <v-dialog
       v-model="manualRegisterDialog"
       max-width="600"
-      persistent
     >
       <v-card class="register-dialog-card">
         <v-card-title class="register-dialog-title">

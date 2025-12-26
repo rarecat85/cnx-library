@@ -95,7 +95,7 @@ const WORKPLACE_CENTER_MAP = {
               </tr>
               <tr>
                 <td><strong>외부 API</strong></td>
-                <td>알라딘 Open API (도서 검색)</td>
+                <td>네이버 도서 API (도서 검색), 알라딘 Open API (베스트셀러)</td>
               </tr>
               <tr>
                 <td><strong>스타일링</strong></td>
@@ -123,13 +123,14 @@ const WORKPLACE_CENTER_MAP = {
 ├── components/
 │   ├── BookCard.vue          # 도서 카드 컴포넌트
 │   ├── BookListSwiper.vue    # 도서 목록 스와이퍼
+│   ├── LocationGuidePopup.vue # 위치 안내 팝업
 │   ├── ConcentrixLogo.vue    # 로고 컴포넌트
 │   ├── NotificationBell.vue  # 알림 벨 (헤더)
 │   ├── PageLayout.vue        # 페이지 레이아웃
 │   └── SideNavigation.vue    # 사이드 네비게이션
 ├── composables/
 │   ├── useAuth.js            # 인증 관련 로직
-│   ├── useBooks.js           # 도서 관련 로직 (알라딘 API)
+│   ├── useBooks.js           # 도서 관련 로직 (네이버/알라딘 API)
 │   └── useNotifications.js   # 알림 관련 로직
 ├── functions/
 │   ├── index.js              # Firebase Cloud Functions
@@ -147,7 +148,9 @@ const WORKPLACE_CENTER_MAP = {
 │   ├── firebase.client.js    # Firebase 초기화
 │   └── vuetify.js            # Vuetify 설정
 ├── utils/
-│   └── centerMapping.js      # 센터-근무지 매핑
+│   ├── centerMapping.js      # 센터-근무지 매핑
+│   ├── labelConfig.js        # 라벨번호 설정 및 유틸리티
+│   └── locationCoordinates.js # 위치 좌표 (서가 이미지)
 ├── firebase.json             # Firebase 설정
 ├── firestore.rules           # Firestore 보안 규칙
 └── firestore.indexes.json    # Firestore 인덱스</pre>
@@ -198,6 +201,8 @@ NUXT_PUBLIC_FIREBASE_APP_ID=your_app_id</pre>
           <div class="code-block">
             <pre># functions/.env
 ALADIN_TTB_KEY=your_aladin_ttb_key
+NAVER_CLIENT_ID=your_naver_client_id
+NAVER_CLIENT_SECRET=your_naver_client_secret
 GMAIL_USER=cnx.library.noreply@gmail.com
 GMAIL_APP_PASSWORD=your_gmail_app_password</pre>
           </div>
@@ -305,15 +310,22 @@ npm run dev
   author: string,
   publisher: string,
   image: string,               // 표지 이미지 URL
+  cover: string,               // 표지 이미지 URL (alias)
   center: string,              // 소속 센터 (강남센터, 용산센터)
+  category: string,            // 도서 카테고리
+  labelNumber: string,         // 라벨번호 (예: 소설_YS0001)
+  location: string,            // 위치 (구매칸, 기부칸, 1~16)
   status: string,              // 'available' | 'rented' | 'requested'
   rentedBy: string,            // 대여자 UID
   rentedAt: timestamp,
+  expectedReturnDate: timestamp,
   requestedBy: string,         // 대여 신청자 UID
   registeredBy: string,
   registeredAt: timestamp
 }</pre>
             </div>
+            <p class="schema-note">* <code>labelNumber</code>는 고유해야 함</p>
+            <p class="schema-note">* <code>location</code>이 '구매칸'인 도서는 NEW 표시됨</p>
           </div>
 
           <div class="schema-card">
@@ -421,9 +433,9 @@ npm run dev
                 <td>재인증 이메일 발송</td>
               </tr>
               <tr>
-                <td><code>searchAladinBooks</code></td>
+                <td><code>searchNaverBooks</code></td>
                 <td>onCall</td>
-                <td>알라딘 도서 검색</td>
+                <td>네이버 도서 검색 (국내/외국)</td>
               </tr>
               <tr>
                 <td><code>getAladinBestsellers</code></td>
@@ -499,11 +511,49 @@ npm run dev
         </div>
       </section>
 
-      <!-- 알라딘 API -->
+      <!-- 외부 API -->
       <section id="aladin" class="guide-section">
-        <h2>📱 알라딘 API</h2>
+        <h2>📱 외부 API</h2>
         <div class="section-content">
-          <h3>API 키 발급</h3>
+          <h3>네이버 도서 API</h3>
+          <p>도서 검색에 사용됩니다. 국내/외국 도서 모두 검색 가능합니다.</p>
+          
+          <ol class="step-list">
+            <li>
+              <span class="step-number">1</span>
+              <div class="step-content">
+                <strong>네이버 개발자 센터 가입</strong>
+                <p><a href="https://developers.naver.com" target="_blank">https://developers.naver.com</a></p>
+              </div>
+            </li>
+            <li>
+              <span class="step-number">2</span>
+              <div class="step-content">
+                <strong>애플리케이션 등록 및 API 사용 신청</strong>
+                <p>검색 API > 도서 검색 선택</p>
+              </div>
+            </li>
+            <li>
+              <span class="step-number">3</span>
+              <div class="step-content">
+                <strong>functions/.env에 설정</strong>
+                <p>NAVER_CLIENT_ID=발급받은_ID<br>NAVER_CLIENT_SECRET=발급받은_SECRET</p>
+              </div>
+            </li>
+          </ol>
+          
+          <div class="info-box">
+            <h4>💡 세트/전집 필터링</h4>
+            <p>검색 결과에서 세트, 전집, 박스 등의 키워드가 포함된 도서는 자동 필터링됩니다.</p>
+            <ul>
+              <li>한글: 세트, 전집, 박스, 시리즈, 전권, 합본, 모음 등</li>
+              <li>영문: box, boxed set, collection, complete, omnibus 등</li>
+            </ul>
+          </div>
+          
+          <h3>알라딘 API</h3>
+          <p>베스트셀러 조회에 사용됩니다.</p>
+          
           <ol class="step-list">
             <li>
               <span class="step-number">1</span>
@@ -528,24 +578,24 @@ npm run dev
             </li>
           </ol>
 
-          <h3>사용 API</h3>
+          <h3>사용 API 요약</h3>
           <table class="data-table">
             <thead>
               <tr>
+                <th>서비스</th>
                 <th>API</th>
-                <th>엔드포인트</th>
                 <th>용도</th>
               </tr>
             </thead>
             <tbody>
               <tr>
+                <td>네이버</td>
                 <td>도서 검색</td>
-                <td><code>ItemSearch.aspx</code></td>
-                <td>도서 신청/등록 시 검색</td>
+                <td>도서 신청/등록 시 검색 (ISBN-13 지원)</td>
               </tr>
               <tr>
+                <td>알라딘</td>
                 <td>베스트셀러</td>
-                <td><code>ItemList.aspx</code></td>
                 <td>메인 페이지 베스트셀러</td>
               </tr>
             </tbody>
@@ -640,6 +690,10 @@ npx firebase deploy --only firestore:rules</pre>
               <h4>⚠️ 센터 매핑 수정 시</h4>
               <p><code>utils/centerMapping.js</code>와 <code>functions/index.js</code> 양쪽 모두 수정 필요</p>
             </div>
+            <div class="tip-card warning">
+              <h4>⚠️ 라벨번호 체계</h4>
+              <p><code>utils/labelConfig.js</code>에서 카테고리, 센터코드, 위치 옵션 관리</p>
+            </div>
             <div class="tip-card danger">
               <h4>🚫 환경 변수</h4>
               <p><code>.env</code> 파일은 Git에 커밋하지 않음 (.gitignore 확인)</p>
@@ -655,6 +709,10 @@ npx firebase deploy --only firestore:rules</pre>
             <div class="tip-card info">
               <h4>ℹ️ 대여 규정</h4>
               <p>최대 5권, 대여기간 7일, 연체 시 추가 대여 불가</p>
+            </div>
+            <div class="tip-card info">
+              <h4>ℹ️ NEW 도서 로직</h4>
+              <p><code>location === '구매칸'</code>인 도서만 NEW 표시 (등록일과 무관)</p>
             </div>
           </div>
         </div>

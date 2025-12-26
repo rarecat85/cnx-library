@@ -255,7 +255,15 @@
                           >
                             mdi-map-marker
                           </v-icon>
-                          {{ formatLocation(book.location) || '위치없음' }}
+                          <span class="location-text">{{ formatLocation(book.location) || '위치없음' }}</span>
+                          <v-icon
+                            v-if="hasLocationImage(currentCenter, book.location)"
+                            size="small"
+                            class="ml-1 location-info-icon"
+                            @click.stop="openLocationPopup(book.location)"
+                          >
+                            mdi-information-outline
+                          </v-icon>
                         </span>
                       </div>
                       <!-- 3줄: 대여/반납 버튼 -->
@@ -338,7 +346,6 @@
     <v-dialog
       v-model="rentDialog"
       max-width="400"
-      persistent
     >
       <v-card class="rent-dialog-card">
         <div class="rent-dialog-title text-h6">
@@ -389,42 +396,54 @@
     <!-- 반납 처리 다이얼로그 -->
     <v-dialog
       v-model="returnDialog"
-      max-width="450"
-      persistent
+      max-width="500"
     >
-      <v-card class="rent-dialog-card">
-        <div class="rent-dialog-title text-h6">
+      <v-card class="rent-confirm-card">
+        <v-card-title class="rent-confirm-title">
           반납 확인
-        </div>
-        <div class="rent-dialog-content">
-          <div class="mb-4 text-body-2 text-medium-emphasis">
-            반납 처리할 도서: {{ returnDialogBooks.length }}권
+        </v-card-title>
+        
+        <v-card-text class="rent-confirm-content">
+          <div class="rent-confirm-info mb-4">
+            <p>아래 도서들을 반납 처리하시겠습니까?</p>
           </div>
           
-          <div class="return-book-list">
+          <div class="multi-rent-book-list">
             <div
               v-for="book in returnDialogBooks"
               :key="book.id"
-              class="return-book-item"
+              class="rent-book-card"
             >
-              <div class="return-book-info">
+              <div class="rent-book-card-inner">
                 <template v-if="book.image">
                   <img
                     :src="book.image"
                     :alt="book.title"
-                    class="return-book-thumbnail"
+                    class="rent-book-thumbnail"
                   >
                 </template>
                 <template v-else>
-                  <div class="return-book-thumbnail no-image-placeholder">
-                    NO IMAGE
+                  <div class="rent-book-thumbnail-placeholder">
+                    <span>NO IMAGE</span>
                   </div>
                 </template>
-                <div class="return-book-meta">
-                  <div class="return-book-title">
+                <div class="rent-book-meta">
+                  <div class="rent-book-title">
                     {{ book.title }}
                   </div>
-                  <div class="return-book-details">
+                  <div
+                    v-if="book.author"
+                    class="rent-book-author"
+                  >
+                    <strong>저자:</strong> {{ book.author }}
+                  </div>
+                  <div
+                    v-if="book.publisher"
+                    class="rent-book-publisher"
+                  >
+                    <strong>출판사:</strong> {{ book.publisher }}
+                  </div>
+                  <div class="rent-book-details">
                     <span class="detail-item">
                       <v-icon
                         size="x-small"
@@ -432,17 +451,25 @@
                       >mdi-label</v-icon>
                       {{ book.labelNumber || '라벨없음' }}
                     </span>
-                    <span class="detail-item">
+                    <span class="detail-item location-item">
                       <v-icon
                         size="x-small"
                         class="mr-1"
                       >mdi-map-marker</v-icon>
-                      {{ formatLocation(book.location) || '위치없음' }}
+                      <span class="location-text">{{ formatLocation(book.location) || '위치없음' }}</span>
+                      <v-icon
+                        v-if="hasLocationImage(currentCenter, book.location)"
+                        size="x-small"
+                        class="ml-1 location-info-icon"
+                        @click.stop="openLocationPopup(book.location)"
+                      >
+                        mdi-information-outline
+                      </v-icon>
                     </span>
                   </div>
                   <div
                     v-if="getRenterInfo(book)"
-                    class="return-book-renter"
+                    class="rent-book-renter"
                   >
                     대여자: {{ getRenterInfo(book) }}
                   </div>
@@ -452,15 +479,16 @@
           </div>
           
           <v-alert
-            type="info"
+            type="warning"
             variant="tonal"
             density="compact"
             class="mt-4"
           >
-            위치와 라벨번호를 확인 후 해당 위치에 도서를 반납해주세요.
+            대여자 정보와 라벨번호를 확인 후, 실제 반납이 완료된 도서만 반납 처리해주세요.
           </v-alert>
-        </div>
-        <div class="rent-dialog-actions">
+        </v-card-text>
+        
+        <v-card-actions class="rent-confirm-actions">
           <v-spacer />
           <v-btn
             variant="text"
@@ -476,7 +504,7 @@
           >
             반납 처리
           </v-btn>
-        </div>
+        </v-card-actions>
       </v-card>
     </v-dialog>
 
@@ -484,7 +512,6 @@
     <v-dialog
       v-model="editDialog"
       max-width="500"
-      persistent
     >
       <v-card class="edit-dialog-card">
         <v-card-title class="edit-dialog-title">
@@ -524,7 +551,15 @@
                   >
                     mdi-map-marker
                   </v-icon>
-                  {{ formatLocation(editingBook.location) || '위치없음' }}
+                  <span class="location-text">{{ formatLocation(editingBook.location) || '위치없음' }}</span>
+                  <v-icon
+                    v-if="hasLocationImage(currentCenter, editingBook.location)"
+                    size="small"
+                    class="ml-1 location-info-icon"
+                    @click.stop="openLocationPopup(editingBook.location)"
+                  >
+                    mdi-information-outline
+                  </v-icon>
                 </div>
               </div>
             </div>
@@ -597,12 +632,21 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+    
+    <!-- 위치 안내 팝업 -->
+    <LocationGuidePopup
+      v-model="locationPopupVisible"
+      :center="currentCenter"
+      :location="selectedPopupLocation"
+      mode="info"
+    />
   </v-app>
 </template>
 
 <script setup>
 import { CENTERS, getCenterByWorkplace } from '@/utils/centerMapping.js'
 import { CENTER_CODE_MAP, createLabelNumber, parseLabelNumber, formatLocation, getLocationSelectOptions } from '@/utils/labelConfig.js'
+import { hasLocationImage } from '@/utils/locationCoordinates.js'
 
 definePageMeta({
   layout: false,
@@ -632,6 +676,15 @@ const drawerWidth = ref(280)
 const centerOptions = [...CENTERS]
 const currentCenter = ref('')
 const userWorkplace = ref('')
+
+// 위치 안내 팝업
+const locationPopupVisible = ref(false)
+const selectedPopupLocation = ref('')
+
+const openLocationPopup = (location) => {
+  selectedPopupLocation.value = location
+  locationPopupVisible.value = true
+}
 
 // 등록된 도서 관련
 const registeredBooks = ref([])
@@ -2043,6 +2096,25 @@ useHead({
   }
 }
 
+.location-info-icon {
+  color: #999;
+  cursor: pointer;
+  transition: color 0.2s;
+  
+  &:hover {
+    color: #002C5B;
+  }
+}
+
+.location-item {
+  display: inline-flex;
+  align-items: center;
+}
+
+.location-text {
+  flex: 0 0 auto;
+}
+
 .copy-actions {
   margin-top: rem(4);
   
@@ -2175,7 +2247,131 @@ useHead({
   gap: rem(8);
 }
 
-// 반납 도서 목록 스타일
+// 반납 확인 다이얼로그 스타일 (대여 확인과 동일)
+.rent-confirm-card {
+  border-radius: rem(12);
+}
+
+.rent-confirm-title {
+  font-size: rem(20);
+  font-weight: 600;
+  color: #002C5B;
+  padding: rem(20) rem(24) rem(8);
+}
+
+.rent-confirm-content {
+  padding: rem(16) rem(24);
+}
+
+.rent-confirm-info {
+  text-align: center;
+  color: #666;
+}
+
+.rent-confirm-actions {
+  padding: rem(8) rem(24) rem(20);
+}
+
+// 다권 대여/반납 목록 스타일
+.multi-rent-book-list {
+  max-height: rem(350);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: rem(12);
+}
+
+// 개별 대여/반납 도서 카드 스타일
+.rent-book-card {
+  background: #f5f5f5;
+  border-radius: rem(8);
+  border: rem(2) solid #e0e0e0;
+  overflow: hidden;
+}
+
+.rent-book-card-inner {
+  display: flex;
+  gap: rem(16);
+  padding: rem(16);
+}
+
+.rent-book-thumbnail {
+  width: rem(80);
+  height: rem(110);
+  object-fit: cover;
+  border-radius: rem(4);
+  flex-shrink: 0;
+}
+
+.rent-book-thumbnail-placeholder {
+  width: rem(80);
+  height: rem(110);
+  background-color: #666;
+  border-radius: rem(4);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  span {
+    color: #fff;
+    font-size: rem(11);
+    font-weight: 500;
+  }
+}
+
+.rent-book-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.rent-book-title {
+  font-size: rem(15);
+  font-weight: 600;
+  color: #002C5B;
+  line-height: 1.3;
+  margin-bottom: rem(4);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.rent-book-author,
+.rent-book-publisher {
+  font-size: rem(13);
+  color: #6b7280;
+  margin-bottom: rem(2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rent-book-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: rem(12);
+  font-size: rem(12);
+  color: #666;
+  margin-top: rem(8);
+  
+  .detail-item {
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 0;
+  }
+}
+
+.rent-book-renter {
+  font-size: rem(12);
+  color: #f59e0b;
+  margin-top: rem(4);
+}
+
+// 반납 도서 목록 스타일 (기존 - 필요시 사용)
 .return-book-list {
   max-height: rem(300);
   overflow-y: auto;

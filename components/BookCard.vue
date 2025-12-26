@@ -334,6 +334,7 @@
     :center="center"
     :location="singleLocation"
     :label-number="labelNumber"
+    :mode="locationPopupMode"
   />
 </template>
 
@@ -470,6 +471,11 @@ const props = defineProps({
   labelNumber: {
     type: String,
     default: ''
+  },
+  // 위치 안내 팝업 모드: 'rent' | 'return' | 'info'
+  locationPopupMode: {
+    type: String,
+    default: 'rent'
   }
 })
 

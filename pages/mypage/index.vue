@@ -10,7 +10,6 @@
         <v-dialog
           v-model="returnDialog"
           max-width="500"
-          persistent
         >
           <v-card class="rent-confirm-card">
             <v-card-title class="rent-confirm-title">
@@ -65,12 +64,20 @@
                           >mdi-label</v-icon>
                           {{ book.labelNumber || '라벨없음' }}
                         </span>
-                        <span class="detail-item">
+                        <span class="detail-item location-item">
                           <v-icon
                             size="x-small"
                             class="mr-1"
                           >mdi-map-marker</v-icon>
-                          {{ formatLocation(book.location) || '위치없음' }}
+                          <span class="location-text">{{ formatLocation(book.location) || '위치없음' }}</span>
+                          <v-icon
+                            v-if="hasLocationImage(selectedCenter || getCenterFromBook(book), book.location)"
+                            size="x-small"
+                            class="ml-1 location-info-icon"
+                            @click.stop="openLocationPopupForBook(book)"
+                          >
+                            mdi-information-outline
+                          </v-icon>
                         </span>
                       </div>
                     </div>
@@ -198,6 +205,7 @@
                   :label-number="book.labelNumber"
                   :show-location="true"
                   :location="book.location"
+                  location-popup-mode="info"
                   @select="handleBookSelect"
                   @return="handleSingleReturn"
                 />
@@ -245,9 +253,9 @@
                   <BookCard
                     :book="book"
                     :center="book.center || ''"
-            :show-action="false"
+                    :show-action="false"
                     :selectable="false"
-            :show-status-flags="false"
+                    :show-status-flags="false"
                     :show-label-number="!!book.labelNumber"
                     :label-number="book.labelNumber"
                     :show-location="!!book.location"
@@ -332,7 +340,7 @@
           >
             <v-row class="book-list-row">
               <v-col
-                v-for="(record, index) in rentalHistory"
+                v-for="record in rentalHistory"
                 :key="`history-${record.id}`"
                 cols="12"
                 sm="6"
@@ -371,12 +379,21 @@
         <SideNavigation />
       </div>
     </v-navigation-drawer>
+    
+    <!-- 위치 안내 팝업 (반납 다이얼로그용) -->
+    <LocationGuidePopup
+      v-model="locationPopupVisible"
+      :center="locationPopupCenter"
+      :location="locationPopupLocation"
+      mode="return"
+    />
   </v-app>
 </template>
 
 <script setup>
 import { CENTERS, getCenterByWorkplace } from '@/utils/centerMapping.js'
 import { formatLocation } from '@/utils/labelConfig.js'
+import { hasLocationImage } from '@/utils/locationCoordinates.js'
 
 definePageMeta({
   layout: false,
@@ -400,6 +417,21 @@ const returnDialogLoading = ref(false)
 // 센터 필터
 const centerOptions = [...CENTERS]
 const selectedCenter = ref('')
+
+// 위치 안내 팝업
+const locationPopupVisible = ref(false)
+const locationPopupCenter = ref('')
+const locationPopupLocation = ref('')
+
+const getCenterFromBook = (book) => {
+  return book.center || ''
+}
+
+const openLocationPopupForBook = (book) => {
+  locationPopupCenter.value = selectedCenter.value || book.center || ''
+  locationPopupLocation.value = book.location || ''
+  locationPopupVisible.value = true
+}
 
 // 대여중인 도서
 const rentedBooks = ref([])
@@ -951,8 +983,8 @@ useHead({
   }
   
   &:disabled {
-    background-color: #e0e0e0;
-    color: #9e9e9e;
+    background-color: #fafafa;
+    color: #bdbdbd;
     opacity: 1;
   }
 }
@@ -1158,6 +1190,25 @@ useHead({
     align-items: center;
     margin-bottom: 0;
   }
+}
+
+.location-info-icon {
+  color: #999;
+  cursor: pointer;
+  transition: color 0.2s;
+  
+  &:hover {
+    color: #002C5B;
+  }
+}
+
+.location-item {
+  display: inline-flex;
+  align-items: center;
+}
+
+.location-text {
+  flex: 0 0 auto;
 }
 
 // 다권 반납 목록 스타일

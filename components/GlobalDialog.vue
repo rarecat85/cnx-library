@@ -3,7 +3,6 @@
   <v-dialog
     v-model="isConfirmOpen"
     max-width="400"
-    persistent
     class="global-dialog"
   >
     <v-card class="dialog-card">
@@ -43,7 +42,6 @@
   <v-dialog
     v-model="isAlertOpen"
     max-width="400"
-    persistent
     class="global-dialog"
   >
     <v-card class="dialog-card">

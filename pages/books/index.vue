@@ -97,7 +97,7 @@
           >
             <v-row class="book-list-row">
               <v-col
-                v-for="(group, index) in filteredGroupedBooks"
+                v-for="(group, index) in displayedGroupedBooks"
                 :key="`group-${index}`"
                 cols="12"
                 sm="6"
@@ -124,6 +124,21 @@
                 />
               </v-col>
             </v-row>
+            
+            <!-- 페이지네이션 -->
+            <div
+              v-if="totalPages > 1"
+              class="pagination-section"
+            >
+              <v-pagination
+                v-model="currentPage"
+                :length="totalPages"
+                :total-visible="5"
+                density="compact"
+                size="small"
+                class="pagination"
+              />
+            </div>
           </div>
           <div
             v-else
@@ -163,7 +178,6 @@
     <v-dialog
       v-model="labelSelectDialog"
       max-width="450"
-      persistent
     >
       <v-card class="label-select-card">
         <v-card-title class="label-select-title">
@@ -236,7 +250,15 @@
                   >
                     mdi-map-marker
                   </v-icon>
-                  {{ formatLocation(copy.location) || '위치없음' }}
+                  <span class="location-text">{{ formatLocation(copy.location) || '위치없음' }}</span>
+                  <v-icon
+                    v-if="hasLocationImage(currentCenter, copy.location)"
+                    size="small"
+                    class="ml-1 location-info-icon"
+                    @click.stop="openLocationPopup(copy.location)"
+                  >
+                    mdi-information-outline
+                  </v-icon>
                 </div>
               </div>
               <v-icon
@@ -273,7 +295,6 @@
     <v-dialog
       v-model="rentConfirmDialog"
       max-width="500"
-      persistent
     >
       <v-card class="rent-confirm-card">
         <v-card-title class="rent-confirm-title">
@@ -327,22 +348,20 @@
                     >mdi-label</v-icon>
                     {{ selectedLabelNumber }}
                   </span>
-                  <span class="detail-item">
+                  <span class="detail-item location-item">
                     <v-icon
                       size="x-small"
                       class="mr-1"
                     >mdi-map-marker</v-icon>
-                    {{ formatLocation(selectedLocation) }}
-                    <v-btn
+                    <span class="location-text">{{ formatLocation(selectedLocation) }}</span>
+                    <v-icon
                       v-if="hasLocationImageForCenter"
-                      variant="text"
                       size="x-small"
-                      color="primary"
-                      class="location-btn"
-                      @click="showLocationPopup"
+                      class="ml-1 location-info-icon"
+                      @click.stop="showLocationPopup"
                     >
-                      위치 보기
-                    </v-btn>
+                      mdi-information-outline
+                    </v-icon>
                   </span>
                 </div>
               </div>
@@ -383,7 +402,6 @@
     <v-dialog
       v-model="multiRentConfirmDialog"
       max-width="500"
-      persistent
     >
       <v-card class="rent-confirm-card">
         <v-card-title class="rent-confirm-title">
@@ -444,12 +462,20 @@
                       >mdi-label</v-icon>
                       {{ item.labelNumber }}
                     </span>
-                    <span class="detail-item">
+                    <span class="detail-item location-item">
                       <v-icon
                         size="x-small"
                         class="mr-1"
                       >mdi-map-marker</v-icon>
-                      {{ formatLocation(item.location) }}
+                      <span class="location-text">{{ formatLocation(item.location) }}</span>
+                      <v-icon
+                        v-if="hasLocationImage(currentCenter, item.location)"
+                        size="x-small"
+                        class="ml-1 location-info-icon"
+                        @click.stop="openLocationPopup(item.location)"
+                      >
+                        mdi-information-outline
+                      </v-icon>
                     </span>
                   </div>
                 </div>
@@ -537,6 +563,10 @@ const sortOptions = [
   { title: '등록일순', value: 'date' },
   { title: '제목순', value: 'title' }
 ]
+
+// 페이지네이션
+const currentPage = ref(1)
+const ITEMS_PER_PAGE = 10
 
 // 도서 선택 관련
 const selectedBooks = ref([]) // { isbn, labelNumber, book } 형태
@@ -761,6 +791,22 @@ const filteredGroupedBooks = computed(() => {
   return groups
 })
 
+// 페이지네이션된 도서 목록
+const totalPages = computed(() => {
+  return Math.ceil(filteredGroupedBooks.value.length / ITEMS_PER_PAGE)
+})
+
+const displayedGroupedBooks = computed(() => {
+  const start = (currentPage.value - 1) * ITEMS_PER_PAGE
+  const end = start + ITEMS_PER_PAGE
+  return filteredGroupedBooks.value.slice(start, end)
+})
+
+// 검색/정렬 변경 시 페이지 리셋
+watch([registeredBooksSearchQuery, sortBy], () => {
+  currentPage.value = 1
+})
+
 // 총 도서 수
 const totalBookCount = computed(() => registeredBooks.value.length)
 const groupedBookCount = computed(() => groupedBooks.value.length)
@@ -954,6 +1000,12 @@ const closeRentConfirmDialog = () => {
 
 // 위치 안내 팝업 표시
 const showLocationPopup = () => {
+  locationPopupVisible.value = true
+}
+
+// 위치 안내 팝업 열기 (특정 위치)
+const openLocationPopup = (location) => {
+  selectedLocation.value = location
   locationPopupVisible.value = true
 }
 
@@ -1177,8 +1229,8 @@ useHead({
   }
   
   &:disabled {
-    background-color: #F5F5F5;
-    color: #002C5B;
+    background-color: #fafafa;
+    color: #bdbdbd;
     opacity: 1;
   }
 }
@@ -1265,6 +1317,25 @@ useHead({
   align-items: center;
   font-size: rem(12);
   color: #666;
+}
+
+.location-info-icon {
+  color: #999;
+  cursor: pointer;
+  transition: color 0.2s;
+  
+  &:hover {
+    color: #002C5B;
+  }
+}
+
+.location-item {
+  display: inline-flex;
+  align-items: center;
+}
+
+.location-text {
+  flex: 0 0 auto;
 }
 
 .label-select-actions {
@@ -1465,6 +1536,43 @@ useHead({
   
   .side-navigation :deep(.v-overlay__scrim) {
     display: none;
+  }
+}
+
+// 페이지네이션 스타일
+.pagination-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: rem(16) 0 rem(8);
+}
+
+.pagination {
+  :deep(.v-pagination__list) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: rem(2);
+  }
+  
+  :deep(.v-pagination__item),
+  :deep(.v-pagination__prev),
+  :deep(.v-pagination__next) {
+    font-size: rem(12);
+    min-width: rem(28);
+    height: rem(28);
+    
+    .v-btn {
+      min-width: rem(28);
+      height: rem(28);
+    }
+  }
+  
+  :deep(.v-pagination__item--is-active) {
+    .v-btn {
+      background-color: #002C5B;
+      color: #fff;
+    }
   }
 }
 </style>

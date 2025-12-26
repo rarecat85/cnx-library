@@ -225,6 +225,12 @@
           <div class="section-header mb-4">
             <h2 class="section-title">
               내가 신청한 책
+              <span
+                v-if="myRequestedBooks.length > 0"
+                class="book-count"
+              >
+                ({{ myRequestedBooks.length }}권)
+              </span>
             </h2>
           </div>
           
@@ -243,7 +249,7 @@
           >
             <v-row class="book-list-row">
               <v-col
-                v-for="(book, index) in myRequestedBooks"
+                v-for="(book, index) in paginatedRequestedBooks"
                 :key="`requested-${index}`"
                 cols="12"
                 sm="6"
@@ -266,6 +272,21 @@
                 />
               </v-col>
             </v-row>
+            
+            <!-- 페이지네이션 -->
+            <div
+              v-if="requestedTotalPages > 1"
+              class="pagination-section"
+            >
+              <v-pagination
+                v-model="requestedCurrentPage"
+                :length="requestedTotalPages"
+                :total-visible="5"
+                density="compact"
+                size="small"
+                class="pagination"
+              />
+            </div>
           </div>
           <div
             v-else
@@ -423,6 +444,20 @@ const rentedBooksLoading = ref(false)
 const myRequestedBooks = ref([])
 const requestedBooksLoading = ref(false)
 const cancelRequestLoading = ref(null)
+
+// 신청 도서 페이지네이션
+const requestedCurrentPage = ref(1)
+const requestedPerPage = 10
+
+const requestedTotalPages = computed(() => {
+  return Math.ceil(myRequestedBooks.value.length / requestedPerPage)
+})
+
+const paginatedRequestedBooks = computed(() => {
+  const start = (requestedCurrentPage.value - 1) * requestedPerPage
+  const end = start + requestedPerPage
+  return myRequestedBooks.value.slice(start, end)
+})
 
 // 센터별 필터링된 대여 도서
 const filteredRentedBooks = computed(() => {
@@ -954,6 +989,16 @@ useHead({
   @media (max-width: 480px) {
     font-size: rem(18);
   }
+  
+  .book-count {
+    font-size: rem(16);
+    font-weight: 400;
+    color: #6b7280;
+    
+    @media (max-width: 480px) {
+      font-size: rem(14);
+    }
+  }
 }
 
 .edit-profile-btn,
@@ -1011,6 +1056,42 @@ useHead({
 .empty-state {
   background-color: #F5F5F5;
   border-radius: rem(8);
+}
+
+// 페이지네이션 스타일
+.pagination-section {
+  display: flex;
+  justify-content: center;
+  margin-top: rem(24);
+}
+
+.pagination {
+  :deep(.v-pagination__list) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: rem(2);
+  }
+  
+  :deep(.v-pagination__item),
+  :deep(.v-pagination__prev),
+  :deep(.v-pagination__next) {
+    font-size: rem(12);
+    min-width: rem(28);
+    height: rem(28);
+    
+    .v-btn {
+      min-width: rem(28);
+      height: rem(28);
+    }
+  }
+  
+  :deep(.v-pagination__item--is-active) {
+    .v-btn {
+      background-color: #002C5B;
+      color: #fff;
+    }
+  }
 }
 
 .book-list-row {

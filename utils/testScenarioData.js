@@ -117,7 +117,7 @@ export const TEST_SCENARIOS = [
       {
         title: '4.2 신청한 책 목록',
         items: [
-          { id: '4.2.1', name: '신청한 책 섹션 표시', method: '도서 신청 후 마이페이지 확인', expected: '스와이퍼로 신청 도서 표시' },
+          { id: '4.2.1', name: '신청한 책 섹션 표시', method: '도서 신청 후 마이페이지 확인', expected: '리스트로 신청 도서 표시 (10개씩 페이지네이션)' },
           { id: '4.2.2', name: '대기중 상태 표시', method: '승인 전 도서 확인', expected: '"대기중" 상태 표시' }
         ]
       },

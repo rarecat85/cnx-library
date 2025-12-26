@@ -36,21 +36,32 @@
               <h4>👤 사용자 기능</h4>
               <ul>
                 <li>도서 검색 및 목록 조회</li>
-                <li>도서 대여/반납 (최대 5권)</li>
+                <li>도서 대여/반납 (최대 5권, 다권 가능)</li>
                 <li>도서 등록 신청</li>
                 <li>대여 현황 및 읽은 책 목록</li>
+                <li>위치 안내 팝업 (서가 위치 확인)</li>
+                <li>정보 수정 (이름, 근무지 변경)</li>
                 <li>알림 수신 (웹 + 이메일)</li>
               </ul>
             </div>
             <div class="feature-card">
-              <h4>⚙️ 관리자 기능</h4>
+              <h4>⚙️ 관리자 기능 (매니저)</h4>
               <ul>
-                <li>도서 등록/삭제</li>
+                <li>모든 사용자 기능 포함</li>
+                <li>도서 등록 (검색/직접 등록, 다권 등록)</li>
+                <li>도서 삭제</li>
+                <li>도서 정보 수정 (카테고리, 라벨번호, 위치)</li>
                 <li>도서 신청 승인</li>
-                <li>대여 현황 관리</li>
                 <li>대여 처리 (타 센터 대여 신청 승인)</li>
                 <li>반납 처리</li>
-                <li>연체 도서 관리</li>
+                <li>센터 변경 (모든 센터 관리 가능)</li>
+              </ul>
+            </div>
+            <div class="feature-card">
+              <h4>👑 최고관리자 기능</h4>
+              <ul>
+                <li>매니저 관리 (지정/해제)</li>
+                <li>모든 관리자 기능 포함</li>
               </ul>
             </div>
           </div>
@@ -96,6 +107,10 @@ const WORKPLACE_CENTER_MAP = {
               <tr>
                 <td><strong>외부 API</strong></td>
                 <td>네이버 도서 API (도서 검색), 알라딘 Open API (베스트셀러)</td>
+              </tr>
+              <tr>
+                <td><strong>이메일</strong></td>
+                <td>Nodemailer + Gmail SMTP (인증/알림 메일 발송)</td>
               </tr>
               <tr>
                 <td><strong>스타일링</strong></td>
@@ -247,9 +262,7 @@ npm run dev
                     <li><code>rarecat85.github.io</code></li>
                   </ul>
                 </li>
-                <li>Email Templates > Action URL:<br>
-                  <code>https://rarecat85.github.io/cnx-library</code>
-                </li>
+                <li>이메일 인증/비밀번호 재설정: 자체 토큰 시스템 사용<br><small style="color: #888;">(Firebase Action URL 미사용)</small></li>
               </ul>
             </div>
             
@@ -322,7 +335,7 @@ npm run dev
   cover: string,               // 표지 이미지 URL (alias)
   center: string,              // 소속 센터 (강남센터, 용산센터)
   category: string,            // 도서 카테고리
-  labelNumber: string,         // 라벨번호 (예: 소설_YS0001)
+  labelNumber: string,         // 라벨번호 (예: 국내소설_20001)
   location: string,            // 위치 (구매칸, 기부칸, 1~16)
   status: string,              // 'available' | 'rented' | 'requested'
   rentedBy: string,            // 대여자 UID
@@ -485,6 +498,63 @@ npm run dev
       <section id="email" class="guide-section">
         <h2>📧 이메일 알림 설정</h2>
         <div class="section-content">
+          <h3>이메일 발송 종류</h3>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>종류</th>
+                <th>발송 시점</th>
+                <th>대상</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>회원가입 인증</strong></td>
+                <td>회원가입 시 (Firebase Auth)</td>
+                <td>가입자</td>
+              </tr>
+              <tr>
+                <td><strong>비밀번호 재설정</strong></td>
+                <td>비밀번호 찾기 요청 시 (Firebase Auth)</td>
+                <td>요청자</td>
+              </tr>
+              <tr>
+                <td><strong>도서 등록 신청 알림</strong></td>
+                <td>사용자가 도서 신청 시</td>
+                <td>관리자 (이메일 알림 활성화된 경우)</td>
+              </tr>
+              <tr>
+                <td><strong>도서 대여 신청 알림</strong></td>
+                <td>타 센터 도서 대여 신청 시</td>
+                <td>관리자 (이메일 알림 활성화된 경우)</td>
+              </tr>
+              <tr>
+                <td><strong>신청 도서 등록 알림</strong></td>
+                <td>관리자가 신청 도서 등록 시</td>
+                <td>신청자 (이메일 알림 활성화된 경우)</td>
+              </tr>
+              <tr>
+                <td><strong>반납 예정 알림</strong></td>
+                <td>반납예정일 1일 전 (매일 09:00)</td>
+                <td>대여자 (이메일 알림 활성화된 경우)</td>
+              </tr>
+              <tr>
+                <td><strong>연체 알림</strong></td>
+                <td>반납예정일 초과 시 (매일 09:00)</td>
+                <td>대여자/관리자 (이메일 알림 활성화된 경우)</td>
+              </tr>
+            </tbody>
+          </table>
+          
+          <div class="info-box">
+            <h4>💡 이메일 알림 활성화 조건</h4>
+            <ul>
+              <li>사용자가 알림 페이지에서 "이메일로 알림 받기" 토글 활성화</li>
+              <li>Firestore <code>users</code> 컬렉션의 <code>receiveEmailNotifications: true</code></li>
+              <li>회원가입 인증, 비밀번호 재설정은 설정과 무관하게 항상 발송</li>
+            </ul>
+          </div>
+
           <h3>Gmail 앱 비밀번호 발급</h3>
           <ol class="step-list">
             <li>
@@ -515,6 +585,7 @@ npm run dev
             <ul>
               <li><strong>발신자:</strong> cnx.library.noreply@gmail.com</li>
               <li><strong>앱 비밀번호:</strong> functions/.env에 저장</li>
+              <li><strong>발송 방식:</strong> Nodemailer + Gmail SMTP</li>
             </ul>
           </div>
         </div>

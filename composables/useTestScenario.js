@@ -1,7 +1,23 @@
 /**
  * 테스트 시나리오 세션 관리 Composable
  */
-import { TEST_SCENARIOS, getTotalTestCount, getAllTestIds } from '@/utils/testScenarioData.js'
+import { TEST_SCENARIOS as TEST_SCENARIOS_V1, getTotalTestCount as getTotalTestCountV1, getAllTestIds as getAllTestIdsV1 } from '@/utils/testScenarioData.js'
+import { TEST_SCENARIOS_V2, getTotalTestCountV2, getAllTestIdsV2 } from '@/utils/testScenarioDataV2.js'
+
+// V2 시나리오에 [V2] 접두사를 붙여서 구분
+const TEST_SCENARIOS_V2_PREFIXED = TEST_SCENARIOS_V2.map(section => ({
+  ...section,
+  section: `[V2] ${section.section}`
+}))
+
+// V1 + V2 통합 시나리오
+const TEST_SCENARIOS = [...TEST_SCENARIOS_V1, ...TEST_SCENARIOS_V2_PREFIXED]
+
+// 통합 테스트 항목 수
+const getTotalTestCount = () => getTotalTestCountV1() + getTotalTestCountV2()
+
+// 통합 테스트 ID 목록
+const getAllTestIds = () => [...getAllTestIdsV1(), ...getAllTestIdsV2()]
 
 export const useTestScenario = () => {
   const { $firebaseFirestore } = useNuxtApp()

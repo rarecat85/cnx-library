@@ -345,7 +345,6 @@
           :loading="isRegistering"
           :disabled="isRegistering"
           class="register-btn"
-          :class="{ 'mt-2': requesterInfo || (isBookRequested && allowRegisterRequested) }"
           @click.stop="handleRegister"
         >
           {{ actionButtonText || `${center}에 등록하기` }}

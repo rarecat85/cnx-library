@@ -304,6 +304,54 @@ export const useTestScenario = () => {
   }
 
   /**
+   * 세션 실시간 구독 (여러 사용자 동시 테스트 지원)
+   * @param {string} sessionId - 세션 ID
+   * @param {Function} onSessionUpdate - 세션 데이터 업데이트 콜백
+   * @param {Function} onResultsUpdate - 결과 데이터 업데이트 콜백
+   * @returns {Function} unsubscribe 함수
+   */
+  const subscribeToSession = async (sessionId, onSessionUpdate, onResultsUpdate) => {
+    if (!firestore) {
+      throw new Error('Firebase가 초기화되지 않았습니다.')
+    }
+
+    const { doc, collection, onSnapshot } = await import('firebase/firestore')
+    const unsubscribers = []
+
+    // 세션 문서 실시간 구독
+    const sessionRef = doc(firestore, 'testSessions', sessionId)
+    const unsubSession = onSnapshot(sessionRef, (docSnapshot) => {
+      if (docSnapshot.exists()) {
+        onSessionUpdate({
+          id: docSnapshot.id,
+          ...docSnapshot.data()
+        })
+      }
+    }, (err) => {
+      console.error('세션 구독 오류:', err)
+    })
+    unsubscribers.push(unsubSession)
+
+    // 결과 서브컬렉션 실시간 구독
+    const resultsRef = collection(firestore, 'testSessions', sessionId, 'results')
+    const unsubResults = onSnapshot(resultsRef, (snapshot) => {
+      const results = {}
+      snapshot.forEach(doc => {
+        results[doc.id] = doc.data()
+      })
+      onResultsUpdate(results)
+    }, (err) => {
+      console.error('결과 구독 오류:', err)
+    })
+    unsubscribers.push(unsubResults)
+
+    // 구독 해제 함수 반환
+    return () => {
+      unsubscribers.forEach(unsub => unsub())
+    }
+  }
+
+  /**
    * 세션 상태 업데이트 (완료 처리)
    * @param {string} sessionId - 세션 ID
    * @param {string} status - 상태 ('in_progress' | 'completed')
@@ -371,6 +419,7 @@ export const useTestScenario = () => {
     createSession,
     getSessions,
     getSession,
+    subscribeToSession,
     saveTestResult,
     deleteSession,
     updateSessionStatus,

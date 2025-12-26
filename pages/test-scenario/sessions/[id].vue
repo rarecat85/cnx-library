@@ -351,7 +351,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 
 definePageMeta({
   layout: 'page'
@@ -362,6 +362,7 @@ const { confirm, alert } = useDialog()
 const {
   TEST_SCENARIOS,
   getSession,
+  subscribeToSession,
   saveTestResult,
   updateSessionStatus,
   updateSessionInfo: updateInfo
@@ -386,12 +387,58 @@ const approvers = ref([
   { role: '', name: '', date: '' }
 ])
 
+// 실시간 구독 해제 함수
+let unsubscribe = null
+
 useHead({
   title: computed(() => session.value ? `테스트 - CNX Library` : '테스트 - CNX Library')
 })
 
 onMounted(async () => {
   await loadSession()
+  
+  // 실시간 구독 시작 (여러 사용자 동시 테스트 지원)
+  unsubscribe = await subscribeToSession(
+    sessionId,
+    // 세션 업데이트 콜백
+    (sessionData) => {
+      session.value = sessionData
+    },
+    // 결과 업데이트 콜백
+    (resultsData) => {
+      // 기존 결과와 다른 항목만 업데이트 (내가 수정 중인 항목 제외)
+      Object.keys(resultsData).forEach(testId => {
+        const newData = resultsData[testId]
+        const oldData = results.value[testId]
+        
+        // 결과값 업데이트
+        if (!results.value[testId]) {
+          results.value[testId] = {}
+        }
+        results.value[testId].result = newData.result || ''
+        
+        // 비고 - 현재 입력 중이 아닌 경우만 업데이트
+        if (noteInputs.value[testId] === undefined || noteInputs.value[testId] === (oldData?.note || '')) {
+          noteInputs.value[testId] = newData.note || ''
+          results.value[testId].note = newData.note || ''
+        }
+        
+        // 담당자 - 현재 입력 중이 아닌 경우만 업데이트
+        if (testerInputs.value[testId] === undefined || testerInputs.value[testId] === (oldData?.tester || '')) {
+          testerInputs.value[testId] = newData.tester || ''
+          results.value[testId].tester = newData.tester || ''
+        }
+      })
+    }
+  )
+})
+
+// 컴포넌트 언마운트 시 구독 해제
+onBeforeUnmount(() => {
+  if (unsubscribe) {
+    unsubscribe()
+    unsubscribe = null
+  }
 })
 
 const loadSession = async () => {
@@ -468,9 +515,7 @@ const setResult = async (testId, result) => {
     }
     results.value[testId].result = result || ''
     
-    // 세션 데이터 다시 로드 (진행률 업데이트)
-    const data = await getSession(sessionId)
-    session.value = data.session
+    // 실시간 구독으로 진행률 자동 업데이트됨
   } catch (err) {
     console.error('결과 저장 오류:', err)
     await alert('결과 저장에 실패했습니다.', { type: 'error' })

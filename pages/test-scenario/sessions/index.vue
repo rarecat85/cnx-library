@@ -95,7 +95,14 @@
                 <span class="stat partial">⚠️ {{ session.progress?.partial || 0 }}</span>
                 <span class="stat skip">⏭️ {{ session.progress?.skip || 0 }}</span>
                 <span class="stat total">
-                  {{ session.progress?.completed || 0 }}/{{ session.progress?.total || 0 }}
+                  {{ Math.min(session.progress?.completed || 0, getTotalTestCount()) }}/{{ getTotalTestCount() }}
+                </span>
+                <span
+                  v-if="(session.progress?.completed || 0) > getTotalTestCount()"
+                  class="stat outdated"
+                  title="시나리오가 변경되어 진행률이 맞지 않습니다. 세션에 진입하면 자동으로 수정됩니다."
+                >
+                  ⚠️
                 </span>
               </div>
             </div>

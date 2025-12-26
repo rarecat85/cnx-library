@@ -110,11 +110,11 @@
           />
         </div>
         <div class="progress-stats">
-          <span class="stat pass">✅ {{ session.progress?.pass || 0 }}</span>
-          <span class="stat fail">❌ {{ session.progress?.fail || 0 }}</span>
-          <span class="stat partial">⚠️ {{ session.progress?.partial || 0 }}</span>
-          <span class="stat skip">⏭️ {{ session.progress?.skip || 0 }}</span>
-          <span class="stat total">{{ session.progress?.completed || 0 }}/{{ currentTotalCount }}</span>
+          <span class="stat pass">✅ {{ validProgress.pass }}</span>
+          <span class="stat fail">❌ {{ validProgress.fail }}</span>
+          <span class="stat partial">⚠️ {{ validProgress.partial }}</span>
+          <span class="stat skip">⏭️ {{ validProgress.skip }}</span>
+          <span class="stat total">{{ validProgress.completed }}/{{ currentTotalCount }}</span>
         </div>
       </div>
 
@@ -363,6 +363,7 @@ const { confirm, alert } = useDialog()
 const {
   TEST_SCENARIOS,
   getTotalTestCount,
+  getAllTestIds,
   getSession,
   subscribeToSession,
   saveTestResult,
@@ -489,10 +490,49 @@ const loadSession = async () => {
 // 현재 테스트 시나리오 총 개수 (동적으로 계산)
 const currentTotalCount = computed(() => getTotalTestCount())
 
+// 현재 유효한 테스트 ID 목록
+const validTestIds = computed(() => new Set(getAllTestIds()))
+
+// 유효한 테스트만 집계한 진행률 (현재 시나리오에 없는 ID는 제외)
+const validProgress = computed(() => {
+  let pass = 0
+  let fail = 0
+  let partial = 0
+  let skip = 0
+  let completed = 0
+
+  Object.entries(results.value).forEach(([testId, data]) => {
+    // 현재 시나리오에 존재하는 ID만 집계
+    if (!validTestIds.value.has(testId)) {
+      return
+    }
+    
+    if (data.result) {
+      completed++
+      switch (data.result) {
+        case 'pass':
+          pass++
+          break
+        case 'fail':
+          fail++
+          break
+        case 'partial':
+          partial++
+          break
+        case 'skip':
+          skip++
+          break
+      }
+    }
+  })
+
+  return { pass, fail, partial, skip, completed }
+})
+
 const progressPercent = computed(() => {
   const total = currentTotalCount.value
   if (!total) return 0
-  const completed = session.value?.progress?.completed || 0
+  const completed = validProgress.value.completed
   return Math.min(100, Math.round((completed / total) * 100))
 })
 

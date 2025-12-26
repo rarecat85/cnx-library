@@ -195,6 +195,9 @@ export const useTestScenario = () => {
     try {
       const { doc, updateDoc, collection, getDocs, serverTimestamp } = await import('firebase/firestore')
 
+      // 현재 유효한 테스트 ID 목록
+      const validTestIds = new Set(getAllTestIds())
+
       // 모든 결과 조회
       const resultsRef = collection(firestore, 'testSessions', sessionId, 'results')
       const resultsSnapshot = await getDocs(resultsRef)
@@ -205,8 +208,15 @@ export const useTestScenario = () => {
       let skip = 0
       let completed = 0
 
-      resultsSnapshot.forEach(doc => {
-        const data = doc.data()
+      resultsSnapshot.forEach(resultDoc => {
+        const testId = resultDoc.id
+        const data = resultDoc.data()
+        
+        // 현재 시나리오에 존재하는 ID만 집계
+        if (!validTestIds.has(testId)) {
+          return // 존재하지 않는 테스트 ID는 무시
+        }
+        
         if (data.result) {
           completed++
           switch (data.result) {

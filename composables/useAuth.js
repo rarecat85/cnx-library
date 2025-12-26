@@ -203,12 +203,12 @@ export const useAuth = () => {
       let emailSent = false
       let emailError = null
       
-      // Promise.race를 사용한 타임아웃 구현
+      // Promise.race를 사용한 타임아웃 구현 (15초 - Firebase 콜드 스타트 고려)
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => {
           console.log('[회원가입] 타임아웃 발생!')
           reject(new Error('타임아웃: 인증 메일 발송 응답 없음'))
-        }, 5000)
+        }, 15000)
       )
       
       try {

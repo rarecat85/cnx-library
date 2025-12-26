@@ -149,13 +149,13 @@ export const TEST_SCENARIOS = [
         items: [
           { id: '5.1', name: '도서 신청 페이지 접근', method: '메뉴에서 "도서 신청" 클릭', expected: '/books/request 페이지로 이동' },
           { id: '5.2', name: '센터 변경', method: '센터 선택 드롭다운 변경', expected: '선택한 센터로 신청 대상 변경' },
-          { id: '5.3', name: '도서 검색', method: '검색창에 도서명 입력 후 검색', expected: '알라딘 API 검색 결과 표시' },
+          { id: '5.3', name: '도서 검색', method: '검색창에 도서명 입력 후 검색', expected: '네이버 도서 API 검색 결과 표시' },
           { id: '5.4', name: '검색 결과 표시', method: '검색 완료 후 확인', expected: '도서 목록 그리드 형태로 표시, 페이지네이션' },
           { id: '5.5', name: '베스트셀러 표시', method: '베스트셀러 섹션 확인', expected: '알라딘 베스트셀러 스와이퍼 표시' },
           { id: '5.6', name: '이미 등록된 도서', method: '등록된 도서 검색', expected: '"이미 등록된 도서" 표시' },
           { id: '5.7', name: '도서 신청하기', method: '미등록 도서의 "신청하기" 클릭', expected: '신청 확인 → 신청 완료 메시지' },
           { id: '5.8', name: '신청 후 상태', method: '신청한 도서 재검색', expected: '"신청완료" 상태 표시' },
-          { id: '5.9', name: '초성 검색', method: '초성으로 검색 (예: "ㅎㄹㅍㅌ")', expected: '초성에 해당하는 도서 검색 결과 표시' },
+          { id: '5.9', name: '초성 검색 (미지원)', method: '초성으로 검색 (예: "ㅎㄹㅍㅌ")', expected: '네이버 API는 초성 검색 미지원 - 결과 없음 정상' },
           { id: '5.10', name: '검색 결과 없음 안내', method: '결과 없는 검색어 입력 (예: "zzzxxx123")', expected: '"검색 결과가 없습니다" 안내 메시지 표시' },
           { id: '5.11', name: '세트 상품 자동 제외', method: '일반 도서명 검색 (예: "해리포터")', expected: '세트/전집 상품이 결과에서 자동 제외됨' }
         ]
@@ -171,7 +171,7 @@ export const TEST_SCENARIOS = [
           { id: '6.1.1', name: '관리자 메뉴 접근', method: '관리자 계정으로 로그인 후 메뉴 확인', expected: '"관리자 메뉴" 표시' },
           { id: '6.1.2', name: '도서 등록 페이지 접근', method: '관리자 메뉴 > 도서 등록', expected: '/admin/books/register 페이지로 이동' },
           { id: '6.1.3', name: '센터 변경', method: '센터 선택 드롭다운 변경', expected: '선택한 센터에 도서 등록 가능' },
-          { id: '6.1.4', name: '도서 검색', method: '도서명으로 검색', expected: '알라딘 검색 결과 그리드 표시' },
+          { id: '6.1.4', name: '도서 검색', method: '도서명으로 검색', expected: '네이버 도서 API 검색 결과 그리드 표시' },
           { id: '6.1.5', name: '베스트셀러 표시', method: '베스트셀러 섹션 확인', expected: '알라딘 베스트셀러 스와이퍼 표시' },
           { id: '6.1.6', name: '도서 등록', method: '검색된 도서의 "등록하기" 클릭', expected: '등록 완료 메시지' },
           { id: '6.1.7', name: '중복 등록 방지', method: '이미 등록된 도서 등록 시도', expected: '"이미 등록된 도서" 메시지' },
@@ -296,7 +296,7 @@ export const TEST_SCENARIOS = [
         items: [
           { id: '9.1', name: '초기 로딩 시간', method: '메인 페이지 첫 로딩', expected: '3초 이내' },
           { id: '9.2', name: '페이지 전환', method: '페이지 간 이동', expected: '1초 이내' },
-          { id: '9.3', name: '도서 검색 응답', method: '알라딘 API 검색', expected: '2초 이내' },
+          { id: '9.3', name: '도서 검색 응답', method: '네이버 도서 API 검색', expected: '2초 이내' },
           { id: '9.4', name: '대여/반납 처리', method: 'Firestore 업데이트', expected: '1초 이내' }
         ]
       }

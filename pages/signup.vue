@@ -171,7 +171,8 @@ const nameRules = [
 
 const emailRules = [
   (v) => !!v || '이메일을 입력해주세요',
-  (v) => /.+@concentrix\.com$/.test(v) || '@concentrix.com 이메일만 사용 가능합니다'
+  (v) => /.+@.+\..+/.test(v) || '올바른 이메일 형식이 아닙니다',
+  (v) => /@concentrix\.com$/.test(v) || '@concentrix.com 이메일만 사용 가능합니다'
 ]
 
 const passwordRules = [

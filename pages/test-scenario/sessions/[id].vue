@@ -114,7 +114,7 @@
           <span class="stat fail">❌ {{ session.progress?.fail || 0 }}</span>
           <span class="stat partial">⚠️ {{ session.progress?.partial || 0 }}</span>
           <span class="stat skip">⏭️ {{ session.progress?.skip || 0 }}</span>
-          <span class="stat total">{{ session.progress?.completed || 0 }}/{{ session.progress?.total || 0 }}</span>
+          <span class="stat total">{{ session.progress?.completed || 0 }}/{{ currentTotalCount }}</span>
         </div>
       </div>
 
@@ -362,6 +362,7 @@ const route = useRoute()
 const { confirm, alert } = useDialog()
 const {
   TEST_SCENARIOS,
+  getTotalTestCount,
   getSession,
   subscribeToSession,
   saveTestResult,
@@ -485,9 +486,14 @@ const loadSession = async () => {
   }
 }
 
+// 현재 테스트 시나리오 총 개수 (동적으로 계산)
+const currentTotalCount = computed(() => getTotalTestCount())
+
 const progressPercent = computed(() => {
-  if (!session.value?.progress?.total) return 0
-  return Math.round((session.value.progress.completed / session.value.progress.total) * 100)
+  const total = currentTotalCount.value
+  if (!total) return 0
+  const completed = session.value?.progress?.completed || 0
+  return Math.min(100, Math.round((completed / total) * 100))
 })
 
 const getResult = (testId) => {

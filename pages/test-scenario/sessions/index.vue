@@ -142,6 +142,7 @@ const {
   createSession,
   getSessions,
   deleteSession,
+  getTotalTestCount,
   loading
 } = useTestScenario()
 
@@ -224,8 +225,10 @@ const formatDate = (date) => {
 }
 
 const getProgressPercent = (session) => {
-  if (!session.progress?.total) return 0
-  return Math.round((session.progress.completed / session.progress.total) * 100)
+  const total = getTotalTestCount()
+  if (!total) return 0
+  const completed = session.progress?.completed || 0
+  return Math.min(100, Math.round((completed / total) * 100))
 }
 </script>
 

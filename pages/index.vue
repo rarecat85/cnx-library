@@ -130,23 +130,8 @@ const firestore = $firebaseFirestore
 // 대여 처리 로딩 상태
 const rentLoading = ref(false)
 
-const drawer = useState('navigationDrawer', () => false)
-
-// 반응형 drawer 너비 계산
-const drawerWidth = ref(280)
-
-onMounted(() => {
-  const updateWidth = () => {
-    drawerWidth.value = window.innerWidth >= 769 ? 360 : 280
-  }
-  
-  updateWidth()
-  window.addEventListener('resize', updateWidth)
-  
-  onBeforeUnmount(() => {
-    window.removeEventListener('resize', updateWidth)
-  })
-})
+// Navigation Drawer 상태 및 반응형 너비
+const { drawer, drawerWidth } = useDrawer()
 
 // 센터 관련
 const centerOptions = [...CENTERS]

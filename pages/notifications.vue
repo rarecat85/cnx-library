@@ -205,8 +205,8 @@ const {
   formatNotificationTime
 } = useNotifications()
 
-const drawer = useState('navigationDrawer', () => false)
-const drawerWidth = ref(280)
+// Navigation Drawer 상태 및 반응형 너비
+const { drawer, drawerWidth } = useDrawer()
 const selectedFilter = ref('all')
 const loadingMore = ref(false)
 const hasMore = ref(true)

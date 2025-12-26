@@ -130,9 +130,8 @@
 import { getCenterByWorkplace } from '@/utils/centerMapping.js'
 
 const router = useRouter()
-const { user, isAuthenticated } = useAuth()
-const { $firebaseFirestore } = useNuxtApp()
-const firestore = $firebaseFirestore
+const { isAuthenticated } = useAuth()
+const { userData, workplace, name: userName } = useUser()
 
 defineProps({
   headerType: {
@@ -148,17 +147,12 @@ defineProps({
 
 defineEmits(['toggle-drawer'])
 
-// 사용자 데이터
-const userData = ref(null)
-
 // 로그인 상태에 따른 헤더 텍스트 계산
 const computedHeaderText = computed(() => {
   if (isAuthenticated.value && userData.value) {
     // 로그인 후: 한글 텍스트
-    const workplace = userData.value.workplace || ''
-    const centerName = workplace ? getCenterByWorkplace(workplace) : ''
-    const name = userData.value.name || ''
-    return `안녕하세요, ${name}님<br>이용하실 도서관은 ${centerName} 입니다.`
+    const centerName = workplace.value ? getCenterByWorkplace(workplace.value) : ''
+    return `안녕하세요, ${userName.value}님<br>이용하실 도서관은 ${centerName} 입니다.`
   } else {
     // 로그인 전: 영문 텍스트
     return 'The world belongs to<br>those who read.'
@@ -173,44 +167,6 @@ const isEnglishText = computed(() => {
 // 헤더 텍스트 표시 여부 (항상 표시)
 const displayHeaderText = computed(() => {
   return true
-})
-
-// Firestore에서 사용자 정보 가져오기
-onMounted(async () => {
-  if (!process.client || !isAuthenticated.value || !user.value || !firestore) {
-    return
-  }
-
-  try {
-    const { doc, getDoc } = await import('firebase/firestore')
-    const userRef = doc(firestore, 'users', user.value.uid)
-    const userDoc = await getDoc(userRef)
-    
-    if (userDoc.exists()) {
-      userData.value = userDoc.data()
-    }
-  } catch (error) {
-    console.error('사용자 정보 조회 실패:', error)
-  }
-})
-
-// 사용자 상태 변경 감지
-watch([isAuthenticated, user], async ([authenticated, currentUser]) => {
-  if (authenticated && currentUser && firestore) {
-    try {
-      const { doc, getDoc } = await import('firebase/firestore')
-      const userRef = doc(firestore, 'users', currentUser.uid)
-      const userDoc = await getDoc(userRef)
-      
-      if (userDoc.exists()) {
-        userData.value = userDoc.data()
-      }
-    } catch (error) {
-      console.error('사용자 정보 조회 실패:', error)
-    }
-  } else {
-    userData.value = null
-  }
 })
 
 const goHome = () => {

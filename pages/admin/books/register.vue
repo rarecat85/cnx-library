@@ -629,8 +629,8 @@ const { confirm, alert } = useDialog()
 const { $firebaseFirestore } = useNuxtApp()
 const firestore = $firebaseFirestore
 
-const drawer = useState('navigationDrawer', () => false)
-const drawerWidth = ref(280)
+// Navigation Drawer 상태 및 반응형 너비
+const { drawer, drawerWidth } = useDrawer()
 
 // 센터 관련
 const centerOptions = [...CENTERS]

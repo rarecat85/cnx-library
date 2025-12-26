@@ -107,52 +107,8 @@
 
 <script setup>
 const drawer = useState('navigationDrawer', () => false)
-const { logout, user } = useAuth()
-const { $firebaseFirestore } = useNuxtApp()
-const firestore = $firebaseFirestore
-
-const isAdmin = ref(false)
-const isSuperAdmin = ref(false)
-
-// 사용자 권한 확인
-const checkUserRole = async () => {
-  if (!process.client || !user.value || !firestore) {
-    isAdmin.value = false
-    isSuperAdmin.value = false
-    return
-  }
-
-  try {
-    const { doc, getDoc } = await import('firebase/firestore')
-    const userRef = doc(firestore, 'users', user.value.uid)
-    const userDoc = await getDoc(userRef)
-    
-    if (userDoc.exists()) {
-      const userData = userDoc.data()
-      // role이 'admin'이거나 'manager'인 경우 관리자로 판단
-      isAdmin.value = userData.role === 'admin' || userData.role === 'manager'
-      // role이 'admin'인 경우 최고관리자로 판단
-      isSuperAdmin.value = userData.role === 'admin'
-    } else {
-      isAdmin.value = false
-      isSuperAdmin.value = false
-    }
-  } catch (error) {
-    console.error('사용자 권한 확인 실패:', error)
-    isAdmin.value = false
-    isSuperAdmin.value = false
-  }
-}
-
-// 사용자 정보가 변경될 때마다 권한 확인
-watch(() => user.value, async (newUser) => {
-  if (newUser) {
-    await checkUserRole()
-  } else {
-    isAdmin.value = false
-    isSuperAdmin.value = false
-  }
-}, { immediate: true })
+const { logout } = useAuth()
+const { isAdmin, isSuperAdmin } = useUser()
 
 const closeDrawer = () => {
   drawer.value = false
@@ -237,12 +193,6 @@ const handleLogout = async () => {
 .menu-item.router-link-active {
   background-color: rgba(255, 255, 255, 0.15);
   font-weight: 500;
-}
-
-.menu-item-disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  pointer-events: none;
 }
 
 .menu-item-disabled {

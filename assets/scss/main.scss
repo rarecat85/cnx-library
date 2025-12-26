@@ -1,21 +1,23 @@
-// 전역 SCSS 파일
-// Vuetify 스타일은 nuxt.config.ts에서 자동으로 로드됩니다.
+// ===========================================
+// CNX Library - Global SCSS
+// ===========================================
+// Vuetify 스타일은 nuxt.config.js에서 자동으로 로드됩니다.
 
-// 함수 import
+// 함수 및 변수 import
 @use 'functions' as *;
+@use 'variables' as *;
 
-// 전역 변수 (필요시 사용)
-// $primary-color: #1976d2;
-// $secondary-color: #424242;
-
+// ===========================================
 // 전역 스타일
+// ===========================================
+
 body {
   margin: 0;
   padding: 0;
   font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   font-weight: 400;
-  background-color: #F2F2F2; // Cool Gray
-  color: #2A2F36; // Charcoal Gray
+  background-color: $background-color;
+  color: $text-color;
 }
 
 // Vuetify 컴포넌트에도 노토 산스 적용 (선택자 우선순위 사용)
@@ -55,15 +57,15 @@ body {
 
 // 브랜드 색상 팔레트 적용
 .v-application {
-  background-color: #F2F2F2;
-  color: #2A2F36;
+  background-color: $background-color;
+  color: $text-color;
 }
 
 // 카드 스타일 개선 (브랜드 스타일)
 .v-application .v-card {
   border-radius: rem(16);
-  box-shadow: 0 rem(2) rem(8) rgba(0, 44, 91, 0.08);
-  background-color: #FFFFFF;
+  box-shadow: 0 rem(2) rem(8) $shadow-light;
+  background-color: $white;
 }
 
 // 버튼 스타일 개선 (브랜드 스타일)
@@ -72,16 +74,16 @@ body {
   font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
-  box-shadow: 0 rem(2) rem(4) rgba(0, 44, 91, 0.2);
+  box-shadow: 0 rem(2) rem(4) $shadow-medium;
 }
 
 .v-application .v-btn--elevated {
-  box-shadow: 0 rem(2) rem(8) rgba(0, 44, 91, 0.3);
+  box-shadow: 0 rem(2) rem(8) $shadow-dark;
 }
 
 .v-application .v-btn--variant-elevated.v-theme--light {
-  background-color: #002C5B;
-  color: #FFFFFF;
+  background-color: $primary-color;
+  color: $white;
 }
 
 // 입력 필드 스타일 개선
@@ -115,9 +117,3 @@ body {
 .english-text {
   font-family: 'Montserrat', 'Noto Sans KR', sans-serif;
 }
-
-// 커스텀 스타일 추가 가능
-// .custom-class {
-//   // 스타일 정의
-// }
-

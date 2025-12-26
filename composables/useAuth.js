@@ -31,7 +31,6 @@ export const useAuth = () => {
         const currentUser = auth.currentUser
         if (currentUser) {
           // Firestore에서 emailVerified 상태 확인
-          const { doc, getDoc } = await import('firebase/firestore')
           const userRef = doc($firebaseFirestore, 'users', currentUser.uid)
           const userDoc = await getDoc(userRef)
           
@@ -90,7 +89,6 @@ export const useAuth = () => {
       if (firebaseUser) {
         // Firestore에서 emailVerified 상태 확인
         try {
-          const { doc, getDoc } = await import('firebase/firestore')
           const userRef = doc($firebaseFirestore, 'users', firebaseUser.uid)
           const userDoc = await getDoc(userRef)
           

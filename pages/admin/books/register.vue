@@ -228,12 +228,13 @@
             
             <div
               v-if="bookRequestsTotalPages > 1"
-              class="d-flex justify-center mt-6"
+              class="pagination-section"
             >
               <v-pagination
                 v-model="currentBookRequestsPage"
                 :length="bookRequestsTotalPages"
                 :total-visible="7"
+                class="pagination"
               />
             </div>
           </div>
@@ -665,7 +666,7 @@ const bookRequests = ref([])
 const requesterInfoCache = ref({})
 const bookRequestsLoading = ref(false)
 const currentBookRequestsPage = ref(1)
-const REQUESTS_PER_PAGE = 4
+const REQUESTS_PER_PAGE = 10
 const bookRequestsTotal = computed(() => bookRequests.value.length)
 const bookRequestsTotalPages = computed(() => Math.ceil(bookRequestsTotal.value / REQUESTS_PER_PAGE))
 const paginatedBookRequests = computed(() => {
@@ -1771,6 +1772,48 @@ useHead({
   }
   
   .side-navigation :deep(.v-overlay__scrim) {
+    display: none;
+  }
+}
+
+// 페이지네이션
+.pagination-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: rem(16) 0 rem(8);
+}
+
+.pagination {
+  :deep(.v-pagination__list) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: rem(2);
+  }
+  
+  :deep(.v-pagination__item),
+  :deep(.v-pagination__prev),
+  :deep(.v-pagination__next) {
+    font-size: rem(12);
+    min-width: rem(28);
+    height: rem(28);
+    
+    .v-btn {
+      font-size: rem(12);
+      min-width: rem(28);
+      height: rem(28);
+      padding: 0;
+      
+      &--active {
+        background-color: #002C5B;
+        color: #fff;
+      }
+    }
+  }
+  
+  :deep(.v-pagination__first),
+  :deep(.v-pagination__last) {
     display: none;
   }
 }

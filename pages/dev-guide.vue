@@ -118,20 +118,26 @@ const WORKPLACE_CENTER_MAP = {
             <pre>cnx-library/
 ├── assets/
 │   └── scss/
+│       ├── _variables.scss   # SCSS 변수 (색상, breakpoint 등)
 │       ├── functions.scss    # SCSS 함수 (rem 변환 등)
 │       └── main.scss         # 전역 스타일
 ├── components/
 │   ├── BookCard.vue          # 도서 카드 컴포넌트
 │   ├── BookListSwiper.vue    # 도서 목록 스와이퍼
-│   ├── LocationGuidePopup.vue # 위치 안내 팝업
 │   ├── ConcentrixLogo.vue    # 로고 컴포넌트
+│   ├── GlobalDialog.vue      # 전역 다이얼로그 컴포넌트
+│   ├── LocationGuidePopup.vue # 위치 안내 팝업
 │   ├── NotificationBell.vue  # 알림 벨 (헤더)
 │   ├── PageLayout.vue        # 페이지 레이아웃
 │   └── SideNavigation.vue    # 사이드 네비게이션
 ├── composables/
 │   ├── useAuth.js            # 인증 관련 로직
 │   ├── useBooks.js           # 도서 관련 로직 (네이버/알라딘 API)
-│   └── useNotifications.js   # 알림 관련 로직
+│   ├── useDialog.js          # 다이얼로그 상태 관리
+│   ├── useDrawer.js          # Navigation Drawer 상태 관리
+│   ├── useNotifications.js   # 알림 관련 로직
+│   ├── useTestScenario.js    # 테스트 시나리오 관리
+│   └── useUser.js            # 사용자 Firestore 데이터 관리
 ├── functions/
 │   ├── index.js              # Firebase Cloud Functions
 │   ├── package.json
@@ -143,6 +149,8 @@ const WORKPLACE_CENTER_MAP = {
 │   ├── admin/
 │   │   ├── managers/         # 매니저 관리 (최고관리자 전용)
 │   │   └── books/            # 도서 등록/관리
+│   ├── test-scenario/        # 테스트 시나리오 (개발자/QA 전용)
+│   │   └── sessions/         # 테스트 세션 관리
 │   └── ...                   # 기타 라우트 페이지들
 ├── plugins/
 │   ├── firebase.client.js    # Firebase 초기화
@@ -150,7 +158,8 @@ const WORKPLACE_CENTER_MAP = {
 ├── utils/
 │   ├── centerMapping.js      # 센터-근무지 매핑
 │   ├── labelConfig.js        # 라벨번호 설정 및 유틸리티
-│   └── locationCoordinates.js # 위치 좌표 (서가 이미지)
+│   ├── locationCoordinates.js # 위치 좌표 (서가 이미지)
+│   └── testScenarioData.js   # 테스트 시나리오 데이터
 ├── firebase.json             # Firebase 설정
 ├── firestore.rules           # Firestore 보안 규칙
 └── firestore.indexes.json    # Firestore 인덱스</pre>

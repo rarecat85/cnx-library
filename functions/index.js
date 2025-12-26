@@ -1980,3 +1980,76 @@ exports.scheduledNotifications = onSchedule(
   }
 )
 
+/**
+ * 미인증 계정 자동 정리 (매일 새벽 3시 KST 실행)
+ * 24시간 이상 이메일 인증을 하지 않은 계정 삭제
+ */
+exports.cleanupUnverifiedUsers = onSchedule(
+  {
+    schedule: '0 3 * * *', // 매일 새벽 3시
+    timeZone: 'Asia/Seoul',
+    region: 'asia-northeast3'
+  },
+  async (event) => {
+    console.log('미인증 계정 자동 정리 시작')
+    
+    // 삭제 기준: 24시간 이상 미인증 계정
+    const HOURS_BEFORE_CLEANUP = 24
+    const cutoffTime = new Date(Date.now() - (HOURS_BEFORE_CLEANUP * 60 * 60 * 1000))
+    
+    let deletedCount = 0
+    let nextPageToken
+    
+    try {
+      // Firebase Auth 사용자 목록 순회 (1000명씩)
+      do {
+        const listUsersResult = await auth.listUsers(1000, nextPageToken)
+        
+        for (const userRecord of listUsersResult.users) {
+          // 이메일 인증 완료 사용자는 스킵
+          if (userRecord.emailVerified) {
+            continue
+          }
+          
+          // 생성 시간 확인
+          const creationTime = new Date(userRecord.metadata.creationTime)
+          
+          // 24시간 이내 생성된 계정은 스킵 (아직 인증 가능)
+          if (creationTime > cutoffTime) {
+            continue
+          }
+          
+          // 미인증 + 24시간 경과 계정 삭제
+          try {
+            const uid = userRecord.uid
+            const email = userRecord.email
+            
+            // 1. Firebase Auth 계정 삭제
+            await auth.deleteUser(uid)
+            console.log(`Firebase Auth 계정 삭제: ${email}`)
+            
+            // 2. Firestore users 문서 삭제
+            const userDocRef = firestore.collection('users').doc(uid)
+            const userDoc = await userDocRef.get()
+            
+            if (userDoc.exists) {
+              await userDocRef.delete()
+              console.log(`Firestore users 문서 삭제: ${uid}`)
+            }
+            
+            deletedCount++
+          } catch (deleteError) {
+            console.error(`계정 삭제 오류 (${userRecord.email}):`, deleteError)
+          }
+        }
+        
+        nextPageToken = listUsersResult.pageToken
+      } while (nextPageToken)
+      
+      console.log(`미인증 계정 자동 정리 완료: ${deletedCount}개 계정 삭제`)
+    } catch (error) {
+      console.error('미인증 계정 자동 정리 오류:', error)
+    }
+  }
+)
+

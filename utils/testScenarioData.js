@@ -26,7 +26,8 @@ export const TEST_SCENARIOS = [
           { id: '1.2.2', name: '인증 링크 클릭', method: '이메일의 인증 링크 클릭', expected: 'verify-email 페이지로 이동' },
           { id: '1.2.3', name: '인증 완료 처리', method: '인증 페이지에서 "로그인하기" 클릭', expected: '로그인 페이지로 이동' },
           { id: '1.2.4', name: '미인증 상태 로그인', method: '이메일 미인증 상태에서 로그인 시도', expected: '"이메일 인증이 완료되지 않았습니다" 오류' },
-          { id: '1.2.5', name: '인증 이메일 재발송', method: '로그인 페이지에서 재발송 요청', expected: '인증 이메일 재발송' }
+          { id: '1.2.5', name: '인증 이메일 재발송', method: '로그인 페이지에서 재발송 요청', expected: '인증 이메일 재발송' },
+          { id: '1.2.6', name: '미인증 계정 자동 삭제', method: '24시간 이상 미인증 계정 확인 (Firebase Console)', expected: '매일 새벽 3시 자동 삭제됨' }
         ]
       },
       {

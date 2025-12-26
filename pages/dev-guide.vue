@@ -484,8 +484,28 @@ npm run dev
                 <td>Scheduled</td>
                 <td>매일 09:00 반납/연체 알림</td>
               </tr>
+              <tr>
+                <td><code>cleanupUnverifiedUsers</code></td>
+                <td>Scheduled</td>
+                <td>매일 03:00 미인증 계정 자동 삭제</td>
+              </tr>
             </tbody>
           </table>
+
+          <div class="info-box">
+            <h4>🧹 미인증 계정 자동 정리</h4>
+            <ul>
+              <li><strong>실행 시간:</strong> 매일 새벽 3시 (KST)</li>
+              <li><strong>삭제 기준:</strong> 24시간 이상 이메일 인증 미완료 계정</li>
+              <li><strong>삭제 대상:</strong>
+                <ul>
+                  <li>Firebase Auth 계정</li>
+                  <li>Firestore <code>users</code> 문서</li>
+                </ul>
+              </li>
+              <li><strong>제외 대상:</strong> 인증 완료 계정, 24시간 이내 생성 계정</li>
+            </ul>
+          </div>
 
           <h3>Functions 로그 확인</h3>
           <div class="code-block">

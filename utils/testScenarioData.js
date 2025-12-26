@@ -424,11 +424,20 @@ export const TEST_SCENARIOS = [
     section: '11. 보안 테스트',
     subsections: [
       {
-        title: '11. 보안',
+        title: '11.1 접근 권한',
         items: [
-          { id: '11.1', name: '비로그인 페이지 접근', method: '로그아웃 상태로 /mypage 접근', expected: '로그인 페이지로 리다이렉트' },
-          { id: '11.2', name: '다른 사용자 알림 접근', method: 'Firestore 직접 쿼리 시도', expected: '자신의 알림만 조회 가능' },
-          { id: '11.3', name: '권한 없는 도서 삭제', method: '일반 사용자가 삭제 API 호출', expected: '권한 오류' }
+          { id: '11.1.1', name: '비로그인 페이지 접근', method: '로그아웃 상태로 /mypage 접근', expected: '로그인 페이지로 리다이렉트' },
+          { id: '11.1.2', name: '다른 사용자 알림 접근', method: 'Firestore 직접 쿼리 시도', expected: '자신의 알림만 조회 가능' },
+          { id: '11.1.3', name: '권한 없는 도서 삭제', method: '일반 사용자가 삭제 API 호출', expected: '권한 오류' }
+        ]
+      },
+      {
+        title: '11.2 XSS 방지',
+        items: [
+          { id: '11.2.1', name: '회원가입 이름 필드', method: '이름 필드에 <script>alert(1)</script> 입력', expected: '스크립트 실행 안됨, 텍스트로 표시되거나 제거됨' },
+          { id: '11.2.2', name: '도서 검색 필드', method: '검색창에 <img src=x onerror=alert(1)> 입력', expected: '스크립트 실행 안됨' },
+          { id: '11.2.3', name: '직접 등록 도서명', method: '도서명에 <script>alert(1)</script> 입력 후 등록', expected: '스크립트 실행 안됨, 정상 저장' },
+          { id: '11.2.4', name: '테스트 비고 필드', method: '비고에 <script>alert(1)</script> 입력', expected: '스크립트 실행 안됨' }
         ]
       }
     ]

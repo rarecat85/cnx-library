@@ -13,6 +13,7 @@ import {
   deleteField
 } from 'firebase/firestore'
 import { DEFAULT_CATEGORIES } from '@/utils/labelConfig.js'
+import { sanitizeSearchQuery, sanitizeInput } from '@/utils/sanitize.js'
 
 export const useBooks = () => {
   const { $firebaseFirestore, $firebaseApp } = useNuxtApp()
@@ -208,11 +209,18 @@ export const useBooks = () => {
       loading.value = true
       error.value = null
 
+      // XSS 방지를 위한 검색어 sanitize
+      const sanitizedQuery = sanitizeSearchQuery(searchQuery)
+      
+      if (!sanitizedQuery.trim()) {
+        return { items: [], total: 0 }
+      }
+
       const functions = getFunctions($firebaseApp)
       const searchNaverBooks = httpsCallable(functions, 'searchNaverBooks')
 
       const result = await searchNaverBooks({
-        query: searchQuery,
+        query: sanitizedQuery,
         start,
         display
       })

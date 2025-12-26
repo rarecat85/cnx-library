@@ -136,6 +136,7 @@
 
 <script setup>
 import { WORKPLACES, CENTERS } from '@/utils/centerMapping.js'
+import { sanitizeName } from '@/utils/sanitize.js'
 
 definePageMeta({
   layout: false,
@@ -247,8 +248,11 @@ const handleSave = async () => {
     const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore')
     const userRef = doc(firestore, 'users', user.value.uid)
 
+    // XSS 방지를 위한 입력값 sanitize
+    const sanitizedName = sanitizeName(name.value)
+
     await updateDoc(userRef, {
-      name: name.value,
+      name: sanitizedName,
       workplace: workplace.value,
       updatedAt: serverTimestamp()
     })

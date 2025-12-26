@@ -245,6 +245,7 @@
 
 <script setup>
 import { getCenterByWorkplace } from '@/utils/centerMapping.js'
+import { sanitizeSearchQuery } from '@/utils/sanitize.js'
 
 definePageMeta({
   layout: false,
@@ -326,7 +327,8 @@ const handleSearch = async () => {
     const usersRef = collection(firestore, 'users')
     const snapshot = await getDocs(usersRef)
     
-    const queryText = searchQuery.value.toLowerCase().trim()
+    // XSS 방지를 위한 검색어 sanitize
+    const queryText = sanitizeSearchQuery(searchQuery.value).toLowerCase().trim()
     
     // 이름 또는 이메일로 검색 (클라이언트 사이드 필터링)
     searchResults.value = snapshot.docs

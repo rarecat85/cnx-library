@@ -609,6 +609,7 @@
 <script setup>
 import { CENTERS, getCenterByWorkplace } from '@/utils/centerMapping.js'
 import { CENTER_CODE_MAP, createLabelNumber, getLocationSelectOptions } from '@/utils/labelConfig.js'
+import { sanitizeInput } from '@/utils/sanitize.js'
 
 definePageMeta({
   layout: false,
@@ -1200,15 +1201,19 @@ const handleManualRegisterBook = async () => {
     return
   }
   
-  const isbn = manualForm.value.isbn.trim()
+  // XSS 방지를 위한 입력값 sanitize
+  const isbn = sanitizeInput(manualForm.value.isbn.trim())
+  const sanitizedTitle = sanitizeInput(manualForm.value.title.trim())
+  const sanitizedAuthor = sanitizeInput(manualForm.value.author.trim())
+  const sanitizedPublisher = sanitizeInput(manualForm.value.publisher.trim())
   
   try {
     manualRegistering.value = true
     
     const bookData = {
-      title: manualForm.value.title.trim(),
-      author: manualForm.value.author.trim(),
-      publisher: manualForm.value.publisher.trim(),
+      title: sanitizedTitle,
+      author: sanitizedAuthor,
+      publisher: sanitizedPublisher,
       isbn13: isbn.length === 13 ? isbn : '',
       isbn: isbn.length === 10 ? isbn : isbn,
       image: '',

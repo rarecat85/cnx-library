@@ -352,6 +352,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { sanitizeInput } from '@/utils/sanitize.js'
 
 definePageMeta({
   layout: 'page'
@@ -528,7 +529,8 @@ const setNote = (testId, note) => {
 
 const saveNote = async (testId) => {
   try {
-    const note = noteInputs.value[testId] || ''
+    // XSS 방지를 위한 입력값 sanitize
+    const note = sanitizeInput(noteInputs.value[testId] || '')
     const currentNote = results.value[testId]?.note || ''
     
     if (note !== currentNote) {
@@ -573,7 +575,8 @@ const setTester = async (testId, tester) => {
 }
 
 const addTester = () => {
-  const name = newTesterName.value.trim()
+  // XSS 방지를 위한 입력값 sanitize
+  const name = sanitizeInput(newTesterName.value.trim())
   if (name && !testers.value.includes(name)) {
     testers.value.push(name)
     newTesterName.value = ''

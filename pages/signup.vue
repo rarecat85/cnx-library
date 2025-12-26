@@ -148,6 +148,7 @@ const { signup, loading } = useAuth()
 const router = useRouter()
 
 import { WORKPLACES } from '@/utils/centerMapping.js'
+import { sanitizeName, sanitizeEmail } from '@/utils/sanitize.js'
 
 const name = ref('')
 const email = ref('')
@@ -200,8 +201,12 @@ const handleSignup = async () => {
   console.log('[signup.vue] 폼 검증 결과:', valid)
   if (!valid) return
 
+  // XSS 방지를 위한 입력값 sanitize
+  const sanitizedName = sanitizeName(name.value)
+  const sanitizedEmail = sanitizeEmail(email.value)
+
   console.log('[signup.vue] signup 함수 호출 전')
-  const result = await signup(email.value, password.value, name.value, workplace.value)
+  const result = await signup(sanitizedEmail, password.value, sanitizedName, workplace.value)
   console.log('[signup.vue] signup 함수 결과:', result)
   
   if (result.success) {

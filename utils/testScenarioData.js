@@ -22,7 +22,7 @@ export const TEST_SCENARIOS = [
       {
         title: '1.2 이메일 인증',
         items: [
-          { id: '1.2.1', name: '인증 이메일 수신', method: '회원가입 후 이메일 확인', expected: 'Firebase 인증 이메일 수신' },
+          { id: '1.2.1', name: '인증 이메일 수신', method: '회원가입 후 이메일 확인', expected: 'CNX Library 인증 이메일 수신 (자체 토큰 시스템)' },
           { id: '1.2.2', name: '인증 링크 클릭', method: '이메일의 인증 링크 클릭', expected: 'verify-email 페이지로 이동' },
           { id: '1.2.3', name: '인증 완료 처리', method: '인증 페이지에서 "로그인하기" 클릭', expected: '로그인 페이지로 이동' },
           { id: '1.2.4', name: '미인증 상태 로그인', method: '이메일 미인증 상태에서 로그인 시도', expected: '"이메일 인증이 완료되지 않았습니다" 오류' },
@@ -118,7 +118,8 @@ export const TEST_SCENARIOS = [
         title: '4.2 신청한 책 목록',
         items: [
           { id: '4.2.1', name: '신청한 책 섹션 표시', method: '도서 신청 후 마이페이지 확인', expected: '리스트로 신청 도서 표시 (10개씩 페이지네이션)' },
-          { id: '4.2.2', name: '대기중 상태 표시', method: '승인 전 도서 확인', expected: '"대기중" 상태 표시' }
+          { id: '4.2.2', name: '신청일 및 취소 버튼 표시', method: '신청 도서 카드 확인', expected: '신청일 표시, "신청 취소" 버튼 표시' },
+          { id: '4.2.3', name: '신청 취소', method: '"신청 취소" 버튼 클릭', expected: '취소 확인 → 목록에서 제거' }
         ]
       },
       {
@@ -155,9 +156,8 @@ export const TEST_SCENARIOS = [
           { id: '5.6', name: '이미 등록된 도서', method: '등록된 도서 검색', expected: '"이미 등록된 도서" 표시' },
           { id: '5.7', name: '도서 신청하기', method: '미등록 도서의 "신청하기" 클릭', expected: '신청 확인 → 신청 완료 메시지' },
           { id: '5.8', name: '신청 후 상태', method: '신청한 도서 재검색', expected: '"신청완료" 상태 표시' },
-          { id: '5.9', name: '초성 검색 (미지원)', method: '초성으로 검색 (예: "ㅎㄹㅍㅌ")', expected: '네이버 API는 초성 검색 미지원 - 결과 없음 정상' },
-          { id: '5.10', name: '검색 결과 없음 안내', method: '결과 없는 검색어 입력 (예: "zzzxxx123")', expected: '"검색 결과가 없습니다" 안내 메시지 표시' },
-          { id: '5.11', name: '세트 상품 자동 제외', method: '일반 도서명 검색 (예: "해리포터")', expected: '세트/전집 상품이 결과에서 자동 제외됨' }
+          { id: '5.9', name: '검색 결과 없음 안내', method: '결과 없는 검색어 입력 (예: "zzzxxx123")', expected: '"검색 결과가 없습니다" 안내 메시지 표시' },
+          { id: '5.10', name: '세트 상품 자동 제외', method: '일반 도서명 검색 (예: "해리포터")', expected: '세트/전집 상품이 결과에서 자동 제외됨' }
         ]
       }
     ]

@@ -6,7 +6,8 @@
       'book-card-disabled': disabled
     }"
     elevation="0"
-    @click="selectable ? handleCardClick() : null"
+    :ripple="!disabled"
+    @click="!disabled && selectable ? handleCardClick() : null"
   >
     <!-- 상태 플래그 영역 -->
     <div
@@ -777,7 +778,8 @@ const handleCancelRequest = () => {
 
 .book-card-disabled {
   opacity: 0.6;
-  cursor: not-allowed;
+  cursor: default;
+  pointer-events: none;
   
   &:hover {
     transform: none;

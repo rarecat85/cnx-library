@@ -160,6 +160,27 @@
           </div>
         </div>
       </div>
+      
+      <!-- 하단 고정 대여 신청 바 -->
+      <Transition name="slide-up">
+        <div
+          v-if="selectedBooks.length > 0"
+          class="sticky-rent-bar"
+        >
+          <div class="sticky-rent-info">
+            <span class="selected-count">{{ selectedBooks.length }}권 선택</span>
+            <span class="rent-status">({{ remainingRentCount }}권 추가 가능)</span>
+          </div>
+          <v-btn
+            class="sticky-rent-btn"
+            variant="flat"
+            :loading="rentRequestLoading"
+            @click="handleRentRequest"
+          >
+            대여 신청
+          </v-btn>
+        </div>
+      </Transition>
     </PageLayout>
 
     <v-navigation-drawer
@@ -1574,5 +1595,62 @@ useHead({
       color: #fff;
     }
   }
+}
+
+// 하단 고정 대여 신청 바
+.sticky-rent-bar {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: rem(768);
+  background: #002C5B;
+  padding: rem(12) rem(20);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 100;
+  box-shadow: 0 rem(-4) rem(12) rgba(0, 0, 0, 0.15);
+}
+
+.sticky-rent-info {
+  display: flex;
+  flex-direction: column;
+  gap: rem(2);
+  color: #FFFFFF;
+}
+
+.selected-count {
+  font-size: rem(16);
+  font-weight: 600;
+}
+
+.rent-status {
+  font-size: rem(12);
+  opacity: 0.8;
+}
+
+.sticky-rent-btn {
+  background-color: #FFFFFF;
+  color: #002C5B;
+  font-weight: 600;
+  min-width: rem(100);
+  
+  &:hover {
+    background-color: #f0f0f0;
+  }
+}
+
+// 슬라이드 업 애니메이션
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.slide-up-enter-from,
+.slide-up-leave-to {
+  transform: translateX(-50%) translateY(100%);
+  opacity: 0;
 }
 </style>

@@ -907,6 +907,15 @@ const handleGroupSelectClick = async (group) => {
     return
   }
   
+  // 읽은 책 목록에 있는지 확인
+  const inReadHistory = await checkIfInReadHistory(group.isbn)
+  if (inReadHistory) {
+    const confirmed = await confirm(`이미 읽은 책입니다.\n정말로 대여하시겠습니까?`)
+    if (!confirmed) {
+      return
+    }
+  }
+  
   // 대여 가능한 복사본이 1개면 바로 선택
   const availableCopies = group.copies.filter(book => !calculateBookStatus(book))
   
@@ -965,6 +974,30 @@ const confirmLabelSelection = () => {
   }
 }
 
+// 읽은 책 목록에서 동일 도서 확인
+const checkIfInReadHistory = async (isbn) => {
+  if (!user.value || !firestore || !isbn) return null
+
+  try {
+    const { collection, query, where, getDocs } = await import('firebase/firestore')
+    const historyRef = collection(firestore, 'rentalHistory')
+    const q = query(
+      historyRef,
+      where('userId', '==', user.value.uid),
+      where('isbn13', '==', isbn)
+    )
+    
+    const snapshot = await getDocs(q)
+    if (!snapshot.empty) {
+      return snapshot.docs[0].data()
+    }
+    return null
+  } catch (error) {
+    console.error('읽은 책 목록 확인 오류:', error)
+    return null
+  }
+}
+
 // 개별 도서 대여 처리
 const handleSingleRent = async (group) => {
   if (!user.value || !group) return
@@ -985,6 +1018,15 @@ const handleSingleRent = async (group) => {
   if (alreadyRented) {
     await alert(`이미 같은 도서를 대여중입니다.\n(라벨번호: ${alreadyRented.labelNumber || '-'})`, { type: 'warning' })
     return
+  }
+  
+  // 읽은 책 목록에 있는지 확인
+  const inReadHistory = await checkIfInReadHistory(group.isbn)
+  if (inReadHistory) {
+    const confirmed = await confirm(`이미 읽은 책입니다.\n정말로 대여하시겠습니까?`)
+    if (!confirmed) {
+      return
+    }
   }
   
   // 대여 가능한 복사본 목록

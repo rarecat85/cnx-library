@@ -688,6 +688,97 @@
       </v-card>
     </v-dialog>
     
+    <!-- 대여 신청 도서 확인 다이얼로그 -->
+    <v-dialog
+      v-model="requestedBooksDialog"
+      max-width="500"
+    >
+      <v-card class="rent-confirm-card">
+        <v-card-title class="rent-confirm-title">
+          대여 신청 도서 확인
+        </v-card-title>
+        
+        <v-card-text class="rent-confirm-content">
+          <div class="rent-confirm-info mb-4">
+            <p>대여 신청된 도서가 {{ requestedBooksForAlert.length }}권 있습니다.</p>
+          </div>
+          
+          <div class="multi-rent-book-list">
+            <div
+              v-for="book in requestedBooksForAlert"
+              :key="book.id"
+              class="rent-book-card"
+            >
+              <div class="rent-book-card-inner">
+                <template v-if="book.image">
+                  <img
+                    :src="book.image"
+                    :alt="book.title"
+                    class="rent-book-thumbnail"
+                  >
+                </template>
+                <template v-else>
+                  <div class="rent-book-thumbnail-placeholder">
+                    <span>NO IMAGE</span>
+                  </div>
+                </template>
+                <div class="rent-book-meta">
+                  <div class="rent-book-title">
+                    {{ book.title }}
+                  </div>
+                  <div
+                    v-if="book.author"
+                    class="rent-book-author"
+                  >
+                    <strong>저자:</strong> {{ book.author }}
+                  </div>
+                  <div
+                    v-if="book.publisher"
+                    class="rent-book-publisher"
+                  >
+                    <strong>출판사:</strong> {{ book.publisher }}
+                  </div>
+                  <div class="rent-book-details">
+                    <span class="detail-item">
+                      <v-icon
+                        size="x-small"
+                        class="mr-1"
+                      >mdi-label</v-icon>
+                      {{ book.labelNumber || '라벨없음' }}
+                    </span>
+                    <span class="detail-item">
+                      <v-icon
+                        size="x-small"
+                        class="mr-1"
+                      >mdi-map-marker</v-icon>
+                      <span class="location-text">{{ formatLocation(book.location) || '위치없음' }}</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </v-card-text>
+        
+        <v-card-actions class="rent-confirm-actions">
+          <v-spacer />
+          <v-btn
+            variant="text"
+            @click="requestedBooksDialog = false"
+          >
+            나중에 처리하기
+          </v-btn>
+          <v-btn
+            color="primary"
+            variant="flat"
+            @click="handleProcessRequestedBooks"
+          >
+            지금 처리하기
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- 위치 안내 팝업 -->
     <LocationGuidePopup
       v-model="locationPopupVisible"
@@ -786,6 +877,10 @@ const MAX_RENT_COUNT = 5
 // 대여자/신청자 정보 캐시
 const renterInfoCache = ref({})
 const requesterInfoCache = ref({})
+
+// 대여 신청 도서 확인 다이얼로그
+const requestedBooksDialog = ref(false)
+const requestedBooksForAlert = ref([])
 
 // 대여 다이얼로그 관련
 const rentDialog = ref(false)
@@ -892,7 +987,30 @@ onMounted(async () => {
   currentCenter.value = workplace ? getCenterByWorkplace(workplace) : centerOptions[0]
   
   await loadRegisteredBooks()
+  
+  // 대여 신청된 도서가 있으면 알림
+  checkAndAlertRequestedBooks()
 })
+
+// 대여 신청된 도서 확인 및 다이얼로그 표시
+const checkAndAlertRequestedBooks = async () => {
+  const requestedBooks = registeredBooks.value.filter(book => {
+    const status = calculateBookStatus(book)
+    return status === 'requested'
+  })
+  
+  if (requestedBooks.length > 0) {
+    requestedBooksForAlert.value = requestedBooks
+    requestedBooksDialog.value = true
+  }
+}
+
+// 지금 처리하기 버튼 핸들러
+const handleProcessRequestedBooks = () => {
+  requestedBooksDialog.value = false
+  // 대여신청도서 탭으로 이동
+  sortBy.value = 'requested'
+}
 
 // 센터 변경 처리
 const handleCenterChange = async () => {
@@ -2381,6 +2499,10 @@ useHead({
   display: flex;
   flex-direction: column;
   gap: rem(12);
+  
+  .rent-book-card {
+    flex-shrink: 0;
+  }
 }
 
 // 개별 대여/반납 도서 카드 스타일

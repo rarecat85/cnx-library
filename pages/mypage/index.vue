@@ -158,17 +158,21 @@
                 ({{ selectedBooks.length }}권 선택됨)
               </span>
             </div>
-            <v-btn
+            <div
               v-if="filteredRentedBooks.length > 0"
-              class="return-btn"
-              variant="flat"
-              size="small"
-              :disabled="selectedBooks.length === 0"
-              :loading="returnLoading"
-              @click="handleReturnBooks"
+              class="d-flex align-center gap-2"
             >
-              반납하기
-            </v-btn>
+              <v-btn
+                class="return-btn"
+                variant="flat"
+                size="small"
+                :disabled="selectedBooks.length === 0"
+                :loading="returnLoading"
+                @click="handleReturnBooks"
+              >
+                반납하기
+              </v-btn>
+            </div>
           </div>
 
           <div
@@ -377,6 +381,27 @@
           </div>
         </div>
       </div>
+      
+      <!-- 하단 고정 반납 상태바 -->
+      <Transition name="slide-up">
+        <div
+          v-if="selectedBooks.length > 0"
+          class="sticky-return-bar"
+        >
+          <div class="sticky-return-info">
+            <span class="selected-count">{{ selectedBooks.length }}권 선택</span>
+            <span class="return-status">반납할 도서를 선택했습니다</span>
+          </div>
+          <v-btn
+            class="sticky-return-btn"
+            variant="flat"
+            :loading="returnLoading"
+            @click="handleReturnBooks"
+          >
+            반납하기
+          </v-btn>
+        </div>
+      </Transition>
     </PageLayout>
 
     <v-navigation-drawer
@@ -1313,5 +1338,62 @@ useHead({
   .rent-book-card {
     flex-shrink: 0;
   }
+}
+
+// 하단 고정 반납 상태바
+.sticky-return-bar {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: rem(768);
+  background: #002C5B;
+  padding: rem(12) rem(20);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 100;
+  box-shadow: 0 rem(-4) rem(12) rgba(0, 0, 0, 0.15);
+}
+
+.sticky-return-info {
+  display: flex;
+  flex-direction: column;
+  gap: rem(2);
+  color: #FFFFFF;
+}
+
+.selected-count {
+  font-size: rem(16);
+  font-weight: 600;
+}
+
+.return-status {
+  font-size: rem(12);
+  opacity: 0.8;
+}
+
+.sticky-return-btn {
+  background-color: #FFFFFF;
+  color: #002C5B;
+  font-weight: 600;
+  min-width: rem(100);
+  
+  &:hover {
+    background-color: #f0f0f0;
+  }
+}
+
+// 슬라이드 업 애니메이션
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.slide-up-enter-from,
+.slide-up-leave-to {
+  transform: translateX(-50%) translateY(100%);
+  opacity: 0;
 }
 </style>

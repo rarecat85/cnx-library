@@ -382,7 +382,7 @@
         </div>
       </div>
       
-      <!-- 하단 고정 반납 상태바 -->
+      <!-- 하단 고정 반납 상태바 (대여 목록) -->
       <Transition name="slide-up">
         <div
           v-if="selectedBooks.length > 0"
@@ -399,6 +399,27 @@
             @click="handleReturnBooks"
           >
             반납하기
+          </v-btn>
+        </div>
+      </Transition>
+
+      <!-- 하단 고정 삭제 상태바 (읽은 책 목록) -->
+      <Transition name="slide-up">
+        <div
+          v-if="selectedHistoryBooks.length > 0"
+          class="sticky-delete-bar"
+        >
+          <div class="sticky-delete-info">
+            <span class="selected-count">{{ selectedHistoryBooks.length }}권 선택</span>
+            <span class="delete-status">삭제할 도서를 선택했습니다</span>
+          </div>
+          <v-btn
+            class="sticky-delete-btn"
+            variant="flat"
+            :loading="deleteHistoryLoading"
+            @click="handleDeleteHistory"
+          >
+            삭제하기
           </v-btn>
         </div>
       </Transition>
@@ -1357,7 +1378,25 @@ useHead({
   box-shadow: 0 rem(-4) rem(12) rgba(0, 0, 0, 0.15);
 }
 
-.sticky-return-info {
+// 하단 고정 삭제 상태바
+.sticky-delete-bar {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: rem(768);
+  background: #d32f2f;
+  padding: rem(12) rem(20);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 100;
+  box-shadow: 0 rem(-4) rem(12) rgba(0, 0, 0, 0.15);
+}
+
+.sticky-return-info,
+.sticky-delete-info {
   display: flex;
   flex-direction: column;
   gap: rem(2);
@@ -1369,7 +1408,8 @@ useHead({
   font-weight: 600;
 }
 
-.return-status {
+.return-status,
+.delete-status {
   font-size: rem(12);
   opacity: 0.8;
 }
@@ -1377,6 +1417,17 @@ useHead({
 .sticky-return-btn {
   background-color: #FFFFFF;
   color: #002C5B;
+  font-weight: 600;
+  min-width: rem(100);
+  
+  &:hover {
+    background-color: #f0f0f0;
+  }
+}
+
+.sticky-delete-btn {
+  background-color: #FFFFFF;
+  color: #d32f2f;
   font-weight: 600;
   min-width: rem(100);
   

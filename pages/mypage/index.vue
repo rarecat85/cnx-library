@@ -272,6 +272,7 @@
                   :center="book.center || ''"
                   :show-action="false"
                   :selectable="false"
+                  :show-ripple="false"
                   :show-status-flags="false"
                   :show-label-number="!!book.labelNumber"
                   :label-number="book.labelNumber"
@@ -280,6 +281,7 @@
                   :show-requested-info="true"
                   :requested-date="book.requestedAt"
                   :cancel-loading="cancelRequestLoading === book.id"
+                  class="requested-book-card"
                   @cancel-request="handleCancelRequest"
                 />
               </v-col>

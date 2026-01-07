@@ -6,7 +6,7 @@
       'book-card-disabled': disabled
     }"
     elevation="0"
-    :ripple="!disabled"
+    :ripple="!disabled && showRipple"
     @click="!disabled && selectable ? handleCardClick() : null"
   >
     <!-- 상태 플래그 영역 -->
@@ -534,6 +534,11 @@ const props = defineProps({
   showCenter: {
     type: Boolean,
     default: false
+  },
+  // Ripple 효과 표시
+  showRipple: {
+    type: Boolean,
+    default: true
   }
 })
 

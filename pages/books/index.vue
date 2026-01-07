@@ -1565,7 +1565,7 @@ useHead({
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: rem(16) 0 rem(8);
+  padding: rem(16) 0 rem(70); // 하단 스티키 바 높이 고려
 }
 
 .pagination {

@@ -81,7 +81,7 @@
 
         <!-- 알림 목록 -->
         <div
-          v-if="loading && filteredNotifications.length === 0"
+          v-if="loading && displayedNotifications.length === 0"
           class="text-center py-8"
         >
           <v-progress-circular
@@ -110,7 +110,7 @@
           class="notification-list"
         >
           <div
-            v-for="notification in filteredNotifications"
+            v-for="notification in displayedNotifications"
             :key="notification.id"
             class="notification-card"
             :class="{ 'notification-unread': !notification.isRead }"
@@ -149,15 +149,14 @@
           </div>
         </div>
 
-        <!-- 더 불러오기 -->
+        <!-- 더 보기 -->
         <div
-          v-if="hasMore && filteredNotifications.length > 0"
+          v-if="hasMore"
           class="load-more-section"
         >
           <v-btn
             variant="outlined"
             color="primary"
-            :loading="loadingMore"
             @click="loadMore"
           >
             더 보기
@@ -199,7 +198,6 @@ const {
   markAsRead,
   markAllAsRead,
   deleteNotification,
-  getNotifications,
   getNotificationIcon,
   getNotificationColor,
   formatNotificationTime
@@ -208,9 +206,10 @@ const {
 // Navigation Drawer 상태 및 반응형 너비
 const { drawer, drawerWidth } = useDrawer()
 const selectedFilter = ref('all')
-const loadingMore = ref(false)
-const hasMore = ref(true)
-const lastDoc = ref(null)
+
+// 표시할 알림 개수 (10개씩 증가)
+const displayCount = ref(10)
+const ITEMS_PER_PAGE = 10
 
 // 이메일 알림 설정
 const emailNotificationEnabled = ref(false)
@@ -281,12 +280,27 @@ onMounted(() => {
   })
 })
 
-// 필터링된 알림 목록
+// 필터링된 알림 목록 (전체)
 const filteredNotifications = computed(() => {
   if (selectedFilter.value === 'unread') {
     return notifications.value.filter(n => !n.isRead)
   }
   return notifications.value
+})
+
+// 현재 표시할 알림 목록 (displayCount만큼만)
+const displayedNotifications = computed(() => {
+  return filteredNotifications.value.slice(0, displayCount.value)
+})
+
+// 더보기 버튼 표시 여부 (전체 개수가 현재 표시 개수보다 많을 때만)
+const hasMore = computed(() => {
+  return filteredNotifications.value.length > displayCount.value
+})
+
+// 필터 변경 시 표시 개수 초기화
+watch(selectedFilter, () => {
+  displayCount.value = ITEMS_PER_PAGE
 })
 
 // 알림 클릭 처리
@@ -327,24 +341,9 @@ const handleDeleteNotification = async (notificationId) => {
   await deleteNotification(notificationId)
 }
 
-// 더 불러오기
-const loadMore = async () => {
-  if (loadingMore.value || !hasMore.value) return
-  
-  try {
-    loadingMore.value = true
-    const result = await getNotifications(20, lastDoc.value)
-    
-    if (result.items.length < 20) {
-      hasMore.value = false
-    }
-    
-    lastDoc.value = result.lastDoc
-  } catch (error) {
-    console.error('알림 더 불러오기 오류:', error)
-  } finally {
-    loadingMore.value = false
-  }
+// 더 보기 (표시 개수 증가)
+const loadMore = () => {
+  displayCount.value += ITEMS_PER_PAGE
 }
 
 // 페이지 메타데이터

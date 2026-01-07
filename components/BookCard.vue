@@ -117,6 +117,20 @@
           </v-icon>
           {{ labelNumber }}
         </div>
+        
+        <!-- 센터 정보 표시 -->
+        <div
+          v-if="showCenter && center"
+          class="book-center text-body-2"
+        >
+          <v-icon
+            size="small"
+            class="mr-1"
+          >
+            mdi-map-marker-radius
+          </v-icon>
+          {{ center }}
+        </div>
       </div>
     </div>
     
@@ -513,6 +527,11 @@ const props = defineProps({
     default: null
   },
   cancelLoading: {
+    type: Boolean,
+    default: false
+  },
+  // 센터 정보 표시
+  showCenter: {
     type: Boolean,
     default: false
   }
@@ -927,6 +946,15 @@ const handleCancelRequest = () => {
   display: flex;
   align-items: center;
   color: #002C5B;
+  margin-top: rem(4);
+  font-weight: 500;
+}
+
+// 센터 정보
+.book-center {
+  display: flex;
+  align-items: center;
+  color: #7c3aed;
   margin-top: rem(4);
   font-weight: 500;
 }

@@ -222,16 +222,24 @@
 
         <!-- 내가 신청한 책 목록 섹션 -->
         <div class="requested-section mb-8">
-          <div class="section-header mb-4">
+          <div class="section-header-with-filter mb-4">
             <h2 class="section-title">
               내가 신청한 책
               <span
-                v-if="myRequestedBooks.length > 0"
+                v-if="filteredRequestedBooks.length > 0"
                 class="book-count"
               >
-                ({{ myRequestedBooks.length }}권)
+                ({{ filteredRequestedBooks.length }}권)
               </span>
             </h2>
+            <v-select
+              v-model="requestedCenterFilter"
+              :items="centerOptions"
+              variant="outlined"
+              density="comfortable"
+              hide-details
+              class="center-filter-select"
+            />
           </div>
           
           <div
@@ -244,7 +252,7 @@
             />
           </div>
           <div
-            v-else-if="myRequestedBooks.length > 0"
+            v-else-if="filteredRequestedBooks.length > 0"
             class="requested-books-grid"
           >
             <v-row class="book-list-row">
@@ -292,7 +300,7 @@
             v-else
             class="text-center py-8 text-medium-emphasis empty-state"
           >
-            신청한 도서가 없습니다.
+            {{ requestedCenterFilter }}에 신청한 도서가 없습니다.
           </div>
         </div>
 
@@ -445,18 +453,29 @@ const myRequestedBooks = ref([])
 const requestedBooksLoading = ref(false)
 const cancelRequestLoading = ref(null)
 
+// 신청 도서 센터 필터
+const requestedCenterFilter = ref('')
+
+// 센터별 필터링된 신청 도서
+const filteredRequestedBooks = computed(() => {
+  if (!requestedCenterFilter.value) {
+    return myRequestedBooks.value
+  }
+  return myRequestedBooks.value.filter(book => book.center === requestedCenterFilter.value)
+})
+
 // 신청 도서 페이지네이션
 const requestedCurrentPage = ref(1)
 const requestedPerPage = 10
 
 const requestedTotalPages = computed(() => {
-  return Math.ceil(myRequestedBooks.value.length / requestedPerPage)
+  return Math.ceil(filteredRequestedBooks.value.length / requestedPerPage)
 })
 
 const paginatedRequestedBooks = computed(() => {
   const start = (requestedCurrentPage.value - 1) * requestedPerPage
   const end = start + requestedPerPage
-  return myRequestedBooks.value.slice(start, end)
+  return filteredRequestedBooks.value.slice(start, end)
 })
 
 // 센터별 필터링된 대여 도서
@@ -498,6 +517,11 @@ watch(selectedCenter, () => {
   selectedBooks.value = []
 })
 
+// 신청 도서 센터 필터 변경 시 페이지네이션 리셋
+watch(requestedCenterFilter, () => {
+  requestedCurrentPage.value = 1
+})
+
 // 사용자 근무지 정보 가져오기
 const getUserWorkplace = async () => {
   if (!user.value || !firestore) {
@@ -523,7 +547,9 @@ const getUserWorkplace = async () => {
 // 초기화
 onMounted(async () => {
   const workplace = await getUserWorkplace()
-  selectedCenter.value = workplace ? getCenterByWorkplace(workplace) : centerOptions[0]
+  const userCenter = workplace ? getCenterByWorkplace(workplace) : centerOptions[0]
+  selectedCenter.value = userCenter
+  requestedCenterFilter.value = userCenter
   
   await Promise.all([
     loadRentedBooks(),

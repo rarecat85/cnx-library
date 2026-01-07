@@ -287,6 +287,20 @@
                           {{ getBookStatus(book) === 'requested' ? '대여승인' : '대여처리' }}
                         </v-btn>
                       </div>
+                      <!-- 반납예정일 (대여중/연체중인 경우) -->
+                      <div
+                        v-if="(getBookStatus(book) === 'rented' || getBookStatus(book) === 'overdue') && getReturnDate(book)"
+                        class="return-date-text"
+                        :class="{ 'return-date-overdue': isReturnDateOverdue(book) }"
+                      >
+                        <v-icon
+                          size="small"
+                          class="mr-1"
+                        >
+                          mdi-calendar-clock
+                        </v-icon>
+                        반납예정일: {{ formatReturnDate(book.expectedReturnDate) }}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -956,6 +970,34 @@ const getRenterInfo = (book) => {
 const getRequesterInfo = (book) => {
   if (!book.requestedBy) return ''
   return requesterInfoCache.value[book.requestedBy] || ''
+}
+
+// 반납예정일 반환
+const getReturnDate = (book) => {
+  if (book.expectedReturnDate) {
+    return book.expectedReturnDate?.toDate?.() || new Date(book.expectedReturnDate)
+  }
+  return null
+}
+
+// 반납예정일 포맷
+const formatReturnDate = (returnDate) => {
+  if (!returnDate) return ''
+  
+  const date = returnDate?.toDate?.() || new Date(returnDate)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  
+  return `${year}.${month}.${day}`
+}
+
+// 반납예정일 지났는지 확인
+const isReturnDateOverdue = (book) => {
+  const returnDate = getReturnDate(book)
+  if (!returnDate) return false
+  
+  return returnDate < new Date()
 }
 
 // 등록된 도서 검색
@@ -2162,6 +2204,25 @@ useHead({
   .v-btn {
     width: 100%;
   }
+}
+
+// 반납예정일 스타일
+.return-date-text {
+  color: #6b7280;
+  font-weight: 500;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: rem(20);
+  box-sizing: border-box;
+  margin-top: rem(2);
+  margin-bottom: rem(2);
+  font-size: rem(12);
+}
+
+.return-date-overdue {
+  color: #ef4444;
 }
 
 // 수정 다이얼로그 스타일

@@ -37,7 +37,7 @@
           variant="text"
           size="small"
           class="mark-all-btn"
-          @click="handleMarkAllAsRead"
+          @click.stop="handleMarkAllAsRead"
         >
           모두 읽음
         </v-btn>

@@ -328,6 +328,47 @@
           </div>
         </div>
       </div>
+
+      <!-- 하단 고정 액션 바 -->
+      <Transition name="slide-up">
+        <div
+          v-if="selectedBooks.length > 0"
+          class="sticky-action-bar"
+        >
+          <div class="sticky-action-info">
+            <span class="selected-count">{{ selectedBooks.length }}권 선택</span>
+          </div>
+          <div class="sticky-action-buttons">
+            <v-btn
+              class="sticky-action-btn delete"
+              variant="flat"
+              size="small"
+              :loading="actionLoading"
+              @click="handleDeleteBooks"
+            >
+              삭제
+            </v-btn>
+            <v-btn
+              class="sticky-action-btn rent"
+              variant="flat"
+              size="small"
+              :loading="actionLoading"
+              @click="handleRentBooks"
+            >
+              대여
+            </v-btn>
+            <v-btn
+              class="sticky-action-btn return"
+              variant="flat"
+              size="small"
+              :loading="actionLoading"
+              @click="handleReturnBooks"
+            >
+              반납
+            </v-btn>
+          </div>
+        </div>
+      </Transition>
     </PageLayout>
 
     <v-navigation-drawer
@@ -2486,5 +2527,79 @@ useHead({
   .side-navigation :deep(.v-overlay__scrim) {
     display: none;
   }
+}
+
+// 하단 고정 액션 바
+.sticky-action-bar {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: rem(768);
+  background: #002C5B;
+  padding: rem(12) rem(20);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 100;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.sticky-action-info {
+  .selected-count {
+    color: #FFFFFF;
+    font-size: rem(14);
+    font-weight: 500;
+  }
+}
+
+.sticky-action-buttons {
+  display: flex;
+  gap: rem(8);
+}
+
+.sticky-action-btn {
+  font-weight: 600;
+  font-size: rem(13);
+  
+  &.delete {
+    background-color: #DC3545;
+    color: #FFFFFF;
+    
+    &:hover {
+      background-color: #C82333;
+    }
+  }
+  
+  &.rent {
+    background-color: #28A745;
+    color: #FFFFFF;
+    
+    &:hover {
+      background-color: #218838;
+    }
+  }
+  
+  &.return {
+    background-color: #007BFF;
+    color: #FFFFFF;
+    
+    &:hover {
+      background-color: #0056B3;
+    }
+  }
+}
+
+// 슬라이드 업 트랜지션
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: all 0.3s ease;
+}
+
+.slide-up-enter-from,
+.slide-up-leave-to {
+  transform: translateX(-50%) translateY(100%);
+  opacity: 0;
 }
 </style>

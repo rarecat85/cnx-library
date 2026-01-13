@@ -9,6 +9,7 @@ const functions = require('firebase-functions')
 const nodemailer = require('nodemailer')
 const crypto = require('crypto')
 
+const { migratePendingUserData } = require('./migration_helper')
 // 환경 변수
 const aladinTtbKey = defineString('ALADIN_TTB_KEY', { default: '' })
 const naverClientId = defineString('NAVER_CLIENT_ID', { default: '' })
@@ -468,6 +469,14 @@ exports.verifyEmailToken = onCall({
       // Firestore 업데이트가 성공했으므로 계속 진행
     }
 
+
+    // pendingUsers에서 해당 이메일의 데이터 마이그레이션
+    try {
+      await migratePendingUserData(uid, userData.email, firestore)
+    } catch (migrateError) {
+      console.error('pendingUsers 마이그레이션 오류 (무시됨):', migrateError)
+      // 마이그레이션 실패해도 인증 성공 처리
+    }
     return {
       success: true,
       message: '이메일 인증이 완료되었습니다.',
@@ -2052,4 +2061,3 @@ exports.cleanupUnverifiedUsers = onSchedule(
     }
   }
 )
-

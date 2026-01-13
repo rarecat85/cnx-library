@@ -69,6 +69,19 @@ service cloud.firestore {
       allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
     
+    // pendingUsers 컬렉션 규칙 (미가입자)
+    match /pendingUsers/{pendingId} {
+      // 읽기: 관리자만
+      allow read: if request.auth != null && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'manager');
+      
+      // 생성/수정/삭제: 관리자만
+      allow create, update, delete: if request.auth != null && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'manager');
+    }
+    
     // notifications 컬렉션 규칙 (알림)
     match /notifications/{notificationId} {
       // 읽기: 자신의 알림만 읽기 가능

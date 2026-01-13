@@ -592,9 +592,11 @@ export const useBooks = () => {
    * @param {string} center - 센터명
    * @param {string} userId - 대여한 사용자 UID
    * @param {string} isbn - ISBN (ISBN 중복 대여 체크용)
+   * @param {string} userType - 사용자 타입 ('user' 또는 'pending')
+   * @param {string} userEmail - 사용자 이메일 (반납 시 히스토리 저장용)
    * @returns {Promise<Object>} 대여 결과
    */
-  const rentBook = async (labelNumber, center, userId, isbn = null) => {
+  const rentBook = async (labelNumber, center, userId, isbn = null, userType = 'user', userEmail = '') => {
     if (!firestore) {
       throw new Error('Firebase가 초기화되지 않았습니다.')
     }
@@ -638,6 +640,8 @@ export const useBooks = () => {
       await updateDoc(bookRef, {
         status: 'rented',
         rentedBy: userId,
+        rentedByType: userType,
+        rentedByEmail: userEmail,
         rentedAt: serverTimestamp(),
         expectedReturnDate: expectedReturnDate,
         requestedBy: deleteField(),

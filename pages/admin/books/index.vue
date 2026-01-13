@@ -1553,19 +1553,40 @@ const handleRentBooks = async () => {
 }
 
 // 사용자의 현재 대여 권수 조회
-const getUserRentedCount = async (userId) => {
+const getUserRentedCount = async (userId, userType = 'user') => {
   if (!firestore || !userId) return 0
   
   try {
     const { collection, query, where, getDocs } = await import('firebase/firestore')
     const booksRef = collection(firestore, 'books')
-    const rentedQuery = query(booksRef, where('rentedBy', '==', userId))
+    
+    // userType에 따라 쿼리 조건 다르게 설정
+    let rentedQuery
+    if (userType === 'pending') {
+      rentedQuery = query(
+        booksRef, 
+        where('rentedBy', '==', userId),
+        where('rentedByType', '==', 'pending')
+      )
+    } else {
+      // 기존 데이터 호환성을 위해 'user' 타입이거나 rentedByType이 없는 경우 모두 포함
+      rentedQuery = query(booksRef, where('rentedBy', '==', userId))
+    }
+    
     const snapshot = await getDocs(rentedQuery)
     let count = 0
     snapshot.forEach(doc => {
       const data = doc.data()
       if (data.status === 'rented' || data.status === 'overdue') {
-        count++
+        // user 타입인 경우 기존 데이터 호환성 체크
+        if (userType === 'user') {
+          // rentedByType이 없거나 'user'인 경우만 카운트
+          if (!data.rentedByType || data.rentedByType === 'user') {
+            count++
+          }
+        } else {
+          count++
+        }
       }
     })
     return count
@@ -1594,8 +1615,14 @@ const openRentDialog = async (book) => {
     try {
       actionLoading.value = true
       
+      // 신청자 이메일 조회
+      const { doc, getDoc } = await import('firebase/firestore')
+      const userRef = doc(firestore, 'users', book.requestedBy)
+      const userDoc = await getDoc(userRef)
+      const requesterEmail = userDoc.exists() ? userDoc.data().email || '' : ''
+      
       const labelNumber = book.labelNumber || book.id.split('_')[0]
-      await rentBook(labelNumber, currentCenter.value, book.requestedBy, book.isbn)
+      await rentBook(labelNumber, currentCenter.value, book.requestedBy, book.isbn, 'user', requesterEmail)
       
       await loadRegisteredBooks()
       await alert('대여 처리가 완료되었습니다.', { type: 'success' })
@@ -1633,26 +1660,44 @@ const confirmRentBooks = async () => {
     rentFormError.value = ''
     
     const { collection, query, where, getDocs } = await import('firebase/firestore')
-    const usersRef = collection(firestore, 'users')
     
+    let targetUserId = null
+    let targetUserData = null
+    let userType = 'user'
+    
+    // 1. 먼저 정식 회원에서 검색
+    const usersRef = collection(firestore, 'users')
     const emailQuery = query(usersRef, where('email', '==', rentFormEmail.value))
     const emailSnapshot = await getDocs(emailQuery)
     
-    if (emailSnapshot.empty) {
-      rentFormError.value = '해당 이메일의 사용자를 찾을 수 없습니다.'
+    if (!emailSnapshot.empty) {
+      targetUserId = emailSnapshot.docs[0].id
+      targetUserData = emailSnapshot.docs[0].data()
+      userType = 'user'
+    } else {
+      // 2. 정식 회원이 아니면 미가입자에서 검색
+      const pendingRef = collection(firestore, 'pendingUsers')
+      const pendingQuery = query(pendingRef, where('email', '==', rentFormEmail.value))
+      const pendingSnapshot = await getDocs(pendingQuery)
+      
+      if (!pendingSnapshot.empty) {
+        targetUserId = pendingSnapshot.docs[0].id
+        targetUserData = pendingSnapshot.docs[0].data()
+        userType = 'pending'
+      } else {
+        rentFormError.value = '해당 이메일의 사용자를 찾을 수 없습니다.\n미가입자 관리에서 먼저 등록해주세요.'
+        return
+      }
+    }
+    
+    // 센터 확인
+    if (targetUserData.center !== rentFormCenter.value) {
+      rentFormError.value = `해당 사용자는 ${targetUserData.center} 소속입니다.`
       return
     }
     
-    const userData = emailSnapshot.docs[0].data()
-    if (userData.center !== rentFormCenter.value) {
-      rentFormError.value = `해당 사용자는 ${userData.center} 소속입니다.`
-      return
-    }
-    
-    const targetUser = emailSnapshot.docs[0]
-    const targetUserId = targetUser.id
-    
-    const currentRentedCount = await getUserRentedCount(targetUserId)
+    // 대여 권수 확인 (userType에 따라 다르게 조회)
+    const currentRentedCount = await getUserRentedCount(targetUserId, userType)
     const booksToRent = rentDialogBooks.value.length
     const remainingSlots = MAX_RENT_COUNT - currentRentedCount
     
@@ -1669,7 +1714,7 @@ const confirmRentBooks = async () => {
     // 선택된 도서들 대여 처리
     for (const book of rentDialogBooks.value) {
       const labelNumber = book.labelNumber || book.id.split('_')[0]
-      await rentBook(labelNumber, currentCenter.value, targetUserId, book.isbn)
+      await rentBook(labelNumber, currentCenter.value, targetUserId, book.isbn, userType, rentFormEmail.value)
     }
     
     const rentedBookCount = rentDialogBooks.value.length
@@ -1726,6 +1771,7 @@ const confirmReturnBooks = async () => {
       const labelNumber = book.labelNumber || book.id.split('_')[0]
       const bookId = book.id
       const rentedBy = book.rentedBy
+      const rentedByType = book.rentedByType || 'user'
       const rentedAt = book.rentedAt
       
       // 1. 도서 상태 업데이트
@@ -1733,6 +1779,7 @@ const confirmReturnBooks = async () => {
       await updateDoc(bookRef, {
         status: 'available',
         rentedBy: deleteField(),
+        rentedByType: deleteField(),
         rentedAt: deleteField(),
         expectedReturnDate: deleteField()
       })
@@ -1762,6 +1809,8 @@ const confirmReturnBooks = async () => {
             cover: book.cover || book.image || '',
             center: book.center || '',
             userId: rentedBy,
+            userType: rentedByType,
+            userEmail: book.rentedByEmail || '',
             rentedAt: rentedAt,
             returnedAt: serverTimestamp(),
             rentCount: 1

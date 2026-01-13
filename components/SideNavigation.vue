@@ -70,6 +70,15 @@
           <v-icon>mdi-book-plus</v-icon>
           <span>도서 등록</span>
         </NuxtLink>
+
+        <NuxtLink
+          to="/admin/users/pending"
+          class="menu-item"
+          @click="closeDrawer"
+        >
+          <v-icon>mdi-account-clock</v-icon>
+          <span>미가입자 관리</span>
+        </NuxtLink>
       </div>
 
       <!-- 최고관리자 메뉴 (admin 역할만 표시) -->

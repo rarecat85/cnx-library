@@ -77,7 +77,7 @@
           @click="closeDrawer"
         >
           <v-icon>mdi-account-clock</v-icon>
-          <span>미가입자 관리</span>
+          <span>임시 회원 관리</span>
         </NuxtLink>
       </div>
 

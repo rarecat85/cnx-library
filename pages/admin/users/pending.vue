@@ -6,68 +6,55 @@
       @toggle-drawer="drawer = !drawer"
     >
       <div class="pending-users-page">
-        <!-- 페이지 헤더 -->
-        <div class="page-header mb-6">
-          <h1 class="page-title mb-0">
-            미가입자 관리
-          </h1>
-          <p class="page-description text-body-2 text-medium-emphasis mt-2">
-            아직 가입하지 않은 사용자의 정보를 미리 등록하여 대출/반납 처리를 할 수 있습니다.
-          </p>
+        <!-- 센터 정보 헤더 -->
+        <div class="center-header mb-6">
+          <div class="center-header-inner">
+            <h1 class="page-title mb-0">
+              임시 회원 관리
+            </h1>
+            <v-select
+              v-model="centerFilter"
+              :items="centerOptions"
+              variant="outlined"
+              density="comfortable"
+              hide-details
+              class="center-select"
+            />
+          </div>
         </div>
 
-        <!-- 등록 버튼 -->
-        <div class="action-section mb-6">
-          <v-btn
-            color="primary"
-            prepend-icon="mdi-account-plus"
-            @click="openRegisterDialog"
-          >
-            미가입자 등록
-          </v-btn>
-        </div>
-
-        <!-- 검색 및 필터 영역 -->
-        <div class="filter-section mb-6">
-          <v-row dense>
-            <v-col
-              cols="12"
-              sm="6"
+        <!-- 검색 영역 + 등록 버튼 -->
+        <div class="search-section mb-6">
+          <div class="search-row">
+            <v-text-field
+              v-model="searchQuery"
+              label="회원 검색 (이름 또는 이메일)"
+              prepend-inner-icon="mdi-magnify"
+              variant="outlined"
+              density="comfortable"
+              hide-details
+              clearable
+              class="search-input"
+              @keyup.enter="filterPendingUsers"
+              @click:clear="clearSearch"
+            />
+            <v-btn
+              color="primary"
+              size="small"
+              variant="flat"
+              class="register-btn"
+              @click="openRegisterDialog"
             >
-              <v-text-field
-                v-model="searchQuery"
-                label="검색 (이름 또는 이메일)"
-                prepend-inner-icon="mdi-magnify"
-                variant="outlined"
-                density="comfortable"
-                hide-details
-                clearable
-                @keyup.enter="filterPendingUsers"
-                @click:clear="clearSearch"
-              />
-            </v-col>
-            <v-col
-              cols="12"
-              sm="6"
-            >
-              <v-select
-                v-model="centerFilter"
-                :items="centerOptions"
-                label="센터 필터"
-                variant="outlined"
-                density="comfortable"
-                hide-details
-                clearable
-              />
-            </v-col>
-          </v-row>
+              임시 회원 등록
+            </v-btn>
+          </div>
         </div>
 
-        <!-- 미가입자 목록 -->
+        <!-- 임시 회원 목록 영역 -->
         <div class="pending-users-section">
           <div class="section-header mb-4">
             <h2 class="section-title">
-              미가입자 목록
+              임시 회원 목록
             </h2>
             <div class="text-body-2 text-medium-emphasis">
               총 {{ filteredPendingUsers.length }}명
@@ -76,7 +63,7 @@
 
           <div
             v-if="loading"
-            class="text-center py-8"
+            class="text-center py-6"
           >
             <v-progress-circular
               indeterminate
@@ -86,7 +73,7 @@
 
           <v-row
             v-else-if="filteredPendingUsers.length > 0"
-            class="pending-users-grid"
+            class="users-grid"
           >
             <v-col
               v-for="pendingUser in paginatedPendingUsers"
@@ -95,23 +82,15 @@
               sm="6"
             >
               <div class="user-card">
-                <!-- 상태 칩 -->
+                <!-- 역할 칩 -->
                 <div class="user-card-header">
                   <v-chip
                     color="warning"
                     size="x-small"
                     variant="flat"
-                    class="status-chip"
+                    class="role-chip"
                   >
-                    미가입
-                  </v-chip>
-                  <v-chip
-                    color="grey"
-                    size="x-small"
-                    variant="outlined"
-                    class="center-chip ml-1"
-                  >
-                    {{ pendingUser.center }}
+                    임시회원
                   </v-chip>
                 </div>
 
@@ -132,12 +111,11 @@
                 </div>
 
                 <!-- 액션 버튼 -->
-                <div class="user-card-actions">
+                <div class="user-card-action">
                   <v-btn
-                    size="small"
-                    variant="outlined"
                     color="primary"
-                    class="action-btn"
+                    size="small"
+                    class="action-btn mb-2"
                     @click="openEditDialog(pendingUser)"
                   >
                     수정
@@ -160,7 +138,7 @@
 
           <div
             v-else
-            class="text-center py-8 text-medium-emphasis empty-state"
+            class="text-center py-6 text-medium-emphasis empty-state"
           >
             <v-icon
               size="48"
@@ -169,7 +147,7 @@
             >
               mdi-account-off-outline
             </v-icon>
-            <p>등록된 미가입자가 없습니다.</p>
+            <p>등록된 임시 회원이 없습니다.</p>
           </div>
 
           <!-- 페이지네이션 -->
@@ -196,7 +174,7 @@
     >
       <v-card class="register-dialog-card">
         <div class="register-dialog-title text-h6">
-          {{ isEditing ? '미가입자 정보 수정' : '미가입자 등록' }}
+          {{ isEditing ? '임시 회원 정보 수정' : '임시 회원 등록' }}
         </div>
         <div class="register-dialog-content">
           <v-text-field
@@ -276,21 +254,22 @@ definePageMeta({
 const { confirm, alert } = useDialog()
 const { $firebaseFirestore } = useNuxtApp()
 const firestore = $firebaseFirestore
+const { user } = useAuth()
 
 // Navigation Drawer 상태 및 반응형 너비
 const { drawer, drawerWidth } = useDrawer()
 
-// 미가입자 목록
+// 임시 회원 목록
 const pendingUsers = ref([])
 const loading = ref(false)
 
-// 각 미가입자의 대여 권수
+// 각 임시 회원의 대여 권수
 const rentedCounts = ref({})
 
 // 검색 및 필터
 const searchQuery = ref('')
-const centerFilter = ref(null)
-const centerOptions = ['전체', ...CENTERS]
+const centerFilter = ref(CENTERS[0])
+const centerOptions = CENTERS
 const workplaces = WORKPLACES
 
 // 페이지네이션
@@ -317,7 +296,7 @@ const formErrors = ref({
   workplace: ''
 })
 
-// 필터링된 미가입자 목록
+// 필터링된 임시 회원 목록
 const filteredPendingUsers = computed(() => {
   let result = [...pendingUsers.value]
   
@@ -332,7 +311,7 @@ const filteredPendingUsers = computed(() => {
   }
   
   // 센터 필터
-  if (centerFilter.value && centerFilter.value !== '전체') {
+  if (centerFilter.value) {
     result = result.filter(user => user.center === centerFilter.value)
   }
   
@@ -382,12 +361,36 @@ onMounted(() => {
   })
 })
 
+// 사용자 근무지 정보 가져오기
+const getUserWorkplace = async () => {
+  if (!user.value || !firestore) {
+    return ''
+  }
+
+  try {
+    const { doc, getDoc } = await import('firebase/firestore')
+    const userRef = doc(firestore, 'users', user.value.uid)
+    const userDoc = await getDoc(userRef)
+
+    if (userDoc.exists()) {
+      return userDoc.data().workplace || ''
+    }
+  } catch (error) {
+    console.error('사용자 근무지 정보 조회 오류:', error)
+  }
+  return ''
+}
+
 // 초기화
 onMounted(async () => {
+  // 관리자의 센터를 기본값으로 설정
+  const workplace = await getUserWorkplace()
+  centerFilter.value = workplace ? getCenterByWorkplace(workplace) : centerOptions[0]
+  
   await loadPendingUsers()
 })
 
-// 미가입자 목록 로드
+// 임시 회원 목록 로드
 const loadPendingUsers = async () => {
   if (!firestore) return
   
@@ -403,10 +406,10 @@ const loadPendingUsers = async () => {
       ...doc.data()
     }))
     
-    // 각 미가입자의 대여 권수 조회
+    // 각 임시 회원의 대여 권수 조회
     await loadRentedCounts()
   } catch (error) {
-    console.error('미가입자 목록 로드 오류:', error)
+    console.error('임시 회원 목록 로드 오류:', error)
     pendingUsers.value = []
   } finally {
     loading.value = false
@@ -570,7 +573,7 @@ const handleSubmit = async () => {
       const pendingSnapshot = await getDocs(pendingQuery)
       
       if (!pendingSnapshot.empty) {
-        formErrors.value.email = '이미 등록된 미가입자 이메일입니다.'
+        formErrors.value.email = '이미 등록된 임시 회원 이메일입니다.'
         return
       }
     }
@@ -587,7 +590,7 @@ const handleSubmit = async () => {
         updatedAt: serverTimestamp()
       })
       
-      await alert('미가입자 정보가 수정되었습니다.', { type: 'success' })
+      await alert('임시 회원 정보가 수정되었습니다.', { type: 'success' })
     } else {
       // 등록
       const pendingRef = collection(firestore, 'pendingUsers')
@@ -604,20 +607,20 @@ const handleSubmit = async () => {
         updatedAt: serverTimestamp()
       })
       
-      await alert('미가입자가 등록되었습니다.', { type: 'success' })
+      await alert('임시 회원이 등록되었습니다.', { type: 'success' })
     }
     
     closeRegisterDialog()
     await loadPendingUsers()
   } catch (error) {
-    console.error('미가입자 저장 오류:', error)
+    console.error('임시 회원 저장 오류:', error)
     await alert('저장에 실패했습니다.', { type: 'error' })
   } finally {
     registerLoading.value = false
   }
 }
 
-// 미가입자 삭제
+// 임시 회원 삭제
 const handleDelete = async (pendingUser) => {
   if (!firestore) return
   
@@ -642,9 +645,9 @@ const handleDelete = async (pendingUser) => {
     await deleteDoc(userRef)
     
     await loadPendingUsers()
-    await alert('미가입자가 삭제되었습니다.', { type: 'success' })
+    await alert('임시 회원이 삭제되었습니다.', { type: 'success' })
   } catch (error) {
-    console.error('미가입자 삭제 오류:', error)
+    console.error('임시 회원 삭제 오류:', error)
     await alert('삭제에 실패했습니다.', { type: 'error' })
   } finally {
     actionLoading.value = null
@@ -653,9 +656,9 @@ const handleDelete = async (pendingUser) => {
 
 // 페이지 메타데이터
 useHead({
-  title: '미가입자 관리 - CNX Library',
+  title: '임시 회원 관리 - CNX Library',
   meta: [
-    { name: 'description', content: '미가입자 등록 및 관리' }
+    { name: 'description', content: '임시 회원 등록 및 관리' }
   ]
 })
 </script>
@@ -667,9 +670,55 @@ useHead({
   width: 100%;
 }
 
-.page-header {
+// 센터 헤더 (도서 관리 페이지와 동일)
+.center-header {
   padding-bottom: rem(16);
   border-bottom: rem(1) solid #e0e0e0;
+}
+
+.center-header-inner {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: rem(10);
+  flex-wrap: nowrap;
+  
+  .page-title {
+    flex: 0 0 70%;
+    min-width: 0;
+  }
+  
+  .center-select {
+    flex: 0 0 calc(30% - rem(10));
+    min-width: 0;
+    
+    :deep(.v-input) {
+      width: 100%;
+    }
+  }
+  
+  @media (max-width: 600px) {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    
+    .page-title {
+      flex: 0 0 auto;
+      width: 100%;
+    }
+    
+    .center-select {
+      flex: 0 0 auto;
+      width: 100%;
+      max-width: 100%;
+      
+      :deep(.v-input) {
+        width: 100%;
+        max-width: 100%;
+      }
+    }
+  }
 }
 
 .page-title {
@@ -688,19 +737,34 @@ useHead({
   }
 }
 
-.page-description {
-  margin: 0;
-}
-
-.action-section {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.filter-section {
-  background-color: #f5f5f5;
-  padding: rem(16);
-  border-radius: rem(8);
+// 검색 섹션 + 등록 버튼
+.search-section {
+  .search-row {
+    display: flex;
+    align-items: center;
+    gap: rem(12);
+  }
+  
+  .search-input {
+    flex: 1;
+  }
+  
+  .register-btn {
+    flex-shrink: 0;
+    height: rem(48);
+    min-width: rem(120);
+  }
+  
+  @media (max-width: 480px) {
+    .search-row {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    
+    .register-btn {
+      width: 100%;
+    }
+  }
 }
 
 .section-header {
@@ -721,8 +785,8 @@ useHead({
   }
 }
 
-// 미가입자 그리드
-.pending-users-grid {
+// 사용자 그리드 (매니저 관리 페이지와 동일)
+.users-grid {
   margin: 0 rem(-8);
   
   .v-col {
@@ -730,7 +794,7 @@ useHead({
   }
 }
 
-// 사용자 카드
+// 사용자 카드 (매니저 관리 페이지와 동일)
 .user-card {
   height: 100%;
   background-color: #F5F5F5;
@@ -748,22 +812,9 @@ useHead({
 
 .user-card-header {
   margin-bottom: rem(10);
-  display: flex;
-  align-items: center;
 }
 
-.status-chip {
-  font-size: rem(9);
-  height: rem(16);
-  padding: 0 rem(6);
-  
-  :deep(.v-chip__content) {
-    font-size: rem(9);
-    line-height: 1;
-  }
-}
-
-.center-chip {
+.role-chip {
   font-size: rem(9);
   height: rem(16);
   padding: 0 rem(6);
@@ -797,14 +848,12 @@ useHead({
   }
 }
 
-.user-card-actions {
+.user-card-action {
   margin-top: rem(10);
-  display: flex;
-  gap: rem(8);
 }
 
 .action-btn {
-  flex: 1;
+  width: 100%;
 }
 
 // 빈 상태

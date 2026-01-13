@@ -22,6 +22,7 @@ export const useUser = () => {
   const name = computed(() => userData.value?.name || '')
   const email = computed(() => userData.value?.email || '')
   const role = computed(() => userData.value?.role || 'user')
+  const center = computed(() => userData.value?.center || '')
   const isAdmin = computed(() => role.value === 'admin' || role.value === 'manager')
   const isSuperAdmin = computed(() => role.value === 'admin')
 
@@ -86,6 +87,7 @@ export const useUser = () => {
     name,
     email,
     role,
+    center,
     isAdmin,
     isSuperAdmin,
     

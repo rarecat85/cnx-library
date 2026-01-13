@@ -1058,6 +1058,7 @@ const loadRenterInfoForBooks = async (books) => {
     if (renterInfoCache.value[userId] && requesterInfoCache.value[userId]) continue
     
     try {
+      // 1. 먼저 users 컬렉션에서 조회
       const userRef = doc(firestore, 'users', userId)
       const userDoc = await getDoc(userRef)
       
@@ -1071,6 +1072,22 @@ const loadRenterInfoForBooks = async (books) => {
         const infoString = `${workplace} ${name}(${emailId})`
         renterInfoCache.value[userId] = infoString
         requesterInfoCache.value[userId] = infoString
+      } else {
+        // 2. users에 없으면 pendingUsers 컬렉션에서 조회
+        const pendingRef = doc(firestore, 'pendingUsers', userId)
+        const pendingDoc = await getDoc(pendingRef)
+        
+        if (pendingDoc.exists()) {
+          const userData = pendingDoc.data()
+          const email = userData.email || ''
+          const emailId = email.split('@')[0] || ''
+          const name = userData.name || ''
+          const workplace = userData.workplace || ''
+          
+          const infoString = `${workplace} ${name}(${emailId}) [미가입]`
+          renterInfoCache.value[userId] = infoString
+          requesterInfoCache.value[userId] = infoString
+        }
       }
     } catch (error) {
       console.error('대여자/신청자 정보 로드 오류:', error)

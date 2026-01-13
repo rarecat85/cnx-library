@@ -907,6 +907,8 @@ const confirmReturnBooks = async () => {
       await updateDoc(bookRef, {
         status: 'available',
         rentedBy: deleteField(),
+        rentedByType: deleteField(),
+        rentedByEmail: deleteField(),
         rentedAt: deleteField(),
         expectedReturnDate: deleteField()
       })

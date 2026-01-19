@@ -333,19 +333,30 @@
 
           <!-- 권수 입력 -->
           <div class="quantity-section mb-4">
-            <v-text-field
-              v-model.number="registerForm.quantity"
-              label="등록 권수"
-              variant="outlined"
-              density="comfortable"
-              type="number"
-              min="1"
-              max="20"
-              :rules="[v => v >= 1 && v <= 20 || '1~20권까지 등록 가능합니다']"
-              hint="같은 도서를 여러 권 등록할 수 있습니다"
-              persistent-hint
-              @update:model-value="handleQuantityChange"
-            />
+            <div class="quantity-row">
+              <span class="quantity-hint">같은 도서를 여러 권 등록할 수 있습니다</span>
+              <div class="quantity-control">
+                <v-btn
+                  icon
+                  size="x-small"
+                  variant="outlined"
+                  :disabled="registerForm.quantity <= 1"
+                  @click="handleQuantityChange(registerForm.quantity - 1)"
+                >
+                  <v-icon size="14">mdi-minus</v-icon>
+                </v-btn>
+                <span class="quantity-value">{{ registerForm.quantity }}</span>
+                <v-btn
+                  icon
+                  size="x-small"
+                  variant="outlined"
+                  :disabled="registerForm.quantity >= 20"
+                  @click="handleQuantityChange(registerForm.quantity + 1)"
+                >
+                  <v-icon size="14">mdi-plus</v-icon>
+                </v-btn>
+              </div>
+            </div>
           </div>
 
           <!-- 라벨번호 및 위치 입력 (권수에 따라 동적 생성) -->
@@ -517,18 +528,30 @@
 
           <!-- 권수 입력 -->
           <div class="quantity-section mb-4">
-            <v-text-field
-              v-model.number="manualForm.quantity"
-              label="등록 권수"
-              variant="outlined"
-              density="comfortable"
-              type="number"
-              min="1"
-              max="20"
-              hint="같은 도서를 여러 권 등록할 수 있습니다"
-              persistent-hint
-              @update:model-value="handleManualQuantityChange"
-            />
+            <div class="quantity-row">
+              <span class="quantity-hint">같은 도서를 여러 권 등록할 수 있습니다</span>
+              <div class="quantity-control">
+                <v-btn
+                  icon
+                  size="x-small"
+                  variant="outlined"
+                  :disabled="manualForm.quantity <= 1"
+                  @click="handleManualQuantityChange(manualForm.quantity - 1)"
+                >
+                  <v-icon size="14">mdi-minus</v-icon>
+                </v-btn>
+                <span class="quantity-value">{{ manualForm.quantity }}</span>
+                <v-btn
+                  icon
+                  size="x-small"
+                  variant="outlined"
+                  :disabled="manualForm.quantity >= 20"
+                  @click="handleManualQuantityChange(manualForm.quantity + 1)"
+                >
+                  <v-icon size="14">mdi-plus</v-icon>
+                </v-btn>
+              </div>
+            </div>
           </div>
 
           <!-- 라벨번호 및 위치 입력 -->
@@ -618,6 +641,7 @@ definePageMeta({
 })
 
 const { user } = useAuth()
+const router = useRouter()
 const { 
   searchBooks, 
   registerBookWithLabel,
@@ -715,8 +739,8 @@ const centerCode = computed(() => {
 })
 
 // 카테고리 관리 클릭 핸들러
-const handleCategoryManageClick = async () => {
-  await alert('카테고리 관리 기능은 준비 중입니다.', { type: 'info' })
+const handleCategoryManageClick = () => {
+  router.push('/admin/settings')
 }
 
 // 위치 옵션 (센터별 동적 로드)
@@ -1683,6 +1707,32 @@ useHead({
 // 권수 입력
 .quantity-section {
   margin-bottom: rem(16);
+}
+
+.quantity-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: rem(12);
+}
+
+.quantity-hint {
+  font-size: rem(12);
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.quantity-control {
+  display: flex;
+  align-items: center;
+  gap: rem(8);
+  flex-shrink: 0;
+}
+
+.quantity-value {
+  font-size: rem(13);
+  font-weight: 600;
+  min-width: rem(20);
+  text-align: center;
 }
 
 // 복수 등록 섹션

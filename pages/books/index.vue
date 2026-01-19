@@ -109,18 +109,22 @@
                   :registered-books="[getGroupDisplayBook(group)]"
                   :is-registered="true"
                   :show-action="false"
-                  :selectable="true"
+                  :selectable="!isGroupUnavailable(group)"
                   :selected="isGroupSelected(group)"
                   :status="getGroupStatus(group)"
                   :show-status-flags="true"
-                  :disabled="isGroupUnavailable(group)"
+                  :disabled="false"
                   :hide-overdue-status="true"
                   :show-rent-button="true"
                   :show-quantity="group.totalCount > 1"
                   :available-count="group.availableCount"
                   :total-count="group.totalCount"
+                  :show-return-notify-button="isGroupUnavailable(group) && !isMyRentedIsbn(group.isbn)"
+                  :is-subscribed-to-return="isSubscribedToBook(group.isbn)"
+                  :return-notify-loading="returnNotifyLoadingIsbn === group.isbn"
                   @select="() => handleGroupSelectClick(group)"
                   @rent="() => handleSingleRent(group)"
+                  @subscribe-return-notify="() => handleSubscribeReturnNotify(group)"
                 />
               </v-col>
             </v-row>
@@ -596,6 +600,8 @@ const MAX_RENT_COUNT = 5
 
 // 현재 대여중인 도서 수
 const currentRentedCount = ref(0)
+// 내가 대여중인 도서 ISBN 목록
+const myRentedIsbns = ref([])
 
 // 라벨번호 선택 다이얼로그 관련
 const labelSelectDialog = ref(false)
@@ -614,6 +620,10 @@ const isDirectRentMode = ref(false)
 
 // 위치 안내 팝업
 const locationPopupVisible = ref(false)
+
+// 반납 알림 구독 관련
+const returnNotifySubscriptions = ref([]) // 내가 구독중인 ISBN 목록
+const returnNotifyLoadingIsbn = ref(null)
 
 // 위치 안내 이미지 존재 여부
 const hasLocationImageForCenter = computed(() => {
@@ -664,14 +674,79 @@ onMounted(async () => {
   
   await Promise.all([
     loadRegisteredBooks(),
-    loadCurrentRentedCount()
+    loadCurrentRentedCount(),
+    loadReturnNotifySubscriptions()
   ])
 })
 
-// 현재 대여중인 도서 수 로드
+// 반납 알림 구독 목록 로드
+const loadReturnNotifySubscriptions = async () => {
+  if (!user.value || !firestore) return
+
+  try {
+    const { collection, query, where, getDocs } = await import('firebase/firestore')
+    const subscriptionsRef = collection(firestore, 'returnNotifySubscriptions')
+    const q = query(
+      subscriptionsRef,
+      where('userId', '==', user.value.uid),
+      where('center', '==', currentCenter.value),
+      where('notified', '==', false)
+    )
+    
+    const snapshot = await getDocs(q)
+    const subscriptions = []
+    snapshot.forEach(doc => {
+      subscriptions.push(doc.data().isbn)
+    })
+    returnNotifySubscriptions.value = subscriptions
+  } catch (error) {
+    console.error('반납 알림 구독 목록 로드 오류:', error)
+    returnNotifySubscriptions.value = []
+  }
+}
+
+// 특정 도서 구독 여부 확인
+const isSubscribedToBook = (isbn) => {
+  return returnNotifySubscriptions.value.includes(isbn)
+}
+
+// 반납 알림 구독
+const handleSubscribeReturnNotify = async (group) => {
+  if (!user.value || !firestore || !group) return
+
+  try {
+    returnNotifyLoadingIsbn.value = group.isbn
+    
+    const { collection, addDoc, serverTimestamp } = await import('firebase/firestore')
+    const subscriptionsRef = collection(firestore, 'returnNotifySubscriptions')
+    
+    await addDoc(subscriptionsRef, {
+      userId: user.value.uid,
+      userEmail: user.value.email,
+      isbn: group.isbn,
+      title: group.title,
+      center: currentCenter.value,
+      notified: false,
+      createdAt: serverTimestamp()
+    })
+    
+    // 로컬 상태 업데이트
+    returnNotifySubscriptions.value.push(group.isbn)
+    
+    await alert('반납 알림이 신청되었습니다.\n도서가 반납되면 알림을 받으실 수 있습니다.', { type: 'success' })
+  } catch (error) {
+    console.error('반납 알림 구독 오류:', error)
+    await alert('반납 알림 신청에 실패했습니다.', { type: 'error' })
+  } finally {
+    returnNotifyLoadingIsbn.value = null
+  }
+}
+
+// 현재 대여중인 도서 수 및 ISBN 목록 로드
 const loadCurrentRentedCount = async () => {
   if (!user.value || !firestore) {
     currentRentedCount.value = 0
+    myRentedIsbns.value = []
     return
   }
 
@@ -685,16 +760,22 @@ const loadCurrentRentedCount = async () => {
     
     const snapshot = await getDocs(q)
     let count = 0
+    const isbns = []
     snapshot.forEach(doc => {
       const data = doc.data()
       if (data.status === 'rented' || data.status === 'overdue') {
         count++
+        if (data.isbn) {
+          isbns.push(data.isbn)
+        }
       }
     })
     currentRentedCount.value = count
+    myRentedIsbns.value = isbns
   } catch (error) {
     console.error('대여중인 도서 수 로드 오류:', error)
     currentRentedCount.value = 0
+    myRentedIsbns.value = []
   }
 }
 
@@ -711,7 +792,10 @@ const remainingRentCount = computed(() => {
 // 센터 변경 처리
 const handleCenterChange = async () => {
   selectedBooks.value = []
-  await loadRegisteredBooks()
+  await Promise.all([
+    loadRegisteredBooks(),
+    loadReturnNotifySubscriptions()
+  ])
 }
 
 // 등록된 도서 로드
@@ -858,6 +942,11 @@ const getGroupStatus = (group) => {
 // 그룹 대여 불가 여부
 const isGroupUnavailable = (group) => {
   return group.availableCount === 0
+}
+
+// 내가 대여중인 ISBN인지 확인
+const isMyRentedIsbn = (isbn) => {
+  return myRentedIsbns.value.includes(isbn)
 }
 
 // 그룹 선택 여부

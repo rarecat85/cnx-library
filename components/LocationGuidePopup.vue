@@ -120,6 +120,9 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue'])
 
+// Firestore에서 이미지 URL 조회용
+const { loadLocationMapping, loadShelfImages } = useSettings()
+
 // 다이얼로그 표시 상태
 const dialogVisible = computed({
   get: () => props.modelValue,
@@ -128,6 +131,10 @@ const dialogVisible = computed({
 
 // 모바일 여부
 const isMobile = ref(false)
+
+// Firestore에서 로드한 이미지 URL
+const firestoreImageUrl = ref(null)
+const firestoreLoaded = ref(false)
 
 onMounted(() => {
   const checkMobile = () => {
@@ -141,12 +148,54 @@ onMounted(() => {
   })
 })
 
+// props 변경 시 Firestore에서 이미지 조회
+watch(
+  () => [props.center, props.location, props.modelValue],
+  async ([center, location, visible]) => {
+    if (visible && center && location) {
+      await loadFirestoreImage(center, location)
+    }
+  },
+  { immediate: true }
+)
+
+// Firestore에서 이미지 URL 로드
+const loadFirestoreImage = async (center, location) => {
+  try {
+    firestoreLoaded.value = false
+    const mapping = await loadLocationMapping()
+    const imageId = mapping[center]?.[location]
+    
+    if (imageId) {
+      const images = await loadShelfImages()
+      const image = images.find(img => img.id === imageId)
+      firestoreImageUrl.value = image?.url || null
+    } else {
+      firestoreImageUrl.value = null
+    }
+  } catch (error) {
+    console.warn('Firestore 이미지 로드 실패, 기본 이미지 사용:', error)
+    firestoreImageUrl.value = null
+  } finally {
+    firestoreLoaded.value = true
+  }
+}
+
 // Nuxt 앱 설정에서 baseURL 가져오기
 const config = useRuntimeConfig()
 const baseURL = config.app.baseURL || '/'
 
-// 이미지 정보 (baseURL 적용)
+// 이미지 정보 (Firestore 우선, 없으면 하드코딩 fallback)
 const imageInfo = computed(() => {
+  // Firestore에서 이미지를 찾은 경우
+  if (firestoreImageUrl.value) {
+    return {
+      imagePath: firestoreImageUrl.value,
+      area: null // 좌표 정보는 사용하지 않음
+    }
+  }
+  
+  // Firestore에 없으면 기존 하드코딩 데이터 사용 (하위 호환성)
   if (!hasLocationImage(props.center)) {
     return null
   }

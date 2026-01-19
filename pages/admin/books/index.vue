@@ -791,7 +791,7 @@
 
 <script setup>
 import { CENTERS, getCenterByWorkplace } from '@/utils/centerMapping.js'
-import { CENTER_CODE_MAP, createLabelNumber, parseLabelNumber, formatLocation, getLocationSelectOptions } from '@/utils/labelConfig.js'
+import { CENTER_CODE_MAP, createLabelNumber, parseLabelNumber, formatLocation } from '@/utils/labelConfig.js'
 import { hasLocationImage } from '@/utils/locationCoordinates.js'
 
 definePageMeta({
@@ -811,6 +811,7 @@ const {
   calculateBookStatus,
   loading: booksLoading 
 } = useBooks()
+const { loadCenterLocations } = useSettings()
 const { confirm, alert } = useDialog()
 const { $firebaseFirestore } = useNuxtApp()
 const firestore = $firebaseFirestore
@@ -908,16 +909,35 @@ const editForm = ref({
   location: ''
 })
 
-// 위치 옵션
-const locationOptions = computed(() => getLocationSelectOptions())
+// 위치 옵션 (센터별 동적 로드)
+const locationOptions = ref([])
 
 // 칸별보기 필터 옵션
 const locationFilterOptions = computed(() => {
   return [
     { title: '전체', value: '' },
-    ...getLocationSelectOptions()
+    ...locationOptions.value
   ]
 })
+
+// 센터별 위치 옵션 로드
+const loadLocationOptions = async () => {
+  try {
+    const locations = await loadCenterLocations(currentCenter.value)
+    locationOptions.value = locations.map(loc => ({
+      title: loc.name,
+      value: loc.name
+    }))
+  } catch (error) {
+    console.error('위치 옵션 로드 오류:', error)
+    locationOptions.value = []
+  }
+}
+
+// 기본 위치값 가져오기 (첫 번째 칸)
+const getDefaultLocation = () => {
+  return locationOptions.value.length > 0 ? locationOptions.value[0].value : ''
+}
 
 // 센터 코드 (수정용)
 const editCenterCode = computed(() => {
@@ -986,7 +1006,10 @@ onMounted(async () => {
   userWorkplace.value = workplace
   currentCenter.value = workplace ? getCenterByWorkplace(workplace) : centerOptions[0]
   
-  await loadRegisteredBooks()
+  await Promise.all([
+    loadRegisteredBooks(),
+    loadLocationOptions()
+  ])
   
   // 대여 신청된 도서가 있으면 알림
   checkAndAlertRequestedBooks()
@@ -1015,7 +1038,10 @@ const handleProcessRequestedBooks = () => {
 // 센터 변경 처리
 const handleCenterChange = async () => {
   selectedBooks.value = []
-  await loadRegisteredBooks()
+  await Promise.all([
+    loadRegisteredBooks(),
+    loadLocationOptions()
+  ])
 }
 
 // 등록된 도서 로드
@@ -1436,10 +1462,13 @@ const openEditDialog = async (book) => {
   // 기존 라벨번호 파싱
   const parsed = parseLabelNumber(book.labelNumber)
   
+  // 기본 위치값 가져오기 (도서에 저장된 위치가 없을 경우)
+  const defaultLocation = getDefaultLocation()
+  
   editForm.value = {
     category: book.category || (parsed?.category || ''),
     fourDigits: parsed?.fourDigits || '',
-    location: book.location || '구매칸'
+    location: book.location || defaultLocation
   }
   editLabelNumberError.value = ''
   

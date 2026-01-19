@@ -609,7 +609,7 @@
 
 <script setup>
 import { CENTERS, getCenterByWorkplace } from '@/utils/centerMapping.js'
-import { CENTER_CODE_MAP, createLabelNumber, getLocationSelectOptions } from '@/utils/labelConfig.js'
+import { CENTER_CODE_MAP, createLabelNumber } from '@/utils/labelConfig.js'
 import { sanitizeInput } from '@/utils/sanitize.js'
 
 definePageMeta({
@@ -627,6 +627,7 @@ const {
   checkLabelNumberExists,
   loading: booksLoading 
 } = useBooks()
+const { loadCenterLocations } = useSettings()
 const { confirm, alert } = useDialog()
 const { $firebaseFirestore } = useNuxtApp()
 const firestore = $firebaseFirestore
@@ -687,7 +688,7 @@ const labelCheckLoading = ref(false)
 const registerForm = ref({
   category: '',
   quantity: 1,
-  copies: [{ fourDigits: '', location: '구매칸' }]
+  copies: [{ fourDigits: '', location: '', error: '', labelPreview: '' }]
 })
 
 // 직접 등록 다이얼로그 관련
@@ -700,8 +701,13 @@ const manualForm = ref({
   isbn: '',
   category: '',
   quantity: 1,
-  copies: [{ fourDigits: '', location: '구매칸', error: '', labelPreview: '' }]
+  copies: [{ fourDigits: '', location: '', error: '', labelPreview: '' }]
 })
+
+// 기본 위치값 가져오기 (첫 번째 칸)
+const getDefaultLocation = () => {
+  return locationOptions.value.length > 0 ? locationOptions.value[0].value : ''
+}
 
 // 센터 코드
 const centerCode = computed(() => {
@@ -713,8 +719,22 @@ const handleCategoryManageClick = async () => {
   await alert('카테고리 관리 기능은 준비 중입니다.', { type: 'info' })
 }
 
-// 위치 옵션
-const locationOptions = computed(() => getLocationSelectOptions())
+// 위치 옵션 (센터별 동적 로드)
+const locationOptions = ref([])
+
+// 센터별 위치 옵션 로드
+const loadLocationOptions = async () => {
+  try {
+    const locations = await loadCenterLocations(currentCenter.value)
+    locationOptions.value = locations.map(loc => ({
+      title: loc.name,
+      value: loc.name
+    }))
+  } catch (error) {
+    console.error('위치 옵션 로드 오류:', error)
+    locationOptions.value = []
+  }
+}
 
 // 4자리 입력 규칙
 const fourDigitsRules = [
@@ -830,7 +850,8 @@ onMounted(async () => {
   await Promise.all([
     loadBestsellers(),
     loadRegisteredBooks(),
-    loadBookRequests()
+    loadBookRequests(),
+    loadLocationOptions()
   ])
 })
 
@@ -840,7 +861,8 @@ const handleCenterChange = async () => {
   await Promise.all([
     loadBestsellers(),
     loadRegisteredBooks(),
-    loadBookRequests()
+    loadBookRequests(),
+    loadLocationOptions()
   ])
 }
 
@@ -996,11 +1018,12 @@ const loadCategories = async () => {
 const handleQuantityChange = (newQuantity) => {
   const qty = Math.max(1, Math.min(20, newQuantity || 1))
   const currentCopies = registerForm.value.copies
+  const defaultLocation = getDefaultLocation()
   
   if (qty > currentCopies.length) {
     // 권수 증가 - 새로운 항목 추가
     for (let i = currentCopies.length; i < qty; i++) {
-      currentCopies.push({ fourDigits: '', location: '구매칸', error: '', labelPreview: '' })
+      currentCopies.push({ fourDigits: '', location: defaultLocation, error: '', labelPreview: '' })
     }
   } else if (qty < currentCopies.length) {
     // 권수 감소 - 뒤에서 삭제
@@ -1063,11 +1086,14 @@ const openRegisterDialog = async (book) => {
   selectedBook.value = book
   selectedRequestInfo.value = null
   
+  // 기본 위치값 가져오기
+  const defaultLocation = getDefaultLocation()
+  
   // 폼 초기화
   registerForm.value = {
     category: '',
     quantity: 1,
-    copies: [{ fourDigits: '', location: '구매칸', error: '', labelPreview: '' }]
+    copies: [{ fourDigits: '', location: defaultLocation, error: '', labelPreview: '' }]
   }
   
   // 카테고리 로드
@@ -1081,11 +1107,14 @@ const openRegisterDialogFromRequest = async (book) => {
   selectedBook.value = book
   selectedRequestInfo.value = book
   
+  // 기본 위치값 가져오기
+  const defaultLocation = getDefaultLocation()
+  
   // 폼 초기화
   registerForm.value = {
     category: '',
     quantity: 1,
-    copies: [{ fourDigits: '', location: '구매칸', error: '', labelPreview: '' }]
+    copies: [{ fourDigits: '', location: defaultLocation, error: '', labelPreview: '' }]
   }
   
   // 카테고리 로드
@@ -1103,6 +1132,9 @@ const closeRegisterDialog = () => {
 
 // 직접 등록 다이얼로그 열기
 const openManualRegisterDialog = async () => {
+  // 기본 위치값 가져오기
+  const defaultLocation = getDefaultLocation()
+  
   manualForm.value = {
     title: '',
     author: '',
@@ -1110,7 +1142,7 @@ const openManualRegisterDialog = async () => {
     isbn: '',
     category: '',
     quantity: 1,
-    copies: [{ fourDigits: '', location: '구매칸', error: '', labelPreview: '' }]
+    copies: [{ fourDigits: '', location: defaultLocation, error: '', labelPreview: '' }]
   }
   await loadCategories()
   manualRegisterDialog.value = true
@@ -1125,10 +1157,11 @@ const closeManualRegisterDialog = () => {
 const handleManualQuantityChange = (value) => {
   const newQuantity = Math.max(1, Math.min(20, parseInt(value) || 1))
   const currentCopies = manualForm.value.copies
+  const defaultLocation = getDefaultLocation()
   
   if (newQuantity > currentCopies.length) {
     for (let i = currentCopies.length; i < newQuantity; i++) {
-      currentCopies.push({ fourDigits: '', location: '구매칸', error: '', labelPreview: '' })
+      currentCopies.push({ fourDigits: '', location: defaultLocation, error: '', labelPreview: '' })
     }
   } else if (newQuantity < currentCopies.length) {
     currentCopies.splice(newQuantity)

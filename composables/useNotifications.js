@@ -206,7 +206,8 @@ export const useNotifications = () => {
       overdue_admin: 'mdi-alert-circle',
       book_registered: 'mdi-book-check',
       book_request: 'mdi-book-plus',
-      rent_request: 'mdi-book-arrow-right'
+      rent_request: 'mdi-book-arrow-right',
+      book_available: 'mdi-book-check'
     }
     return iconMap[type] || 'mdi-bell'
   }
@@ -221,7 +222,8 @@ export const useNotifications = () => {
       overdue_admin: 'error',
       book_registered: 'success',
       book_request: 'info',
-      rent_request: 'info'
+      rent_request: 'info',
+      book_available: 'success'
     }
     return colorMap[type] || 'primary'
   }

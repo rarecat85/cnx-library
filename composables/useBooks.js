@@ -67,11 +67,11 @@ export const useBooks = () => {
   }
 
   /**
-   * 같은 ISBN을 이미 대여중인지 체크
+   * 같은 ISBN을 이미 대여중이거나 대여 신청중인지 체크
    * @param {string} userId - 사용자 UID
    * @param {string} isbn - ISBN
    * @param {string} center - 센터명
-   * @returns {Promise<Object|null>} 대여중인 도서 정보 또는 null
+   * @returns {Promise<Object|null>} 대여중/신청중인 도서 정보 또는 null
    */
   const checkAlreadyRentedSameIsbn = async (userId, isbn, center) => {
     if (!firestore) {
@@ -80,21 +80,46 @@ export const useBooks = () => {
 
     try {
       const booksRef = collection(firestore, 'books')
-      const q = query(
+      
+      // 1. 대여중인 도서 체크
+      const rentedQuery = query(
         booksRef,
         where('center', '==', center),
         where('isbn', '==', isbn),
         where('rentedBy', '==', userId)
       )
       
-      const snapshot = await getDocs(q)
+      const rentedSnapshot = await getDocs(rentedQuery)
       
       // 대여중 또는 연체중인 도서 찾기
-      for (const docSnapshot of snapshot.docs) {
+      for (const docSnapshot of rentedSnapshot.docs) {
         const data = docSnapshot.data()
         if (data.status === 'rented' || calculateBookStatus(data) === 'overdue') {
           return {
             id: docSnapshot.id,
+            type: 'rented',
+            ...data
+          }
+        }
+      }
+      
+      // 2. 대여 신청중인 도서 체크
+      const requestedQuery = query(
+        booksRef,
+        where('center', '==', center),
+        where('isbn', '==', isbn),
+        where('requestedBy', '==', userId)
+      )
+      
+      const requestedSnapshot = await getDocs(requestedQuery)
+      
+      // 대여 신청중인 도서 찾기
+      for (const docSnapshot of requestedSnapshot.docs) {
+        const data = docSnapshot.data()
+        if (data.status === 'requested') {
+          return {
+            id: docSnapshot.id,
+            type: 'requested',
             ...data
           }
         }
@@ -116,7 +141,7 @@ export const useBooks = () => {
    */
   const getCategories = async (center) => {
     // 기본 카테고리는 항상 반환
-    const categories = [...DEFAULT_CATEGORIES]
+    let categories = [...DEFAULT_CATEGORIES]
     
     if (!firestore) {
       console.warn('Firebase가 초기화되지 않았습니다. 기본 카테고리만 반환합니다.')
@@ -129,12 +154,36 @@ export const useBooks = () => {
       const q = query(categoriesRef, where('center', '==', center))
       const snapshot = await getDocs(q)
       
-      snapshot.forEach((doc) => {
-        const data = doc.data()
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data()
         if (data.name && !categories.includes(data.name)) {
           categories.push(data.name)
         }
       })
+      
+      // 센터별 사용여부 필터링 (settings/categories 문서 확인)
+      try {
+        const settingsRef = doc(firestore, 'settings', 'categories')
+        const settingsDoc = await getDoc(settingsRef)
+        
+        if (settingsDoc.exists()) {
+          const settings = settingsDoc.data()
+          const items = settings.items || {}
+          
+          // 센터별 사용여부가 설정된 카테고리만 필터링
+          categories = categories.filter(categoryName => {
+            // 설정이 없으면 모든 센터에서 사용 가능 (기본 동작 유지)
+            if (!items[categoryName]) {
+              return true
+            }
+            // 설정이 있으면 해당 센터가 포함되어 있는지 확인
+            return items[categoryName].includes(center)
+          })
+        }
+      } catch (settingsErr) {
+        // 설정 조회 실패 시 필터링 없이 진행 (하위 호환성)
+        console.warn('카테고리 설정 조회 실패 (기본 동작 유지):', settingsErr)
+      }
     } catch (err) {
       console.error('추가 카테고리 조회 오류 (기본 카테고리는 사용 가능):', err)
     }
@@ -615,12 +664,16 @@ export const useBooks = () => {
 
       const bookData = bookDoc.data()
       
-      // ISBN 중복 대여 체크
+      // ISBN 중복 대여/신청 체크
       const bookIsbn = isbn || bookData.isbn
       if (bookIsbn) {
-        const alreadyRented = await checkAlreadyRentedSameIsbn(userId, bookIsbn, center)
-        if (alreadyRented) {
-          throw new Error(`이미 같은 도서를 대여중입니다. (라벨번호: ${alreadyRented.labelNumber || alreadyRented.id})`)
+        const alreadyExists = await checkAlreadyRentedSameIsbn(userId, bookIsbn, center)
+        if (alreadyExists) {
+          if (alreadyExists.type === 'requested') {
+            throw new Error(`이미 같은 도서를 대여 신청중입니다. (라벨번호: ${alreadyExists.labelNumber || alreadyExists.id})`)
+          } else {
+            throw new Error(`이미 같은 도서를 대여중입니다. (라벨번호: ${alreadyExists.labelNumber || alreadyExists.id})`)
+          }
         }
       }
       
@@ -688,12 +741,16 @@ export const useBooks = () => {
 
       const bookData = bookDoc.data()
       
-      // ISBN 중복 대여 체크
+      // ISBN 중복 대여/신청 체크
       const bookIsbn = isbn || bookData.isbn
       if (bookIsbn) {
-        const alreadyRented = await checkAlreadyRentedSameIsbn(userId, bookIsbn, center)
-        if (alreadyRented) {
-          throw new Error(`이미 같은 도서를 대여중입니다. (라벨번호: ${alreadyRented.labelNumber || alreadyRented.id})`)
+        const alreadyExists = await checkAlreadyRentedSameIsbn(userId, bookIsbn, center)
+        if (alreadyExists) {
+          if (alreadyExists.type === 'requested') {
+            throw new Error(`이미 같은 도서를 대여 신청중입니다. (라벨번호: ${alreadyExists.labelNumber || alreadyExists.id})`)
+          } else {
+            throw new Error(`이미 같은 도서를 대여중입니다. (라벨번호: ${alreadyExists.labelNumber || alreadyExists.id})`)
+          }
         }
       }
       

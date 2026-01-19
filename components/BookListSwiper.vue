@@ -87,11 +87,15 @@
             :status="getBookStatus(book)"
             :show-rent-button="showRentButton"
             :hide-overdue-status="hideOverdueStatus"
-            :disabled="isBookDisabled(book)"
+            :disabled="false"
             :allow-register-requested="allowRegisterRequested"
             :allow-additional-register="allowAdditionalRegister"
+            :show-return-notify-button="shouldShowReturnNotifyButton(book)"
+            :is-subscribed-to-return="isSubscribedToBook(book.isbn)"
+            :return-notify-loading="returnNotifyLoadingIsbn === book.isbn"
             @register="handleRegister"
             @rent="handleRent"
+            @subscribe-return-notify="handleSubscribeReturnNotify"
           />
         </SwiperSlide>
       </Swiper>
@@ -218,10 +222,30 @@ const props = defineProps({
   allowAdditionalRegister: {
     type: Boolean,
     default: false
+  },
+  // 반납 알림 관련
+  showReturnNotifyButton: {
+    type: Boolean,
+    default: false
+  },
+  // 내가 구독중인 ISBN 목록
+  subscribedIsbns: {
+    type: Array,
+    default: () => []
+  },
+  // 내가 대여중인 ISBN 목록
+  myRentedIsbns: {
+    type: Array,
+    default: () => []
+  },
+  // 반납 알림 로딩중인 ISBN
+  returnNotifyLoadingIsbn: {
+    type: String,
+    default: null
   }
 })
 
-const emit = defineEmits(['register', 'rent'])
+const emit = defineEmits(['register', 'rent', 'subscribeReturnNotify'])
 
 // 도서 상태 계산
 const { calculateBookStatus } = useBooks()
@@ -253,6 +277,25 @@ const handleRegister = (book) => {
 // 도서 대여 처리
 const handleRent = (book) => {
   emit('rent', book)
+}
+
+// 반납 알림 버튼 표시 여부 (대여중 + 반납알림 표시 설정 + 내가 대여중이 아닌 경우)
+const shouldShowReturnNotifyButton = (book) => {
+  if (!props.showReturnNotifyButton) return false
+  const status = getBookStatus(book)
+  const isRented = status === 'rented' || status === 'overdue'
+  const isMyRented = props.myRentedIsbns.includes(book.isbn)
+  return isRented && !isMyRented
+}
+
+// 내가 구독중인 ISBN인지 확인
+const isSubscribedToBook = (isbn) => {
+  return props.subscribedIsbns.includes(isbn)
+}
+
+// 반납 알림 구독 처리
+const handleSubscribeReturnNotify = (book) => {
+  emit('subscribeReturnNotify', book)
 }
 </script>
 

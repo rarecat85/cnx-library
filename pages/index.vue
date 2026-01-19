@@ -82,7 +82,12 @@
             :show-status-flags="true"
             :show-rent-button="true"
             :hide-overdue-status="true"
+            :show-return-notify-button="true"
+            :subscribed-isbns="returnNotifySubscriptions"
+            :my-rented-isbns="myRentedIsbns"
+            :return-notify-loading-isbn="returnNotifyLoadingIsbn"
             @rent="handleRent"
+            @subscribe-return-notify="handleSubscribeReturnNotify"
           />
           <div class="more-books-btn-wrapper">
             <v-btn
@@ -301,6 +306,11 @@ const userWorkplace = ref('')
 const newBooks = ref([])
 const newBooksLoading = ref(false)
 
+// 반납 알림 관련
+const returnNotifySubscriptions = ref([]) // 내가 구독중인 ISBN 목록
+const returnNotifyLoadingIsbn = ref(null)
+const myRentedIsbns = ref([]) // 내가 대여중인 ISBN 목록
+
 // 나의 도서 대여 현황
 const userName = ref('')
 const myRentedCount = ref(0)
@@ -354,6 +364,11 @@ const loadMyRentalStatus = async () => {
       .filter(book => book.status === 'rented' || book.status === 'overdue')
     myRentedCount.value = rentedBooks.length
     
+    // 내가 대여중인 ISBN 목록 저장
+    myRentedIsbns.value = rentedBooks
+      .map(book => book.isbn13 || book.isbn)
+      .filter(isbn => isbn)
+    
     // 반납 예정 도서 (반납예정일 1일 전부터 + 연체 도서 포함)
     // 반납예정일 = 대여일 + 7일
     // 내일 23:59:59까지의 반납예정일을 가진 도서 + 이미 지난 연체 도서
@@ -392,13 +407,17 @@ onMounted(async () => {
   
   await Promise.all([
     loadNewBooks(),
-    loadMyRentalStatus()
+    loadMyRentalStatus(),
+    loadReturnNotifySubscriptions()
   ])
 })
 
 // 센터 변경 처리
 const handleCenterChange = async () => {
-  await loadNewBooks()
+  await Promise.all([
+    loadNewBooks(),
+    loadReturnNotifySubscriptions()
+  ])
 }
 
 // 전체 신규 도서 (그룹화 전)
@@ -449,6 +468,65 @@ const loadNewBooks = async () => {
     allNewBooks.value = []
   } finally {
     newBooksLoading.value = false
+  }
+}
+
+// 반납 알림 구독 목록 로드
+const loadReturnNotifySubscriptions = async () => {
+  if (!user.value || !firestore) return
+
+  try {
+    const { collection, query, where, getDocs } = await import('firebase/firestore')
+    const subscriptionsRef = collection(firestore, 'returnNotifySubscriptions')
+    const q = query(
+      subscriptionsRef,
+      where('userId', '==', user.value.uid),
+      where('center', '==', currentCenter.value),
+      where('notified', '==', false)
+    )
+    
+    const snapshot = await getDocs(q)
+    const subscriptions = []
+    snapshot.forEach(doc => {
+      subscriptions.push(doc.data().isbn)
+    })
+    returnNotifySubscriptions.value = subscriptions
+  } catch (error) {
+    console.error('반납 알림 구독 목록 로드 오류:', error)
+    returnNotifySubscriptions.value = []
+  }
+}
+
+// 반납 알림 구독 처리
+const handleSubscribeReturnNotify = async (book) => {
+  if (!user.value || !firestore || !book) return
+
+  try {
+    const isbn = book.isbn13 || book.isbn
+    returnNotifyLoadingIsbn.value = isbn
+    
+    const { collection, addDoc, serverTimestamp } = await import('firebase/firestore')
+    const subscriptionsRef = collection(firestore, 'returnNotifySubscriptions')
+    
+    await addDoc(subscriptionsRef, {
+      userId: user.value.uid,
+      userEmail: user.value.email,
+      isbn: isbn,
+      title: book.title,
+      center: currentCenter.value,
+      notified: false,
+      createdAt: serverTimestamp()
+    })
+    
+    // 로컬 상태 업데이트
+    returnNotifySubscriptions.value.push(isbn)
+    
+    await alert('반납 알림이 신청되었습니다.\n도서가 반납되면 알림을 받으실 수 있습니다.', { type: 'success' })
+  } catch (error) {
+    console.error('반납 알림 구독 오류:', error)
+    await alert('반납 알림 신청에 실패했습니다.', { type: 'error' })
+  } finally {
+    returnNotifyLoadingIsbn.value = null
   }
 }
 

@@ -211,8 +211,8 @@ const selectedFilter = ref('all')
 const displayCount = ref(10)
 const ITEMS_PER_PAGE = 10
 
-// 이메일 알림 설정
-const emailNotificationEnabled = ref(false)
+// 이메일 알림 설정 (기본값: 켜짐)
+const emailNotificationEnabled = ref(true)
 const emailSettingLoading = ref(false)
 
 // 이메일 알림 설정 로드
@@ -226,7 +226,8 @@ const loadEmailNotificationSetting = async () => {
     
     if (userDoc.exists()) {
       const userData = userDoc.data()
-      emailNotificationEnabled.value = userData.emailNotification === true
+      // 명시적으로 false인 경우에만 비활성화, 그 외(true 또는 undefined)는 활성화
+      emailNotificationEnabled.value = userData.emailNotification !== false
     }
   } catch (error) {
     console.error('이메일 알림 설정 로드 오류:', error)
@@ -322,6 +323,8 @@ const handleNotificationClick = async (notification) => {
       router.push('/admin/books')
       break
     case 'book_registered':
+    case 'book_available':
+      // 도서 등록/반납 완료 → 도서 대여 페이지
       router.push('/books')
       break
     case 'return_reminder':

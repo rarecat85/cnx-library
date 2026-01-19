@@ -79,6 +79,15 @@
           <v-icon>mdi-account-clock</v-icon>
           <span>임시 회원 관리</span>
         </NuxtLink>
+
+        <NuxtLink
+          to="/admin/settings"
+          class="menu-item"
+          @click="closeDrawer"
+        >
+          <v-icon>mdi-cog</v-icon>
+          <span>설정 관리</span>
+        </NuxtLink>
       </div>
 
       <!-- 최고관리자 메뉴 (admin 역할만 표시) -->
@@ -111,6 +120,17 @@
         </div>
       </div>
     </nav>
+
+    <!-- 하단 문의하기 -->
+    <div class="menu-footer">
+      <a
+        href="mailto:officemanager.korea@concentrix.com"
+        class="contact-link"
+      >
+        <v-icon>mdi-email-outline</v-icon>
+        <span>문의하기</span>
+      </a>
+    </div>
   </div>
 </template>
 
@@ -223,6 +243,36 @@ const handleLogout = async () => {
 
 .logout-item:hover {
   background-color: rgba(255, 255, 255, 0.1);
+}
+
+.menu-footer {
+  padding: rem(12) rem(16);
+  border-top: rem(1) solid rgba(255, 255, 255, 0.1);
+  margin-top: auto;
+}
+
+.contact-link {
+  display: inline-flex;
+  align-items: center;
+  gap: rem(4);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: rem(12);
+  text-decoration: none;
+  transition: color 0.2s;
+  
+  span {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  
+  &:hover {
+    color: #FFFFFF;
+  }
+  
+  .v-icon {
+    font-size: rem(14);
+    margin-top: 2px;
+  }
 }
 </style>
 

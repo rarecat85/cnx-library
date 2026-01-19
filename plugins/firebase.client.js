@@ -2,6 +2,7 @@ import { defineNuxtPlugin } from '#app'
 import { initializeApp, getApps } from 'firebase/app'
 import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth'
 import { initializeFirestore } from 'firebase/firestore'
+import { getStorage } from 'firebase/storage'
 
 export default defineNuxtPlugin(async (nuxtApp) => {
   const config = useRuntimeConfig()
@@ -26,6 +27,8 @@ export default defineNuxtPlugin(async (nuxtApp) => {
 
   // Firebase 서비스 초기화
   const auth = getAuth(app)
+  const storage = getStorage(app)
+  
   // Firestore 초기화 시 QUIC 프로토콜 에러 방지를 위해 long polling 사용
   let firestore
   if (process.client) {
@@ -60,7 +63,8 @@ export default defineNuxtPlugin(async (nuxtApp) => {
     provide: {
       firebaseApp: app,
       firebaseAuth: auth,
-      firebaseFirestore: firestore
+      firebaseFirestore: firestore,
+      firebaseStorage: storage
     }
   }
 })

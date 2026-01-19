@@ -264,13 +264,64 @@
       </div>
     </div>
     
+    <!-- 대여 신청일 및 취소 버튼 (마이페이지 대여 신청 도서용) -->
+    <div
+      v-else-if="showRentRequestInfo && rentRequestDate"
+      class="book-action-area book-action-area-mypage"
+    >
+      <v-btn
+        color="error"
+        variant="outlined"
+        size="small"
+        class="cancel-request-btn"
+        :loading="cancelRentRequestLoading"
+        @click.stop="handleCancelRentRequest"
+      >
+        대여 신청 취소
+      </v-btn>
+      <div class="requested-date-text text-body-2">
+        <v-icon
+          size="small"
+          class="mr-1"
+        >
+          mdi-clock-outline
+        </v-icon>
+        {{ formattedRentRequestDate }}
+      </div>
+    </div>
+    
     <!-- 대여 신청 버튼 (도서 대여 페이지용) -->
     <div
       v-else-if="showRentButton"
       class="book-action-area"
     >
       <div
-        v-if="isRented"
+        v-if="isRented && showReturnNotifyButton"
+        class="rented-notify-section"
+      >
+        <div class="rented-text text-body-2 mb-1">
+          대여중인 도서입니다.
+        </div>
+        <v-btn
+          v-if="!isSubscribedToReturn"
+          color="primary"
+          variant="outlined"
+          size="small"
+          class="return-notify-btn"
+          :loading="returnNotifyLoading"
+          @click.stop="handleSubscribeReturnNotify"
+        >
+          반납알림받기
+        </v-btn>
+        <div
+          v-else
+          class="subscribed-text text-body-2"
+        >
+          반납 알림 신청됨
+        </div>
+      </div>
+      <div
+        v-else-if="isRented"
         class="rented-text text-body-2"
       >
         대여중인 도서입니다.
@@ -455,6 +506,19 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  // 반납 알림 관련 (도서 대여 페이지용)
+  showReturnNotifyButton: {
+    type: Boolean,
+    default: false
+  },
+  isSubscribedToReturn: {
+    type: Boolean,
+    default: false
+  },
+  returnNotifyLoading: {
+    type: Boolean,
+    default: false
+  },
   renterInfo: {
     type: String,
     default: ''
@@ -530,6 +594,19 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  // 대여 신청 정보 표시 (마이페이지 대여 신청 도서용)
+  showRentRequestInfo: {
+    type: Boolean,
+    default: false
+  },
+  rentRequestDate: {
+    type: [Date, Object, String],
+    default: null
+  },
+  cancelRentRequestLoading: {
+    type: Boolean,
+    default: false
+  },
   // 센터 정보 표시
   showCenter: {
     type: Boolean,
@@ -542,7 +619,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['register', 'select', 'return', 'rent', 'adminRent', 'adminReturn', 'locationClick', 'cancelRequest'])
+const emit = defineEmits(['register', 'select', 'return', 'rent', 'adminRent', 'adminReturn', 'locationClick', 'cancelRequest', 'cancelRentRequest', 'subscribeReturnNotify'])
 
 // 위치 안내 팝업
 const locationPopupVisible = ref(false)
@@ -771,10 +848,32 @@ const formattedRequestedDate = computed(() => {
   return `${year}.${month}.${day}`
 })
 
-// 신청 취소 처리
+// 신청 취소 처리 (도서 등록 신청)
 const handleCancelRequest = () => {
   emit('cancelRequest', props.book)
 }
+
+// 대여 신청 취소 처리
+const handleCancelRentRequest = () => {
+  emit('cancelRentRequest', props.book)
+}
+
+// 반납 알림 구독 처리
+const handleSubscribeReturnNotify = () => {
+  emit('subscribeReturnNotify', props.book)
+}
+
+// 대여 신청일 포맷
+const formattedRentRequestDate = computed(() => {
+  if (!props.rentRequestDate) return ''
+  
+  const date = props.rentRequestDate?.toDate?.() || new Date(props.rentRequestDate)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  
+  return `${year}.${month}.${day} 신청`
+})
 </script>
 
 <style lang="scss" scoped>
@@ -1040,6 +1139,26 @@ const handleCancelRequest = () => {
   justify-content: center;
   min-height: rem(28);
   box-sizing: border-box;
+}
+
+.rented-notify-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.return-notify-btn {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.subscribed-text {
+  color: #616161;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .requested-status-text {

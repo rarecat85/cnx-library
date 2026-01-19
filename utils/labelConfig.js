@@ -32,25 +32,6 @@ export const getCenterByCode = (code) => {
   return entry ? entry[0] : null
 }
 
-// 위치(칸) 목록
-export const LOCATION_OPTIONS = [
-  { value: '구매칸', text: '구매칸', type: 'special' },
-  { value: '기부칸', text: '기부칸', type: 'special' },
-  ...Array.from({ length: 16 }, (_, i) => ({
-    value: String(i + 1),
-    text: `${i + 1}번 칸`,
-    type: 'number'
-  }))
-]
-
-// 위치 목록에서 선택 옵션 형태로 변환
-export const getLocationSelectOptions = () => {
-  return LOCATION_OPTIONS.map(opt => ({
-    title: opt.text,
-    value: opt.value
-  }))
-}
-
 /**
  * 라벨번호 생성
  * @param {string} category - 카테고리명

@@ -224,6 +224,72 @@
           </div>
         </div>
 
+        <!-- 대여 신청 목록 섹션 (근무지와 센터가 다른 경우에만 표시) -->
+        <div
+          v-if="showRentRequestSection"
+          class="rent-request-section mb-8"
+        >
+          <div class="section-header mb-4">
+            <h2 class="section-title">
+              대여 신청 목록
+              <span
+                v-if="myRentRequests.length > 0"
+                class="book-count"
+              >
+                ({{ myRentRequests.length }}권)
+              </span>
+            </h2>
+          </div>
+          
+          <div
+            v-if="rentRequestsLoading"
+            class="text-center py-8"
+          >
+            <v-progress-circular
+              indeterminate
+              color="primary"
+            />
+          </div>
+          <div
+            v-else-if="myRentRequests.length > 0"
+            class="rent-requests-grid"
+          >
+            <v-row class="book-list-row">
+              <v-col
+                v-for="(book, index) in myRentRequests"
+                :key="`rent-request-${index}`"
+                cols="12"
+                sm="6"
+                class="book-list-col"
+              >
+                <BookCard
+                  :book="book"
+                  :center="book.center || ''"
+                  :show-action="false"
+                  :selectable="false"
+                  :show-ripple="false"
+                  :show-status-flags="false"
+                  :show-label-number="true"
+                  :label-number="book.labelNumber"
+                  :show-location="true"
+                  :location="book.location"
+                  :show-rent-request-info="true"
+                  :rent-request-date="book.requestedAt"
+                  :cancel-rent-request-loading="cancelRentRequestLoading === book.id"
+                  class="rent-request-book-card"
+                  @cancel-rent-request="handleCancelRentRequest"
+                />
+              </v-col>
+            </v-row>
+          </div>
+          <div
+            v-else
+            class="text-center py-8 text-medium-emphasis empty-state"
+          >
+            대여 신청한 도서가 없습니다.
+          </div>
+        </div>
+
         <!-- 내가 신청한 책 목록 섹션 -->
         <div class="requested-section mb-8">
           <div class="section-header-with-filter mb-4">
@@ -496,10 +562,27 @@ const openLocationPopupForBook = (book) => {
 const rentedBooks = ref([])
 const rentedBooksLoading = ref(false)
 
-// 내가 신청한 도서
+// 내가 신청한 도서 (도서 등록 요청)
 const myRequestedBooks = ref([])
 const requestedBooksLoading = ref(false)
 const cancelRequestLoading = ref(null)
+
+// 대여 신청 도서 (books 컬렉션에서 status='requested')
+const myRentRequests = ref([])
+const rentRequestsLoading = ref(false)
+const cancelRentRequestLoading = ref(null)
+
+// 사용자 근무지
+const userWorkplace = ref('')
+
+// 대여 신청 섹션 표시 여부 (근무지와 센터가 다른 경우에만)
+const showRentRequestSection = computed(() => {
+  if (!userWorkplace.value) return false
+  const userCenter = getCenterByWorkplace(userWorkplace.value)
+  // 근무지 센터와 일치하면 미노출 (바로 대여 가능하므로 대여 신청 불필요)
+  // 근무지 센터와 다르면 노출 (대여 신청 기능을 사용하는 경우)
+  return userCenter !== selectedCenter.value
+})
 
 // 신청 도서 센터 필터
 const requestedCenterFilter = ref('')
@@ -595,16 +678,94 @@ const getUserWorkplace = async () => {
 // 초기화
 onMounted(async () => {
   const workplace = await getUserWorkplace()
+  userWorkplace.value = workplace
   const userCenter = workplace ? getCenterByWorkplace(workplace) : centerOptions[0]
   selectedCenter.value = userCenter
   requestedCenterFilter.value = userCenter
   
   await Promise.all([
     loadRentedBooks(),
+    loadMyRentRequests(),
     loadMyRequestedBooks(),
     loadRentalHistory()
   ])
 })
+
+// 대여 신청 도서 로드 (books 컬렉션에서 status='requested' 조회)
+const loadMyRentRequests = async () => {
+  if (!user.value || !firestore) return
+
+  try {
+    rentRequestsLoading.value = true
+    
+    const { collection, query, where, getDocs } = await import('firebase/firestore')
+    
+    // books 컬렉션에서 내가 대여 신청한 도서 조회
+    const booksRef = collection(firestore, 'books')
+    const q = query(
+      booksRef,
+      where('requestedBy', '==', user.value.uid),
+      where('status', '==', 'requested')
+    )
+    
+    const snapshot = await getDocs(q)
+    const books = []
+    
+    snapshot.forEach((doc) => {
+      books.push({
+        id: doc.id,
+        ...doc.data()
+      })
+    })
+    
+    // 신청일 기준 내림차순 정렬
+    books.sort((a, b) => {
+      const dateA = a.requestedAt?.toDate?.() || new Date(0)
+      const dateB = b.requestedAt?.toDate?.() || new Date(0)
+      return dateB - dateA
+    })
+    
+    myRentRequests.value = books
+  } catch (error) {
+    console.error('대여 신청 도서 로드 오류:', error)
+    myRentRequests.value = []
+  } finally {
+    rentRequestsLoading.value = false
+  }
+}
+
+// 대여 신청 취소 (books 컬렉션의 상태 업데이트)
+const handleCancelRentRequest = async (book) => {
+  if (!user.value || !book) return
+
+  if (!await confirm(`"${book.title}" 대여 신청을 취소하시겠습니까?`)) {
+    return
+  }
+
+  try {
+    cancelRentRequestLoading.value = book.id
+    
+    const { doc, updateDoc, deleteField } = await import('firebase/firestore')
+    
+    // books 컬렉션에서 해당 도서 상태 업데이트
+    const bookRef = doc(firestore, 'books', book.id)
+    await updateDoc(bookRef, {
+      status: 'available',
+      requestedBy: deleteField(),
+      requestedAt: deleteField()
+    })
+    
+    // 목록에서 제거
+    myRentRequests.value = myRentRequests.value.filter(b => b.id !== book.id)
+    
+    await alert('대여 신청이 취소되었습니다.', { type: 'success' })
+  } catch (error) {
+    console.error('대여 신청 취소 오류:', error)
+    await alert(error.message || '대여 신청 취소에 실패했습니다.', { type: 'error' })
+  } finally {
+    cancelRentRequestLoading.value = null
+  }
+}
 
 // 내가 신청한 도서 로드 (bookRequests 컬렉션에서 조회)
 const loadMyRequestedBooks = async () => {
@@ -892,6 +1053,61 @@ const closeReturnDialog = () => {
   returnDialogBooks.value = []
 }
 
+// 반납 알림 구독자에게 알림 발송
+const notifyReturnSubscribers = async (book) => {
+  if (!firestore || !book) return
+
+  try {
+    const { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp } = await import('firebase/firestore')
+    
+    const isbn = book.isbn13 || book.isbn || ''
+    if (!isbn) return
+    
+    // 해당 ISBN + 센터에 대한 미통보 구독자 조회
+    const subscriptionsRef = collection(firestore, 'returnNotifySubscriptions')
+    const q = query(
+      subscriptionsRef,
+      where('isbn', '==', isbn),
+      where('center', '==', book.center),
+      where('notified', '==', false)
+    )
+    
+    const snapshot = await getDocs(q)
+    if (snapshot.empty) return
+    
+    // 각 구독자에게 알림 발송
+    const notificationsRef = collection(firestore, 'notifications')
+    
+    for (const subscriptionDoc of snapshot.docs) {
+      const subscription = subscriptionDoc.data()
+      
+      // 알림 생성
+      await addDoc(notificationsRef, {
+        userId: subscription.userId,
+        type: 'book_available',
+        title: '도서 반납 알림',
+        message: `"${book.title}" 도서가 반납되어 대여 가능합니다.`,
+        bookInfo: {
+          isbn: isbn,
+          title: book.title,
+          center: book.center
+        },
+        isRead: false,
+        createdAt: serverTimestamp()
+      })
+      
+      // 구독 상태 업데이트 (알림 발송 완료)
+      await updateDoc(doc(firestore, 'returnNotifySubscriptions', subscriptionDoc.id), {
+        notified: true,
+        notifiedAt: serverTimestamp()
+      })
+    }
+  } catch (error) {
+    console.error('반납 알림 발송 오류:', error)
+    // 알림 발송 실패해도 반납 처리는 계속 진행
+  }
+}
+
 // 반납 확인 처리
 const confirmReturnBooks = async () => {
   if (returnDialogBooks.value.length === 0 || !user.value) return
@@ -950,6 +1166,9 @@ const confirmReturnBooks = async () => {
           rentCount: (existingData.rentCount || 1) + 1
         })
       }
+      
+      // 3. 반납 알림 구독자에게 알림 발송
+      await notifyReturnSubscribers(book)
     }
     
     // 목록 새로고침
@@ -1095,11 +1314,13 @@ useHead({
 }
 
 .rental-section,
+.rent-request-section,
 .requested-section,
 .history-section {
   padding-top: rem(16);
 }
 
+.rent-request-section,
 .requested-section,
 .history-section {
   border-top: rem(1) solid #e0e0e0;

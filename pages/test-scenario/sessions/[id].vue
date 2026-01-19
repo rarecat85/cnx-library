@@ -120,7 +120,7 @@
 
       <!-- 테스트 섹션들 -->
       <div
-        v-for="section in TEST_SCENARIOS"
+        v-for="section in sessionScenarios"
         :key="section.section"
         class="section test-section"
       >
@@ -361,10 +361,8 @@ definePageMeta({
 const route = useRoute()
 const { confirm, alert } = useDialog()
 const {
-  TEST_SCENARIOS,
-  getTotalTestCount,
-  getAllTestIds,
   getSession,
+  getScenariosByVersion,
   subscribeToSession,
   saveTestResult,
   updateSessionStatus,
@@ -377,6 +375,12 @@ const session = ref(null)
 const results = ref({})
 const completing = ref(false)
 const noteInputs = ref({})
+
+// 세션의 템플릿 버전에 맞는 시나리오 데이터
+const templateVersion = ref('v1')
+const sessionScenarios = ref([])
+const sessionTotalCount = ref(0)
+const sessionAllIds = ref([])
 
 const sessionInfo = reactive({
   testDate: ''
@@ -451,6 +455,12 @@ const loadSession = async () => {
     session.value = data.session
     results.value = data.results
     
+    // 세션 버전에 맞는 시나리오 데이터 설정
+    templateVersion.value = data.templateVersion || 'v1'
+    sessionScenarios.value = data.scenarios
+    sessionTotalCount.value = data.totalCount
+    sessionAllIds.value = data.allIds
+    
     // 세션 정보 초기화
     const testDate = data.session.testDate?.toDate?.() || new Date(data.session.testDate)
     sessionInfo.testDate = testDate.toISOString().split('T')[0]
@@ -487,11 +497,11 @@ const loadSession = async () => {
   }
 }
 
-// 현재 테스트 시나리오 총 개수 (동적으로 계산)
-const currentTotalCount = computed(() => getTotalTestCount())
+// 현재 세션의 테스트 시나리오 총 개수
+const currentTotalCount = computed(() => sessionTotalCount.value)
 
-// 현재 유효한 테스트 ID 목록
-const validTestIds = computed(() => new Set(getAllTestIds()))
+// 현재 세션의 유효한 테스트 ID 목록
+const validTestIds = computed(() => new Set(sessionAllIds.value))
 
 // 유효한 테스트만 집계한 진행률 (현재 시나리오에 없는 ID는 제외)
 const validProgress = computed(() => {

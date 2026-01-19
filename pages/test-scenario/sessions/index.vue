@@ -95,7 +95,7 @@
                 <span class="stat partial">⚠️ {{ session.validProgress?.partial || 0 }}</span>
                 <span class="stat skip">⏭️ {{ session.validProgress?.skip || 0 }}</span>
                 <span class="stat total">
-                  {{ session.validProgress?.completed || 0 }}/{{ getTotalTestCount() }}
+                  {{ session.validProgress?.completed || 0 }}/{{ session.totalCount }}
                 </span>
               </div>
             </div>
@@ -143,8 +143,7 @@ const {
   getSessions,
   getSession,
   deleteSession,
-  getTotalTestCount,
-  getAllTestIds,
+  getScenariosByVersion,
   loading
 } = useTestScenario()
 
@@ -155,11 +154,11 @@ onMounted(async () => {
   await loadSessions()
 })
 
-// 유효한 테스트 ID 목록
-const validTestIds = new Set(getAllTestIds())
-
-// 결과에서 유효한 테스트만 집계
-const calculateValidProgress = (results) => {
+// 결과에서 유효한 테스트만 집계 (세션 버전에 맞게)
+const calculateValidProgress = (results, templateVersion) => {
+  const { allIds } = getScenariosByVersion(templateVersion || 'v1')
+  const validTestIds = new Set(allIds)
+  
   let pass = 0
   let fail = 0
   let partial = 0
@@ -167,7 +166,7 @@ const calculateValidProgress = (results) => {
   let completed = 0
 
   Object.entries(results).forEach(([testId, data]) => {
-    // 현재 시나리오에 존재하는 ID만 집계
+    // 해당 버전의 시나리오에 존재하는 ID만 집계
     if (!validTestIds.has(testId)) {
       return
     }
@@ -202,18 +201,23 @@ const loadSessions = async () => {
     const sessionsWithValidProgress = await Promise.all(
       sessionList.map(async (session) => {
         try {
-          const { results } = await getSession(session.id)
-          const validProgress = calculateValidProgress(results)
+          const { results, totalCount, templateVersion } = await getSession(session.id)
+          const validProgress = calculateValidProgress(results, templateVersion)
           return {
             ...session,
-            validProgress
+            validProgress,
+            totalCount,      // 세션별 총 항목 수
+            templateVersion  // 세션의 템플릿 버전
           }
         } catch (err) {
           console.error(`세션 ${session.id} 결과 로드 오류:`, err)
           // 에러 시 서버에 저장된 progress 사용
+          const { totalCount } = getScenariosByVersion(session.templateVersion || 'v1')
           return {
             ...session,
-            validProgress: session.progress
+            validProgress: session.progress,
+            totalCount,
+            templateVersion: session.templateVersion || 'v1'
           }
         }
       })
@@ -289,7 +293,7 @@ const formatDate = (date) => {
 }
 
 const getProgressPercent = (session) => {
-  const total = getTotalTestCount()
+  const total = session.totalCount || 0
   if (!total) return 0
   const completed = session.validProgress?.completed || 0
   return Math.min(100, Math.round((completed / total) * 100))

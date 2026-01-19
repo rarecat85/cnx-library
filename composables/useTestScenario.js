@@ -1,7 +1,13 @@
 /**
  * 테스트 시나리오 세션 관리 Composable
  */
+// V1: 기존 세션용 (약 160개 항목)
 import { TEST_SCENARIOS, getTotalTestCount, getAllTestIds } from '@/utils/testScenarioData.js'
+// V2: 신규 세션용 (통합 버전, 약 278개 항목)
+import { TEST_SCENARIOS_V2, getTotalTestCountV2, getAllTestIdsV2 } from '@/utils/testScenarioDataV2.js'
+
+// 현재 템플릿 버전 (새 세션 생성 시 사용)
+const CURRENT_TEMPLATE_VERSION = 'v2'
 
 export const useTestScenario = () => {
   const { $firebaseFirestore } = useNuxtApp()
@@ -10,6 +16,26 @@ export const useTestScenario = () => {
 
   const loading = ref(false)
   const error = ref(null)
+
+  /**
+   * 템플릿 버전에 따른 시나리오 데이터 반환
+   * @param {string} version - 'v1' 또는 'v2' (없으면 v1)
+   */
+  const getScenariosByVersion = (version) => {
+    if (version === 'v2') {
+      return {
+        scenarios: TEST_SCENARIOS_V2,
+        totalCount: getTotalTestCountV2(),
+        allIds: getAllTestIdsV2()
+      }
+    }
+    // 기본값: V1 (기존 세션 호환)
+    return {
+      scenarios: TEST_SCENARIOS,
+      totalCount: getTotalTestCount(),
+      allIds: getAllTestIds()
+    }
+  }
 
   /**
    * 새 테스트 세션 생성
@@ -28,12 +54,14 @@ export const useTestScenario = () => {
 
       const { collection, addDoc, serverTimestamp } = await import('firebase/firestore')
 
-      const totalCount = getTotalTestCount()
+      // 새 세션은 항상 최신 버전(V2) 사용
+      const { totalCount } = getScenariosByVersion(CURRENT_TEMPLATE_VERSION)
 
       const newSession = {
         testDate: sessionData.testDate,
         testers: sessionData.testers || [],
         status: 'in_progress',
+        templateVersion: CURRENT_TEMPLATE_VERSION, // 버전 정보 저장
         progress: {
           total: totalCount,
           pass: 0,
@@ -136,9 +164,17 @@ export const useTestScenario = () => {
         results[doc.id] = doc.data()
       })
 
+      // 세션의 템플릿 버전에 맞는 시나리오 데이터 포함
+      const templateVersion = sessionData.templateVersion || 'v1'
+      const { scenarios, totalCount, allIds } = getScenariosByVersion(templateVersion)
+
       return {
         session: sessionData,
-        results
+        results,
+        scenarios,       // 해당 버전의 시나리오 데이터
+        totalCount,      // 해당 버전의 총 항목 수
+        allIds,          // 해당 버전의 모든 ID
+        templateVersion  // 템플릿 버전
       }
     } catch (err) {
       console.error('테스트 세션 상세 조회 오류:', err)
@@ -193,10 +229,19 @@ export const useTestScenario = () => {
     if (!firestore) return
 
     try {
-      const { doc, updateDoc, collection, getDocs, serverTimestamp } = await import('firebase/firestore')
+      const { doc, getDoc, updateDoc, collection, getDocs, serverTimestamp } = await import('firebase/firestore')
 
-      // 현재 유효한 테스트 ID 목록
-      const validTestIds = new Set(getAllTestIds())
+      // 먼저 세션 정보를 조회해서 템플릿 버전 확인
+      const sessionRef = doc(firestore, 'testSessions', sessionId)
+      const sessionDoc = await getDoc(sessionRef)
+      
+      if (!sessionDoc.exists()) return
+      
+      const templateVersion = sessionDoc.data().templateVersion || 'v1'
+      const { totalCount, allIds } = getScenariosByVersion(templateVersion)
+      
+      // 해당 버전의 유효한 테스트 ID 목록
+      const validTestIds = new Set(allIds)
 
       // 모든 결과 조회
       const resultsRef = collection(firestore, 'testSessions', sessionId, 'results')
@@ -236,11 +281,9 @@ export const useTestScenario = () => {
         }
       })
 
-      const totalCount = getTotalTestCount()
       const status = completed === totalCount ? 'completed' : 'in_progress'
 
       // 세션 업데이트
-      const sessionRef = doc(firestore, 'testSessions', sessionId)
       await updateDoc(sessionRef, {
         status,
         progress: {
@@ -400,10 +443,19 @@ export const useTestScenario = () => {
   }
 
   return {
-    // 데이터
+    // 데이터 (V1 - 기존 호환용)
     TEST_SCENARIOS,
     getTotalTestCount,
     getAllTestIds,
+    
+    // 데이터 (V2 - 신규)
+    TEST_SCENARIOS_V2,
+    getTotalTestCountV2,
+    getAllTestIdsV2,
+    
+    // 버전 관리
+    CURRENT_TEMPLATE_VERSION,
+    getScenariosByVersion,
     
     // 상태
     loading,

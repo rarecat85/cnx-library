@@ -109,26 +109,33 @@
         </NuxtLink>
       </div>
 
-      <!-- 공통 메뉴 -->
-      <div class="menu-section">
-        <div
-          class="menu-item logout-item"
-          @click="handleLogout"
-        >
-          <v-icon>mdi-logout</v-icon>
-          <span>로그아웃</span>
-        </div>
-      </div>
     </nav>
 
-    <!-- 하단 문의하기 -->
+    <!-- 하단 이용가이드 & 문의하기 & 로그아웃 -->
     <div class="menu-footer">
+      <NuxtLink
+        to="/user-guide"
+        class="footer-link guide-link"
+        @click="closeDrawer"
+      >
+        <v-icon>mdi-help-circle-outline</v-icon>
+        <span>이용가이드</span>
+      </NuxtLink>
+      <span class="footer-divider">|</span>
       <a
         href="mailto:officemanager.korea@concentrix.com"
-        class="contact-link"
+        class="footer-link"
       >
         <v-icon>mdi-email-outline</v-icon>
         <span>문의하기</span>
+      </a>
+      <span class="footer-divider">|</span>
+      <a
+        class="footer-link guide-link"
+        @click="handleLogout"
+      >
+        <v-icon>mdi-logout</v-icon>
+        <span>로그아웃</span>
       </a>
     </div>
   </div>
@@ -235,23 +242,24 @@ const handleLogout = async () => {
   color: #FFFFFF;
 }
 
-.logout-item {
-  border-top: rem(1) solid rgba(255, 255, 255, 0.1);
-  margin-top: rem(8);
-  padding-top: rem(12);
-}
-
-.logout-item:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
 .menu-footer {
-  padding: rem(12) rem(16);
+  padding: rem(16) rem(16);
   border-top: rem(1) solid rgba(255, 255, 255, 0.1);
   margin-top: auto;
+  padding-top: rem(24);
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  gap: rem(8);
 }
 
-.contact-link {
+.footer-divider {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: rem(12);
+}
+
+.footer-link {
   display: inline-flex;
   align-items: center;
   gap: rem(4);
@@ -263,6 +271,10 @@ const handleLogout = async () => {
   span {
     text-decoration: underline;
     text-underline-offset: 3px;
+  }
+  
+  &.guide-link span {
+    text-decoration: none;
   }
   
   &:hover {

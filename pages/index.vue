@@ -423,14 +423,20 @@ const handleCenterChange = async () => {
 // 전체 신규 도서 (그룹화 전)
 const allNewBooks = ref([])
 
-// 신규 도서 로드 (구매칸에 위치한 도서)
+// 신규 도서 로드 (기본 칸에 위치한 도서)
 const loadNewBooks = async () => {
   try {
     newBooksLoading.value = true
     const books = await getBooksByCenter(currentCenter.value)
     
-    // 구매칸에 있는 도서만 필터링
-    const purchaseBooks = books.filter(book => book.location === '구매칸')
+    // 센터별 기본 칸 조회
+    const { getDefaultLocation } = useSettings()
+    const defaultLoc = await getDefaultLocation(currentCenter.value)
+    
+    // 기본 칸에 있는 도서만 필터링 (기본 칸이 설정되지 않으면 빈 배열)
+    const purchaseBooks = defaultLoc 
+      ? books.filter(book => book.location === defaultLoc)
+      : []
     allNewBooks.value = purchaseBooks
     
     // ISBN 기준으로 중복 제거 (첫 번째 도서만 표시, 나머지는 copies로 그룹화)

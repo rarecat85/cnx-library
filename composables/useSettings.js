@@ -795,6 +795,64 @@ export const useSettings = () => {
     }))
   }
 
+  // ==================== 기본 칸 관리 ====================
+
+  /**
+   * 센터별 기본 칸 로드
+   * @param {string} center - 센터명
+   * @returns {Promise<string|null>} 기본 칸 이름 또는 null
+   */
+  const getDefaultLocation = async (center) => {
+    if (!firestore) {
+      return null
+    }
+
+    try {
+      const { doc, getDoc } = await import('firebase/firestore')
+      const settingsRef = doc(firestore, 'settings', 'defaultLocations')
+      const settingsDoc = await getDoc(settingsRef)
+
+      if (settingsDoc.exists()) {
+        return settingsDoc.data()[center] || null
+      }
+
+      return null
+    } catch (err) {
+      console.error('기본 칸 로드 오류:', err)
+      return null
+    }
+  }
+
+  /**
+   * 센터별 기본 칸 설정
+   * @param {string} center - 센터명
+   * @param {string} locationName - 칸 이름
+   */
+  const setDefaultLocation = async (center, locationName) => {
+    if (!firestore) {
+      throw new Error('Firebase가 초기화되지 않았습니다.')
+    }
+
+    try {
+      const { doc, getDoc, setDoc, serverTimestamp } = await import('firebase/firestore')
+      const settingsRef = doc(firestore, 'settings', 'defaultLocations')
+      const settingsDoc = await getDoc(settingsRef)
+
+      const existingData = settingsDoc.exists() ? settingsDoc.data() : {}
+
+      await setDoc(settingsRef, {
+        ...existingData,
+        [center]: locationName,
+        updatedAt: serverTimestamp()
+      })
+
+      return { success: true }
+    } catch (err) {
+      console.error('기본 칸 설정 오류:', err)
+      throw err
+    }
+  }
+
   return {
     loading,
     error,
@@ -822,6 +880,9 @@ export const useSettings = () => {
     updateLocationName,
     deleteCenterLocation,
     // 칸 선택 옵션
-    getLocationSelectOptions
+    getLocationSelectOptions,
+    // 기본 칸 관리
+    getDefaultLocation,
+    setDefaultLocation
   }
 }

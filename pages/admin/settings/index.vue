@@ -256,7 +256,28 @@
               <template v-else>
                 <div class="location-view">
                   <div class="location-info">
-                    <span class="location-name">{{ location.text }}</span>
+                    <div class="location-name-row">
+                      <span class="location-name">{{ location.text }}</span>
+                      <v-chip
+                        v-if="defaultLocation === location.value"
+                        size="x-small"
+                        color="primary"
+                        variant="flat"
+                        class="default-badge"
+                      >
+                        기본
+                      </v-chip>
+                      <v-btn
+                        v-else
+                        size="x-small"
+                        variant="text"
+                        color="grey"
+                        class="set-default-btn"
+                        @click.stop="handleSetDefaultLocation(location.value)"
+                      >
+                        기본으로 설정
+                      </v-btn>
+                    </div>
                     <span class="location-image-name">
                       {{ getMappedImageName(location.value) }}
                     </span>
@@ -546,7 +567,9 @@ const {
   saveLocationMapping,
   loadCenterLocations,
   addCenterLocation,
-  updateLocationName
+  updateLocationName,
+  getDefaultLocation,
+  setDefaultLocation
 } = useSettings()
 
 // Navigation Drawer 상태 및 반응형 너비
@@ -603,6 +626,7 @@ const locationLoading = ref(false)
 const editingLocation = ref(null)
 const editLocationNameValue = ref('')
 const editLocationImageValue = ref(null)
+const defaultLocation = ref(null)
 
 // 전체 칸 목록 (센터별 커스텀 칸만 사용)
 const allLocations = computed(() => {
@@ -1076,9 +1100,24 @@ const handleMappingChange = async (location) => {
 const loadCustomLocations = async () => {
   try {
     customLocations.value = await loadCenterLocations(currentCenter.value)
+    // 기본 칸도 함께 로드
+    defaultLocation.value = await getDefaultLocation(currentCenter.value)
   } catch (error) {
     console.error('커스텀 칸 로드 오류:', error)
     customLocations.value = []
+    defaultLocation.value = null
+  }
+}
+
+// 기본 칸 설정
+const handleSetDefaultLocation = async (locationName) => {
+  try {
+    await setDefaultLocation(currentCenter.value, locationName)
+    defaultLocation.value = locationName
+    await alert('기본 칸이 설정되었습니다.', { type: 'success' })
+  } catch (error) {
+    console.error('기본 칸 설정 오류:', error)
+    await alert('기본 칸 설정에 실패했습니다.', { type: 'error' })
   }
 }
 
@@ -1536,6 +1575,26 @@ useHead({
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.location-name-row {
+  display: flex;
+  align-items: center;
+  gap: rem(6);
+  flex-wrap: wrap;
+}
+
+.default-badge {
+  font-size: rem(10);
+  height: rem(18);
+}
+
+.set-default-btn {
+  font-size: rem(10);
+  height: rem(18);
+  padding: 0 rem(4);
+  min-width: auto;
+  text-transform: none;
 }
 
 .location-image-name {

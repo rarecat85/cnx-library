@@ -325,81 +325,8 @@ export const useAuth = () => {
     return { verified: auth.currentUser.emailVerified }
   }
 
-  // 간단한 Base64 인코딩/디코딩 (보안 강화를 위한 기본 인코딩)
-  const encodeEmail = (email) => {
-    if (!process.client) return email
-    try {
-      return btoa(encodeURIComponent(email))
-    } catch {
-      return email
-    }
-  }
-
-  const decodeEmail = (encodedEmail) => {
-    if (!process.client) return encodedEmail
-    try {
-      return decodeURIComponent(atob(encodedEmail))
-    } catch {
-      return encodedEmail
-    }
-  }
-
-  // 자동로그인 정보 저장 (이메일은 Base64 인코딩하여 저장)
-  const saveAutoLoginInfo = (email, rememberMe) => {
-    if (!process.client) return
-    
-    if (rememberMe) {
-      const expiryDate = new Date()
-      expiryDate.setMonth(expiryDate.getMonth() + 1) // 30일 후
-      
-      // 이메일을 Base64 인코딩하여 저장 (보안 강화)
-      const encodedEmail = encodeEmail(email)
-      localStorage.setItem('autoLoginEmail', encodedEmail)
-      localStorage.setItem('autoLoginExpiry', expiryDate.toISOString())
-      localStorage.setItem('rememberMe', 'true')
-    } else {
-      localStorage.removeItem('autoLoginEmail')
-      localStorage.removeItem('autoLoginExpiry')
-      localStorage.removeItem('rememberMe')
-    }
-  }
-
-  // 자동로그인 정보 조회 (이메일은 디코딩하여 반환)
-  const getAutoLoginInfo = () => {
-    if (!process.client) return null
-    
-    const encodedEmail = localStorage.getItem('autoLoginEmail')
-    const expiry = localStorage.getItem('autoLoginExpiry')
-    
-    if (!encodedEmail || !expiry) return null
-    
-    const expiryDate = new Date(expiry)
-    const now = new Date()
-    
-    // 만료일이 지났으면 제거
-    if (now > expiryDate) {
-      localStorage.removeItem('autoLoginEmail')
-      localStorage.removeItem('autoLoginExpiry')
-      localStorage.removeItem('rememberMe')
-      return null
-    }
-    
-    // 이메일 디코딩하여 반환
-    const email = decodeEmail(encodedEmail)
-    return { email, expiry: expiryDate }
-  }
-
-  // 자동로그인 정보 제거
-  const clearAutoLoginInfo = () => {
-    if (!process.client) return
-    
-    localStorage.removeItem('autoLoginEmail')
-    localStorage.removeItem('autoLoginExpiry')
-    localStorage.removeItem('rememberMe')
-  }
-
   // 로그인 (Firestore 기반 인증 상태 확인)
-  const login = async (email, password, rememberMe = false) => {
+  const login = async (email, password) => {
     if (!auth || !firestore) {
       console.error('Firebase가 초기화되지 않았습니다.')
       return { success: false, error: 'Firebase가 초기화되지 않았습니다.' }
@@ -464,9 +391,6 @@ export const useAuth = () => {
         }
       }
       
-      // 자동로그인 정보 저장
-      saveAutoLoginInfo(email, rememberMe)
-      
       user.value = firebaseUser
       loading.value = false
       return { success: true, user: firebaseUser }
@@ -500,7 +424,6 @@ export const useAuth = () => {
     try {
       await signOut(auth)
       user.value = null
-      clearAutoLoginInfo()
       await router.push('/login')
       return { success: true }
     } catch (error) {
@@ -588,8 +511,6 @@ export const useAuth = () => {
     checkEmailVerificationStatus,
     sendPasswordResetEmail: sendPasswordResetEmailToUser,
     verifyPasswordResetToken,
-    confirmPasswordReset,
-    getAutoLoginInfo,
-    clearAutoLoginInfo
+    confirmPasswordReset
   }
 }

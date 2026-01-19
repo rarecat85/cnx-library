@@ -13,8 +13,10 @@
           <li><a href="#role">관리자 권한 안내</a></li>
           <li><a href="#register">도서 등록</a></li>
           <li><a href="#manage">도서 관리</a></li>
+          <li><a href="#settings">설정 관리</a></li>
           <li><a href="#rental-approve">대여 신청 승인</a></li>
           <li><a href="#return">반납 처리</a></li>
+          <li><a href="#pending-users">임시 회원 관리</a></li>
           <li><a href="#manager-admin">매니저 관리 (최고관리자)</a></li>
           <li><a href="#notification">알림 수신</a></li>
           <li><a href="#tips">관리 팁</a></li>
@@ -120,9 +122,15 @@
             <h4>📚 다권 등록 기능</h4>
             <ul>
               <li>같은 도서를 여러 권 한번에 등록할 수 있습니다.</li>
+              <li><strong>+/- 버튼</strong>으로 등록 권수를 조절합니다.</li>
               <li>권수를 설정하면 각 권별로 라벨번호와 위치를 개별 지정합니다.</li>
               <li>라벨번호는 자동 생성되며, 필요시 수정 가능합니다.</li>
             </ul>
+          </div>
+          
+          <div class="info-box highlight">
+            <h4>📋 카테고리 관리</h4>
+            <p>도서 등록 다이얼로그에서 "카테고리 관리" 링크를 클릭하면 설정 관리 페이지로 이동하여 카테고리를 추가하거나 수정할 수 있습니다.</p>
           </div>
           
           <div class="info-box">
@@ -287,6 +295,54 @@
         </div>
       </section>
 
+      <!-- 설정 관리 -->
+      <section id="settings" class="guide-section">
+        <h2>⚙️ 설정 관리</h2>
+        <div class="section-content">
+          <p>"관리자 메뉴" > "설정 관리"에서 센터별 설정을 관리할 수 있습니다.</p>
+          
+          <h3>카테고리 관리</h3>
+          <div class="info-box">
+            <h4>📋 카테고리 설정</h4>
+            <ul>
+              <li>기본 카테고리(경제경영, 국내소설 등)의 센터별 사용 여부를 설정합니다.</li>
+              <li>토글 버튼으로 해당 센터에서 카테고리 사용을 켜고 끌 수 있습니다.</li>
+              <li>커스텀 카테고리를 추가하여 새로운 분류를 만들 수 있습니다.</li>
+              <li>카테고리명 변경 시 해당 카테고리의 모든 도서 라벨번호가 함께 변경됩니다.</li>
+            </ul>
+          </div>
+          
+          <h3>서가 이미지 관리</h3>
+          <div class="info-box">
+            <h4>🖼️ 서가 이미지 업로드</h4>
+            <ul>
+              <li>센터별 서가 위치 이미지를 업로드합니다.</li>
+              <li>이미지에 이름을 지정하여 관리합니다.</li>
+              <li>업로드된 이미지는 칸-이미지 매핑에서 사용됩니다.</li>
+            </ul>
+          </div>
+          
+          <h3>칸-이미지 매핑</h3>
+          <div class="info-box">
+            <h4>📍 칸 설정</h4>
+            <ul>
+              <li><strong>칸 추가:</strong> 새로운 칸을 추가하고 서가 이미지를 연결합니다.</li>
+              <li><strong>칸 이름 변경:</strong> 기존 칸 이름을 수정합니다. 해당 칸의 모든 도서 위치가 함께 변경됩니다.</li>
+              <li><strong>이미지 매핑:</strong> 각 칸에 서가 이미지를 연결하여 위치 안내 팝업에 표시합니다.</li>
+              <li><strong>기본 칸 설정:</strong> 신규 도서가 배치되는 기본 칸을 지정합니다. 메인 페이지의 "신규 도서"는 이 기본 칸에 있는 도서가 표시됩니다.</li>
+            </ul>
+          </div>
+          
+          <div class="warning-box">
+            <h4>⚠️ 주의사항</h4>
+            <ul>
+              <li>카테고리 또는 칸 삭제는 해당 항목을 사용하는 도서가 없을 때만 가능합니다.</li>
+              <li>카테고리명/칸 이름 변경 시 관련 도서 데이터가 일괄 수정됩니다.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
       <!-- 대여 신청 승인 -->
       <section id="rental-approve" class="guide-section">
         <h2>✅ 대여 신청 승인</h2>
@@ -397,6 +453,46 @@
               <li>장기 연체 도서 강제 반납</li>
             </ul>
           </div>
+        </div>
+      </section>
+
+      <!-- 임시 회원 관리 -->
+      <section id="pending-users" class="guide-section">
+        <h2>👥 임시 회원 관리</h2>
+        <div class="section-content">
+          <p>회원가입을 하지 않은 사용자에게 도서를 대여해야 하는 경우, 임시 회원으로 등록할 수 있습니다.</p>
+          
+          <h3>임시 회원이란?</h3>
+          <div class="info-box">
+            <h4>📋 임시 회원 특징</h4>
+            <ul>
+              <li>관리자가 직접 대여 처리 시 미가입자를 임시 회원으로 등록할 수 있습니다.</li>
+              <li>임시 회원은 시스템에 로그인할 수 없습니다.</li>
+              <li>반납 처리도 관리자가 직접 진행해야 합니다.</li>
+              <li>해당 사용자가 실제 회원가입을 하면 대여 기록이 연결됩니다.</li>
+            </ul>
+          </div>
+          
+          <h3>임시 회원 등록 (대여 처리 시)</h3>
+          <ol class="step-list">
+            <li>
+              <span class="step-number">1</span>
+              <div class="step-content">
+                <strong>도서 관리에서 "대여 처리" 클릭</strong>
+                <p>대여 가능한 도서의 "대여 처리" 버튼을 클릭합니다.</p>
+              </div>
+            </li>
+            <li>
+              <span class="step-number">2</span>
+              <div class="step-content">
+                <strong>대여자 정보 입력</strong>
+                <p>이메일, 이름, 근무지를 입력합니다. 미가입 이메일의 경우 임시 회원으로 등록됩니다.</p>
+              </div>
+            </li>
+          </ol>
+          
+          <h3>임시 회원 목록 확인</h3>
+          <p>"관리자 메뉴" > "임시 회원 관리"에서 임시 회원 목록을 확인하고 관리할 수 있습니다.</p>
         </div>
       </section>
 
@@ -536,6 +632,16 @@
       <section id="tips" class="guide-section">
         <h2>💡 관리 팁</h2>
         <div class="section-content">
+          <div class="info-box highlight">
+            <h4>🔐 보안 정책 안내</h4>
+            <p>공공PC 환경을 고려하여 다음과 같은 보안 정책이 적용됩니다:</p>
+            <ul>
+              <li><strong>자동 로그아웃:</strong> 10분간 활동이 없으면 자동으로 로그아웃됩니다.</li>
+              <li><strong>세션 종료:</strong> 브라우저 탭/창을 닫으면 자동으로 로그아웃됩니다.</li>
+            </ul>
+            <p class="small-note">※ 자동로그인 기능은 보안상의 이유로 제공되지 않습니다. 작업 중간중간 저장하시기 바랍니다.</p>
+          </div>
+          
           <div class="tip-grid">
             <div class="tip-card">
               <div class="tip-number">1</div>

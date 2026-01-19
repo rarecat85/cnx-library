@@ -15,7 +15,9 @@
           <li><a href="#structure">프로젝트 구조</a></li>
           <li><a href="#setup">설치 및 실행</a></li>
           <li><a href="#firebase">Firebase 설정</a></li>
+          <li><a href="#composables">Composables</a></li>
           <li><a href="#firestore">Firestore 스키마</a></li>
+          <li><a href="#security">보안 정책</a></li>
           <li><a href="#functions">Cloud Functions</a></li>
           <li><a href="#email">이메일 알림</a></li>
           <li><a href="#aladin">알라딘 API</a></li>
@@ -293,6 +295,75 @@ npm run dev
           <div class="code-block">
             <pre>npx firebase login</pre>
           </div>
+          
+          <h3>Auth Persistence 설정</h3>
+          <div class="info-box highlight">
+            <h4>🔐 세션 기반 인증</h4>
+            <p>공공PC 환경을 위해 <code>browserSessionPersistence</code>를 사용합니다:</p>
+            <div class="code-block">
+              <pre>// plugins/firebase.client.js
+import { browserSessionPersistence } from 'firebase/auth'
+await setPersistence(auth, browserSessionPersistence)</pre>
+            </div>
+            <p><strong>효과:</strong> 브라우저 탭/창을 닫으면 자동으로 로그아웃됩니다.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Composables -->
+      <section id="composables" class="guide-section">
+        <h2>🧩 Composables</h2>
+        <div class="section-content">
+          <p>주요 비즈니스 로직은 composables로 분리되어 있습니다:</p>
+          
+          <h3>useAuth.js</h3>
+          <div class="info-box">
+            <h4>인증 관련 기능</h4>
+            <ul>
+              <li><code>login(email, password)</code> - 로그인</li>
+              <li><code>logout()</code> - 로그아웃</li>
+              <li><code>signup(...)</code> - 회원가입</li>
+              <li><code>user</code>, <code>loading</code>, <code>isAuthenticated</code> - 상태</li>
+            </ul>
+            <p class="small-note">※ 자동로그인 관련 함수(saveAutoLoginInfo, getAutoLoginInfo)는 제거됨</p>
+          </div>
+          
+          <h3>useSettings.js</h3>
+          <div class="info-box">
+            <h4>설정 관리 기능</h4>
+            <ul>
+              <li><strong>카테고리:</strong> loadCategorySettings, saveCategorySettings, addCategory, updateCategoryName, deleteCategory</li>
+              <li><strong>서가 이미지:</strong> loadShelfImages, uploadShelfImage, deleteShelfImage</li>
+              <li><strong>칸 관리:</strong> loadCenterLocations, saveCenterLocations, addCenterLocation, updateLocationName, deleteCenterLocation</li>
+              <li><strong>칸-이미지 매핑:</strong> loadLocationMapping, saveLocationMapping, getLocationImageUrl</li>
+              <li><strong>기본 칸:</strong> getDefaultLocation(center), setDefaultLocation(center, name)</li>
+            </ul>
+          </div>
+          
+          <h3>useReturnNotify.js</h3>
+          <div class="info-box">
+            <h4>반납 알림 구독 기능</h4>
+            <ul>
+              <li><code>loadReturnNotifySubscriptions(center)</code> - 구독 목록 로드</li>
+              <li><code>subscribeReturnNotify(book, center)</code> - 반납 알림 구독</li>
+              <li><code>isSubscribedToBook(isbn)</code> - 구독 여부 확인</li>
+              <li><code>loadMyRentedIsbns()</code> - 내가 대여중인 ISBN 목록 로드</li>
+              <li><code>isMyRentedIsbn(isbn)</code> - 내가 대여중인 ISBN인지 확인</li>
+            </ul>
+            <p class="small-note">※ ISBN 비교 시 항상 <code>isbn13 || isbn</code> 형식으로 통일</p>
+          </div>
+          
+          <h3>useBooks.js</h3>
+          <div class="info-box">
+            <h4>도서 관련 기능</h4>
+            <ul>
+              <li><code>getBooksByCenter(center)</code> - 센터별 도서 조회</li>
+              <li><code>rentBook(...)</code> - 도서 대여</li>
+              <li><code>requestRent(...)</code> - 대여 신청</li>
+              <li><code>returnBook(...)</code> - 도서 반납</li>
+              <li><code>checkAlreadyRentedSameIsbn(...)</code> - 같은 ISBN 대여/신청 여부 확인</li>
+            </ul>
+          </div>
         </div>
       </section>
 
@@ -427,6 +498,80 @@ npm run dev
               </tr>
             </tbody>
           </table>
+          
+          <h3>새로 추가된 컬렉션</h3>
+          <div class="info-box">
+            <h4>returnNotifySubscriptions</h4>
+            <p>반납 알림 구독 정보를 저장합니다:</p>
+            <ul>
+              <li><code>userId</code> - 구독자 UID</li>
+              <li><code>userEmail</code> - 구독자 이메일</li>
+              <li><code>isbn</code> - 도서 ISBN</li>
+              <li><code>title</code> - 도서 제목</li>
+              <li><code>center</code> - 센터명</li>
+              <li><code>notified</code> - 알림 발송 여부</li>
+              <li><code>createdAt</code> - 구독 일시</li>
+            </ul>
+          </div>
+          
+          <div class="info-box">
+            <h4>settings/defaultLocations</h4>
+            <p>센터별 기본 칸 설정을 저장합니다:</p>
+            <div class="code-block">
+              <pre>{
+  "강남센터": "구매칸",
+  "용산센터": "구매칸",
+  "updatedAt": Timestamp
+}</pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 보안 정책 -->
+      <section id="security" class="guide-section">
+        <h2>🔐 보안 정책</h2>
+        <div class="section-content">
+          <h3>비활성 자동 로그아웃</h3>
+          <div class="info-box highlight">
+            <h4>10분 비활성 시 자동 로그아웃</h4>
+            <p><code>app.vue</code>에서 구현:</p>
+            <div class="code-block">
+              <pre>// 감지 이벤트: mousemove, keydown, click, scroll, touchstart
+// 타임아웃: 600,000ms (10분)
+// 스로틀링: 1,000ms (1초) - 성능 최적화
+
+const INACTIVITY_TIMEOUT = 10 * 60 * 1000
+const THROTTLE_DELAY = 1000
+
+const resetInactivityTimer = () =&gt; {
+  const now = Date.now()
+  if (now - lastActivityTime &lt; THROTTLE_DELAY) return
+  lastActivityTime = now
+  // ... 타이머 리셋 로직
+}</pre>
+            </div>
+          </div>
+          
+          <h3>세션 기반 인증</h3>
+          <p><code>browserSessionPersistence</code>를 사용하여 브라우저 탭/창을 닫으면 자동 로그아웃됩니다.</p>
+          
+          <h3>Firestore 보안 규칙</h3>
+          <div class="info-box">
+            <h4>returnNotifySubscriptions 규칙</h4>
+            <div class="code-block">
+              <pre>match /returnNotifySubscriptions/{subscriptionId} {
+  allow read: if request.auth != null &&
+    (resource.data.userId == request.auth.uid ||
+     isAdminOrManager());
+  allow create: if request.auth != null && 
+    request.resource.data.userId == request.auth.uid;
+  allow update: if request.auth != null;
+  allow delete: if request.auth != null && 
+    resource.data.userId == request.auth.uid;
+}</pre>
+            </div>
+          </div>
         </div>
       </section>
 

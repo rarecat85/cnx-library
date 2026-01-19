@@ -1,6 +1,6 @@
 import { defineNuxtPlugin } from '#app'
 import { initializeApp, getApps } from 'firebase/app'
-import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth'
+import { getAuth, setPersistence, browserSessionPersistence } from 'firebase/auth'
 import { initializeFirestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 
@@ -46,13 +46,12 @@ export default defineNuxtPlugin(async (nuxtApp) => {
     firestore = getFirestore(app)
   }
   
-  // Firebase Auth persistence 설정 (브라우저를 닫아도 로그인 상태 유지)
-  // 기본값이 browserLocalPersistence이지만 명시적으로 설정
+  // Firebase Auth persistence 설정 (브라우저 탭/창을 닫으면 로그아웃)
+  // 공공PC 환경을 위해 browserSessionPersistence 사용
   if (process.client) {
     try {
-      // persistence 설정을 await로 기다림 (중요!)
-      await setPersistence(auth, browserLocalPersistence)
-      console.log('Firebase Auth persistence 설정 완료')
+      await setPersistence(auth, browserSessionPersistence)
+      console.log('Firebase Auth persistence 설정 완료 (세션 기반)')
     } catch (error) {
       console.error('Firebase Auth persistence 설정 실패:', error)
     }

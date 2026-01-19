@@ -765,8 +765,9 @@ const loadCurrentRentedCount = async () => {
       const data = doc.data()
       if (data.status === 'rented' || data.status === 'overdue') {
         count++
-        if (data.isbn) {
-          isbns.push(data.isbn)
+        const isbn = data.isbn13 || data.isbn
+        if (isbn) {
+          isbns.push(isbn)
         }
       }
     })
@@ -1063,23 +1064,38 @@ const confirmLabelSelection = () => {
   }
 }
 
-// 읽은 책 목록에서 동일 도서 확인
+// 읽은 책 목록에서 동일 도서 확인 (isbn13 또는 isbn으로 검색)
 const checkIfInReadHistory = async (isbn) => {
   if (!user.value || !firestore || !isbn) return null
 
   try {
     const { collection, query, where, getDocs } = await import('firebase/firestore')
     const historyRef = collection(firestore, 'rentalHistory')
-    const q = query(
+    
+    // isbn13으로 먼저 검색
+    const q1 = query(
       historyRef,
       where('userId', '==', user.value.uid),
       where('isbn13', '==', isbn)
     )
     
-    const snapshot = await getDocs(q)
-    if (!snapshot.empty) {
-      return snapshot.docs[0].data()
+    const snapshot1 = await getDocs(q1)
+    if (!snapshot1.empty) {
+      return snapshot1.docs[0].data()
     }
+    
+    // isbn으로도 검색 (isbn13이 없는 경우 대비)
+    const q2 = query(
+      historyRef,
+      where('userId', '==', user.value.uid),
+      where('isbn', '==', isbn)
+    )
+    
+    const snapshot2 = await getDocs(q2)
+    if (!snapshot2.empty) {
+      return snapshot2.docs[0].data()
+    }
+    
     return null
   } catch (error) {
     console.error('읽은 책 목록 확인 오류:', error)

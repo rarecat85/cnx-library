@@ -91,8 +91,8 @@
             :allow-register-requested="allowRegisterRequested"
             :allow-additional-register="allowAdditionalRegister"
             :show-return-notify-button="shouldShowReturnNotifyButton(book)"
-            :is-subscribed-to-return="isSubscribedToBook(book.isbn)"
-            :return-notify-loading="returnNotifyLoadingIsbn === book.isbn"
+            :is-subscribed-to-return="isSubscribedToBook(book.isbn13 || book.isbn)"
+            :return-notify-loading="returnNotifyLoadingIsbn === (book.isbn13 || book.isbn)"
             @register="handleRegister"
             @rent="handleRent"
             @subscribe-return-notify="handleSubscribeReturnNotify"
@@ -284,13 +284,14 @@ const shouldShowReturnNotifyButton = (book) => {
   if (!props.showReturnNotifyButton) return false
   const status = getBookStatus(book)
   const isRented = status === 'rented' || status === 'overdue'
-  const isMyRented = props.myRentedIsbns.includes(book.isbn)
+  const bookIsbn = book.isbn13 || book.isbn
+  const isMyRented = props.myRentedIsbns.includes(bookIsbn)
   return isRented && !isMyRented
 }
 
 // 내가 구독중인 ISBN인지 확인
-const isSubscribedToBook = (isbn) => {
-  return props.subscribedIsbns.includes(isbn)
+const isSubscribedToBook = (bookIsbn) => {
+  return props.subscribedIsbns.includes(bookIsbn)
 }
 
 // 반납 알림 구독 처리

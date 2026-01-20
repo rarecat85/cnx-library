@@ -1326,10 +1326,10 @@ const sendViaGmail = async (to, subject, html) => {
 }
 
 /**
- * 통합 이메일 발송 함수 (Brevo 우선, Gmail Fallback)
+ * 통합 이메일 발송 함수 (Gmail 우선, Brevo Fallback)
  * 
- * 1. Brevo API로 먼저 발송 시도
- * 2. Brevo 실패 시 (일일 한도 초과, API 오류 등) Gmail SMTP로 fallback
+ * 1. Gmail SMTP로 먼저 발송 시도 (회사 메일 호환성 좋음)
+ * 2. Gmail 실패 시 (일일 한도 초과 등) Brevo API로 fallback
  * 3. 둘 다 실패하면 false 반환
  * 
  * @param {string} to - 수신자 이메일
@@ -1338,25 +1338,25 @@ const sendViaGmail = async (to, subject, html) => {
  * @returns {Promise<boolean>} 발송 성공 여부
  */
 const sendEmailWithBrevo = async (to, subject, html) => {
-  // 1. Brevo API 먼저 시도
-  const brevoResult = await sendViaBrevo(to, subject, html)
-  
-  if (brevoResult.success) {
-    console.log(`[Brevo] 이메일 발송 성공: ${to}`)
-    return true
-  }
-  
-  console.warn(`[Brevo] 발송 실패, Gmail로 전환 시도: ${brevoResult.error}`)
-  
-  // 2. Brevo 실패 시 Gmail SMTP로 fallback
+  // 1. Gmail SMTP 먼저 시도 (회사 메일 호환성이 좋음)
   const gmailResult = await sendViaGmail(to, subject, html)
   
   if (gmailResult.success) {
-    console.log(`[Gmail Fallback] 이메일 발송 성공: ${to}`)
+    console.log(`[Gmail] 이메일 발송 성공: ${to}`)
     return true
   }
   
-  console.error(`[Gmail Fallback] 발송 실패: ${gmailResult.error}`)
+  console.warn(`[Gmail] 발송 실패, Brevo로 전환 시도: ${gmailResult.error}`)
+  
+  // 2. Gmail 실패 시 Brevo API로 fallback
+  const brevoResult = await sendViaBrevo(to, subject, html)
+  
+  if (brevoResult.success) {
+    console.log(`[Brevo Fallback] 이메일 발송 성공: ${to}`)
+    return true
+  }
+  
+  console.error(`[Brevo Fallback] 발송 실패: ${brevoResult.error}`)
   console.error(`[이메일 발송 최종 실패] 수신자: ${to}, 제목: ${subject}`)
   return false
 }

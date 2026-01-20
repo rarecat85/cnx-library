@@ -201,6 +201,7 @@
               v-for="location in allLocations"
               :key="location.value"
               class="location-item"
+              :class="{ 'location-item-default': defaultLocation === location.value }"
             >
               <!-- 수정 모드 -->
               <template v-if="editingLocation === location.value">
@@ -255,22 +256,12 @@
                       <v-chip
                         v-if="defaultLocation === location.value"
                         size="x-small"
-                        color="primary"
+                        color="error"
                         variant="flat"
                         class="default-badge"
                       >
                         기본
                       </v-chip>
-                      <v-btn
-                        v-else
-                        size="x-small"
-                        variant="text"
-                        color="grey"
-                        class="set-default-btn"
-                        @click.stop="handleSetDefaultLocation(location.value)"
-                      >
-                        기본으로 설정
-                      </v-btn>
                     </div>
                     <span class="location-image-name">
                       {{ getMappedImageName(location.value) }}
@@ -1495,6 +1486,11 @@ useHead({
   background-color: #f5f5f5;
   border-radius: rem(8);
   padding: rem(12);
+  
+  &.location-item-default {
+    background-color: #ffebee;
+    border: rem(1) solid #ffcdd2;
+  }
 }
 
 // 보기 모드

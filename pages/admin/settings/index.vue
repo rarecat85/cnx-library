@@ -129,6 +129,19 @@
                     mdi-magnify-plus
                   </v-icon>
                 </div>
+                <div class="image-action-btns">
+                <v-btn
+                  icon
+                  size="small"
+                  color="primary"
+                  variant="flat"
+                  class="replace-image-btn"
+                  @click.stop="triggerReplaceFileInput(image)"
+                >
+                  <v-icon size="small">
+                    mdi-image-edit
+                  </v-icon>
+                </v-btn>
                 <v-btn
                   icon
                   size="small"
@@ -141,6 +154,7 @@
                     mdi-delete
                   </v-icon>
                 </v-btn>
+              </div>
               </div>
               <div class="shelf-image-name">
                 {{ image.name }}
@@ -166,13 +180,21 @@
             </div>
           </div>
 
-          <!-- 숨겨진 파일 입력 -->
+          <!-- 숨겨진 파일 입력 (새 이미지 추가용) -->
           <input
             ref="fileInputRef"
             type="file"
             accept="image/*"
             style="display: none"
             @change="handleFileSelect"
+          >
+          <!-- 숨겨진 파일 입력 (이미지 변경용) -->
+          <input
+            ref="replaceFileInputRef"
+            type="file"
+            accept="image/*"
+            style="display: none"
+            @change="handleReplaceFileSelect"
           >
         </div>
 
@@ -184,7 +206,7 @@
             </h3>
             <div
               v-if="selectedLocation"
-              class="section-actions d-flex gap-2"
+              class="section-actions d-flex"
             >
               <v-btn
                 class="action-btn"
@@ -196,7 +218,7 @@
                 {{ defaultLocation === selectedLocation ? '기본칸 해제' : '기본칸 설정' }}
               </v-btn>
               <v-btn
-                class="action-btn action-btn-danger"
+                class="action-btn action-btn-danger ml-2"
                 variant="flat"
                 size="small"
                 :loading="locationActionLoading"
@@ -256,7 +278,6 @@
                     hide-details
                     variant="outlined"
                     placeholder="이미지 선택"
-                    clearable
                     class="location-edit-input"
                   />
                   <div class="location-edit-actions mt-2">
@@ -284,7 +305,6 @@
                 <div class="location-view">
                   <div class="location-info">
                     <div class="location-name-row">
-                      <span class="location-name">{{ location.text }}</span>
                       <v-chip
                         v-if="defaultLocation === location.value"
                         size="x-small"
@@ -294,6 +314,7 @@
                       >
                         기본
                       </v-chip>
+                      <span class="location-name">{{ location.text }}</span>
                     </div>
                     <span class="location-image-name">
                       {{ getMappedImageName(location.value) }}
@@ -577,6 +598,7 @@ const {
   uploadShelfImage,
   deleteShelfImage,
   updateShelfImageName,
+  replaceShelfImage,
   loadLocationMapping,
   saveLocationMapping,
   loadCenterLocations,
@@ -592,6 +614,8 @@ const { drawer, drawerWidth } = useDrawer()
 
 // 파일 입력 참조
 const fileInputRef = ref(null)
+const replaceFileInputRef = ref(null)
+const replacingImage = ref(null) // 변경 대상 이미지
 
 // 센터 관련
 const centerOptions = [...CENTERS]
@@ -940,6 +964,53 @@ const handleDeleteImage = async (image) => {
   } catch (error) {
     console.error('이미지 삭제 오류:', error)
     await alert(error.message || '이미지 삭제에 실패했습니다.', { type: 'error' })
+  }
+}
+
+// 이미지 변경 파일 입력 트리거
+const triggerReplaceFileInput = (image) => {
+  replacingImage.value = image
+  replaceFileInputRef.value?.click()
+}
+
+// 이미지 변경 파일 선택 처리
+const handleReplaceFileSelect = async (event) => {
+  const file = event.target.files?.[0]
+  if (!file || !replacingImage.value) {
+    console.warn('파일이 선택되지 않았거나 변경 대상 이미지가 없습니다.')
+    replacingImage.value = null
+    return
+  }
+
+  const targetImage = replacingImage.value
+  
+  const confirmed = await confirm(
+    `"${targetImage.name}" 이미지를 선택한 파일로 교체하시겠습니까?\n기존 이미지와 매핑된 모든 칸에 새 이미지가 적용됩니다.`
+  )
+  
+  if (!confirmed) {
+    replacingImage.value = null
+    if (replaceFileInputRef.value) {
+      replaceFileInputRef.value.value = ''
+    }
+    return
+  }
+
+  try {
+    imagesLoading.value = true
+    await replaceShelfImage(targetImage.id, file)
+    await alert('이미지가 변경되었습니다.', { type: 'success' })
+    await loadAllImages()
+  } catch (error) {
+    console.error('이미지 변경 오류:', error)
+    await alert(error.message || '이미지 변경에 실패했습니다.', { type: 'error' })
+  } finally {
+    imagesLoading.value = false
+    replacingImage.value = null
+    // 파일 입력 초기화
+    if (replaceFileInputRef.value) {
+      replaceFileInputRef.value.value = ''
+    }
   }
 }
 
@@ -1487,12 +1558,18 @@ useHead({
   transition: opacity 0.2s;
 }
 
-.delete-image-btn {
+.image-action-btns {
   position: absolute;
   top: rem(8);
   right: rem(8);
-  opacity: 0.9;
+  display: flex;
+  gap: rem(4);
   z-index: 1;
+}
+
+.replace-image-btn,
+.delete-image-btn {
+  opacity: 0.9;
   
   &:hover {
     opacity: 1;

@@ -497,6 +497,74 @@ export const useSettings = () => {
     }
   }
 
+  /**
+   * 서가 이미지 교체 (기존 이미지 ID 유지, Storage 파일만 교체)
+   * 기존 이미지와 매핑된 모든 칸은 자동으로 새 이미지로 연결됨
+   * @param {string} imageId - 교체할 이미지 ID
+   * @param {File} newFile - 새 이미지 파일
+   * @returns {Promise<Object>} 교체 결과 { id, name, url, center }
+   */
+  const replaceShelfImage = async (imageId, newFile) => {
+    if (!storage || !firestore) {
+      throw new Error('Firebase가 초기화되지 않았습니다.')
+    }
+
+    try {
+      const { ref, uploadBytes, getDownloadURL, deleteObject } = await import('firebase/storage')
+      const { doc, setDoc, serverTimestamp } = await import('firebase/firestore')
+
+      // 기존 이미지 정보 찾기
+      const images = await loadShelfImages()
+      const imageIndex = images.findIndex(img => img.id === imageId)
+      
+      if (imageIndex === -1) {
+        throw new Error('이미지를 찾을 수 없습니다.')
+      }
+
+      const existingImage = images[imageIndex]
+
+      // 기존 Storage 파일 삭제
+      if (existingImage.fileName) {
+        try {
+          const oldStorageRef = ref(storage, `shelves/${existingImage.fileName}`)
+          await deleteObject(oldStorageRef)
+        } catch (storageErr) {
+          console.warn('기존 Storage 이미지 삭제 실패 (이미 삭제되었거나 존재하지 않음):', storageErr)
+        }
+      }
+
+      // 새 파일 업로드 (기존 ID 유지)
+      const newFileName = `${imageId}_${newFile.name}`
+      const newStorageRef = ref(storage, `shelves/${newFileName}`)
+      await uploadBytes(newStorageRef, newFile)
+      const newUrl = await getDownloadURL(newStorageRef)
+
+      // Firestore에 이미지 정보 업데이트 (ID, name, center 유지, url과 fileName만 변경)
+      images[imageIndex] = {
+        ...existingImage,
+        url: newUrl,
+        fileName: newFileName,
+        updatedAt: new Date().toISOString()
+      }
+
+      const settingsRef = doc(firestore, 'settings', 'shelfImages')
+      await setDoc(settingsRef, {
+        images,
+        updatedAt: serverTimestamp()
+      })
+
+      return { 
+        id: existingImage.id, 
+        name: existingImage.name, 
+        url: newUrl, 
+        center: existingImage.center 
+      }
+    } catch (err) {
+      console.error('서가 이미지 교체 오류:', err)
+      throw err
+    }
+  }
+
   // ==================== 칸-이미지 매핑 관리 ====================
 
   /**
@@ -877,6 +945,7 @@ export const useSettings = () => {
     uploadShelfImage,
     deleteShelfImage,
     updateShelfImageName,
+    replaceShelfImage,
     // 칸-이미지 매핑
     loadLocationMapping,
     saveLocationMapping,

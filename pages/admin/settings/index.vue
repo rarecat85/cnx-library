@@ -178,9 +178,34 @@
 
         <!-- 칸-이미지 매핑 섹션 -->
         <div class="section">
-          <h3 class="section-title mb-4">
-            칸-이미지 매핑
-          </h3>
+          <div class="section-header d-flex align-center justify-space-between mb-4">
+            <h3 class="section-title mb-0">
+              칸-이미지 매핑
+            </h3>
+            <div
+              v-if="selectedLocation"
+              class="section-actions d-flex gap-2"
+            >
+              <v-btn
+                class="action-btn"
+                variant="flat"
+                size="small"
+                :loading="locationActionLoading"
+                @click="handleToggleDefaultLocation"
+              >
+                {{ defaultLocation === selectedLocation ? '기본칸 해제' : '기본칸 설정' }}
+              </v-btn>
+              <v-btn
+                class="action-btn action-btn-danger"
+                variant="flat"
+                size="small"
+                :loading="locationActionLoading"
+                @click="handleDeleteLocation"
+              >
+                칸 삭제
+              </v-btn>
+            </div>
+          </div>
 
           <div
             v-if="mappingLoading"
@@ -201,11 +226,18 @@
               v-for="location in allLocations"
               :key="location.value"
               class="location-item"
-              :class="{ 'location-item-default': defaultLocation === location.value }"
+              :class="{ 
+                'location-item-default': defaultLocation === location.value,
+                'location-item-selected': selectedLocation === location.value
+              }"
+              @click="handleLocationSelect(location.value)"
             >
               <!-- 수정 모드 -->
               <template v-if="editingLocation === location.value">
-                <div class="location-edit-form">
+                <div
+                  class="location-edit-form"
+                  @click.stop
+                >
                   <v-text-field
                     v-model="editLocationNameValue"
                     label="칸 이름"
@@ -272,7 +304,7 @@
                     size="x-small"
                     variant="text"
                     class="location-edit-btn"
-                    @click="startLocationEdit(location)"
+                    @click.stop="startLocationEdit(location)"
                   >
                     <v-icon size="small">mdi-pencil</v-icon>
                   </v-btn>
@@ -550,6 +582,7 @@ const {
   loadCenterLocations,
   addCenterLocation,
   updateLocationName,
+  deleteCenterLocation,
   getDefaultLocation,
   setDefaultLocation
 } = useSettings()
@@ -611,6 +644,8 @@ const editingLocation = ref(null)
 const editLocationNameValue = ref('')
 const editLocationImageValue = ref(null)
 const defaultLocation = ref(null)
+const selectedLocation = ref(null)
+const locationActionLoading = ref(false)
 
 // 전체 칸 목록 (센터별 커스텀 칸만 사용)
 const allLocations = computed(() => {
@@ -689,7 +724,8 @@ onMounted(async () => {
 
 // 센터 변경 시 카테고리, 매핑 및 커스텀 칸 업데이트
 watch(currentCenter, async () => {
-  selectedCategories.value = [] // 선택 초기화
+  selectedCategories.value = [] // 카테고리 선택 초기화
+  selectedLocation.value = null // 칸 선택 초기화
   await loadCategoriesData()
   updateCurrentMapping()
   await loadCustomLocations()
@@ -1048,6 +1084,65 @@ const handleSetDefaultLocation = async (locationName) => {
   }
 }
 
+// 칸 선택/해제
+const handleLocationSelect = (locationValue) => {
+  // 수정 모드일 때는 선택 무시
+  if (editingLocation.value) return
+  
+  if (selectedLocation.value === locationValue) {
+    selectedLocation.value = null
+  } else {
+    selectedLocation.value = locationValue
+  }
+}
+
+// 기본칸 설정/해제 토글
+const handleToggleDefaultLocation = async () => {
+  if (!selectedLocation.value) return
+  
+  try {
+    locationActionLoading.value = true
+    
+    if (defaultLocation.value === selectedLocation.value) {
+      // 기본칸 해제 (null로 설정)
+      await setDefaultLocation(currentCenter.value, null)
+      defaultLocation.value = null
+      await alert('기본 칸이 해제되었습니다.', { type: 'success' })
+    } else {
+      // 기본칸 설정
+      await setDefaultLocation(currentCenter.value, selectedLocation.value)
+      defaultLocation.value = selectedLocation.value
+      await alert('기본 칸이 설정되었습니다.', { type: 'success' })
+    }
+  } catch (error) {
+    console.error('기본 칸 변경 오류:', error)
+    await alert('기본 칸 변경에 실패했습니다.', { type: 'error' })
+  } finally {
+    locationActionLoading.value = false
+  }
+}
+
+// 칸 삭제
+const handleDeleteLocation = async () => {
+  if (!selectedLocation.value) return
+  
+  const confirmed = await confirm(`"${selectedLocation.value}" 칸을 삭제하시겠습니까?\n해당 칸에 도서가 있으면 삭제할 수 없습니다.`)
+  if (!confirmed) return
+  
+  try {
+    locationActionLoading.value = true
+    await deleteCenterLocation(currentCenter.value, selectedLocation.value)
+    await alert('칸이 삭제되었습니다.', { type: 'success' })
+    selectedLocation.value = null
+    await loadCustomLocations()
+  } catch (error) {
+    console.error('칸 삭제 오류:', error)
+    await alert(error.message || '칸 삭제에 실패했습니다.', { type: 'error' })
+  } finally {
+    locationActionLoading.value = false
+  }
+}
+
 // 칸 추가 다이얼로그
 const openAddLocationDialog = () => {
   locationForm.value = { name: '', imageId: null }
@@ -1326,6 +1421,14 @@ useHead({
     background-color: #fafafa;
     color: #bdbdbd;
   }
+  
+  &.action-btn-danger {
+    background-color: #d32f2f;
+    
+    &:hover:not(:disabled) {
+      background-color: #b71c1c;
+    }
+  }
 }
 
 // 서가 이미지 컨테이너
@@ -1486,10 +1589,25 @@ useHead({
   background-color: #f5f5f5;
   border-radius: rem(8);
   padding: rem(12);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: rem(2) solid transparent;
+  
+  &:hover {
+    background-color: #eeeeee;
+  }
   
   &.location-item-default {
     background-color: #ffebee;
-    border: rem(1) solid #ffcdd2;
+    border-color: #ffcdd2;
+  }
+  
+  &.location-item-selected {
+    border-color: #1976d2;
+    
+    &.location-item-default {
+      border-color: #1976d2;
+    }
   }
 }
 

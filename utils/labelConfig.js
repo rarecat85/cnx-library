@@ -61,12 +61,7 @@ export const parseLabelNumber = (labelNumber) => {
 export const formatLocation = (location) => {
   if (!location) return ''
   
-  // 특수 위치 (구매칸, 기부칸)
-  if (location === '구매칸' || location === '기부칸') {
-    return location
-  }
-  
-  // 위치 표시 (숫자 또는 문자)
+  // 모든 위치에 '칸' 붙여서 표시
   return `${location} 칸`
 }
 

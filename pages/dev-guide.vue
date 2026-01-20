@@ -938,6 +938,7 @@ npx firebase deploy --only firestore:rules</pre>
             <div class="tip-card warning">
               <h4>⚠️ 라벨번호 체계</h4>
               <p>카테고리는 Firestore <code>settings/categories</code>에서 센터별로 관리, 센터코드는 <code>utils/labelConfig.js</code>에서 관리</p>
+              <p><strong>카테고리명에 <code>/</code> 사용 금지!</strong> 라벨번호가 Firestore 문서 ID에 포함되어 오류 발생. <code>/</code> 대신 <code>·</code> (가운뎃점) 사용 (예: IT/보안 → IT·보안)</p>
             </div>
             <div class="tip-card danger">
               <h4>🚫 환경 변수</h4>

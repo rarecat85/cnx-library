@@ -20,7 +20,7 @@
       </div>
       
       <div class="location-guide-content">
-        <!-- 이미지 로딩 중 -->
+        <!-- 이미지 로딩 중 (Firestore 조회 중 또는 이미지 로드 중) -->
         <div
           v-if="isLoading"
           class="image-loading-container"
@@ -33,9 +33,10 @@
           <p class="mt-3">이미지를 불러오는 중...</p>
         </div>
         
-        <!-- 이미지가 있는 경우 (로드 완료 후에만 표시) -->
+        <!-- 이미지가 있는 경우 (숨겨진 상태로 미리 로드) -->
         <div
-          v-else-if="imageInfo && imageReady"
+          v-if="imageInfo"
+          v-show="imageReady"
           class="shelf-image-container"
         >
           <img
@@ -43,12 +44,13 @@
             :alt="`${center} 서가 이미지`"
             class="shelf-image"
             @load="onImageLoad"
+            @error="onImageError"
           >
         </div>
         
         <!-- 이미지가 없는 경우 -->
         <div
-          v-else-if="firestoreLoaded && !imageInfo"
+          v-else-if="firestoreLoaded"
           class="no-image-message"
         >
           <v-icon
@@ -150,14 +152,25 @@ const firestoreImageUrl = ref(null)
 const firestoreLoaded = ref(false)
 const imageReady = ref(false) // 이미지 실제 로드 완료 여부
 
-// 로딩 중 상태
+// 로딩 중 상태 (Firestore 조회 중 또는 이미지 실제 로드 중)
 const isLoading = computed(() => {
-  return !firestoreLoaded.value || (firestoreImageUrl.value && !imageReady.value)
+  // Firestore 조회 중
+  if (!firestoreLoaded.value) return true
+  // 이미지 URL이 있지만 아직 실제 로드되지 않음
+  if (firestoreImageUrl.value && !imageReady.value) return true
+  return false
 })
 
 // 이미지 로드 완료 핸들러
 const onImageLoad = () => {
   imageReady.value = true
+}
+
+// 이미지 로드 실패 핸들러
+const onImageError = () => {
+  console.warn('이미지 로드 실패')
+  firestoreImageUrl.value = null
+  imageReady.value = false
 }
 
 onMounted(() => {

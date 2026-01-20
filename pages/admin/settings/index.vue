@@ -953,14 +953,17 @@ const getNextImageNumber = () => {
 // 파일 선택 처리 (직접 업로드)
 const handleFileSelect = async (event) => {
   const file = event.target.files?.[0]
-  if (!file) return
+  if (!file) {
+    console.warn('파일이 선택되지 않았습니다.')
+    return
+  }
 
   // 현재 센터의 다음 번호로 이름 자동 생성
   const nextNumber = getNextImageNumber()
   const imageName = `서가 이미지 ${nextNumber}`
   
   try {
-    imageLoading.value = true
+    imagesLoading.value = true
     // 현재 센터 정보와 함께 업로드
     await uploadShelfImage(file, imageName, currentCenter.value)
     await alert('이미지가 업로드되었습니다.', { type: 'success' })
@@ -969,7 +972,7 @@ const handleFileSelect = async (event) => {
     console.error('이미지 업로드 오류:', error)
     await alert(error.message || '이미지 업로드에 실패했습니다.', { type: 'error' })
   } finally {
-    imageLoading.value = false
+    imagesLoading.value = false
     // 파일 입력 초기화
     if (fileInputRef.value) {
       fileInputRef.value.value = ''

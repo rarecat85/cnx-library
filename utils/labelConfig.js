@@ -66,14 +66,14 @@ export const formatLocation = (location) => {
     return location
   }
   
-  // 숫자 위치
-  return `${location}번 칸`
+  // 위치 표시 (숫자 또는 문자)
+  return `${location} 칸`
 }
 
 /**
  * 여러 위치를 표시 형식으로 변환
  * @param {Array<string>} locations - 위치 배열
- * @returns {string} 표시 문자열 (예: "3번 칸, 5번 칸" 또는 "3번 칸 외 1곳")
+ * @returns {string} 표시 문자열 (예: "3 칸, 5 칸" 또는 "3 칸 외 1곳")
  */
 export const formatMultipleLocations = (locations) => {
   if (!locations || locations.length === 0) {

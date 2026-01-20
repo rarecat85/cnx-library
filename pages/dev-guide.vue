@@ -332,7 +332,7 @@ await setPersistence(auth, browserSessionPersistence)</pre>
           <div class="info-box">
             <h4>설정 관리 기능</h4>
             <ul>
-              <li><strong>카테고리:</strong> loadCategorySettings, saveCategorySettings, addCategory, updateCategoryName, deleteCategory</li>
+              <li><strong>카테고리:</strong> loadCategoriesByCenter(center), addCategory(center, name), deleteCategory(center, name), deleteCategories(center, names[]), getBookCountByCategory(center, name)</li>
               <li><strong>서가 이미지:</strong> loadShelfImages, uploadShelfImage, deleteShelfImage</li>
               <li><strong>칸 관리:</strong> loadCenterLocations, saveCenterLocations, addCenterLocation, updateLocationName, deleteCenterLocation</li>
               <li><strong>칸-이미지 매핑:</strong> loadLocationMapping, saveLocationMapping, getLocationImageUrl</li>
@@ -937,7 +937,7 @@ npx firebase deploy --only firestore:rules</pre>
             </div>
             <div class="tip-card warning">
               <h4>⚠️ 라벨번호 체계</h4>
-              <p><code>utils/labelConfig.js</code>에서 카테고리, 센터코드, 위치 옵션 관리</p>
+              <p>카테고리는 Firestore <code>settings/categories</code>에서 센터별로 관리, 센터코드는 <code>utils/labelConfig.js</code>에서 관리</p>
             </div>
             <div class="tip-card danger">
               <h4>🚫 환경 변수</h4>

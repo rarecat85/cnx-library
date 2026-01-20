@@ -20,21 +20,35 @@
       </div>
       
       <div class="location-guide-content">
-        <!-- 이미지가 있는 경우 -->
+        <!-- 이미지 로딩 중 -->
         <div
-          v-if="imageInfo"
+          v-if="isLoading"
+          class="image-loading-container"
+        >
+          <v-progress-circular
+            indeterminate
+            color="primary"
+            size="48"
+          />
+          <p class="mt-3">이미지를 불러오는 중...</p>
+        </div>
+        
+        <!-- 이미지가 있는 경우 (로드 완료 후에만 표시) -->
+        <div
+          v-else-if="imageInfo && imageReady"
           class="shelf-image-container"
         >
           <img
             :src="imageInfo.imagePath"
             :alt="`${center} 서가 이미지`"
             class="shelf-image"
+            @load="onImageLoad"
           >
         </div>
         
         <!-- 이미지가 없는 경우 -->
         <div
-          v-else
+          v-else-if="firestoreLoaded && !imageInfo"
           class="no-image-message"
         >
           <v-icon
@@ -134,6 +148,17 @@ const isMobile = ref(false)
 // Firestore에서 로드한 이미지 URL
 const firestoreImageUrl = ref(null)
 const firestoreLoaded = ref(false)
+const imageReady = ref(false) // 이미지 실제 로드 완료 여부
+
+// 로딩 중 상태
+const isLoading = computed(() => {
+  return !firestoreLoaded.value || (firestoreImageUrl.value && !imageReady.value)
+})
+
+// 이미지 로드 완료 핸들러
+const onImageLoad = () => {
+  imageReady.value = true
+}
 
 onMounted(() => {
   const checkMobile = () => {
@@ -161,7 +186,11 @@ watch(
 // Firestore에서 이미지 URL 로드
 const loadFirestoreImage = async (center, location) => {
   try {
+    // 로드 시작 시 이전 상태 초기화 (다른 센터 이미지가 보이는 것 방지)
     firestoreLoaded.value = false
+    firestoreImageUrl.value = null
+    imageReady.value = false
+    
     const mapping = await loadLocationMapping()
     const imageId = mapping[center]?.[location]
     
@@ -173,7 +202,7 @@ const loadFirestoreImage = async (center, location) => {
       firestoreImageUrl.value = null
     }
   } catch (error) {
-    console.warn('Firestore 이미지 로드 실패, 기본 이미지 사용:', error)
+    console.warn('Firestore 이미지 로드 실패:', error)
     firestoreImageUrl.value = null
   } finally {
     firestoreLoaded.value = true
@@ -244,6 +273,19 @@ const close = () => {
   display: block;
   width: 100%;
   height: auto;
+}
+
+.image-loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: rem(60) rem(20);
+  background-color: #f5f5f5;
+  border-radius: rem(8);
+  margin-bottom: rem(16);
+  color: #666;
+  font-size: rem(14);
 }
 
 .no-image-message {

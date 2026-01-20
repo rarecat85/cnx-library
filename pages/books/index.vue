@@ -552,7 +552,6 @@
 <script setup>
 import { CENTERS, getCenterByWorkplace, canDirectRent } from '@/utils/centerMapping.js'
 import { formatLocation } from '@/utils/labelConfig.js'
-import { hasLocationImage } from '@/utils/locationCoordinates.js'
 
 definePageMeta({
   layout: false,
@@ -569,7 +568,7 @@ const {
   loading: booksLoading 
 } = useBooks()
 const { confirm, alert } = useDialog()
-const { getDefaultLocation } = useSettings()
+const { getDefaultLocation, hasLocationMappingForCenter } = useSettings()
 const { $firebaseFirestore } = useNuxtApp()
 const firestore = $firebaseFirestore
 
@@ -630,10 +629,26 @@ const returnNotifyLoadingIsbn = ref(null)
 // 센터별 기본 칸 (NEW 표시 기준)
 const defaultLocation = ref('')
 
-// 위치 안내 이미지 존재 여부
-const hasLocationImageForCenter = computed(() => {
-  return hasLocationImage(currentCenter.value)
-})
+// 위치 안내 이미지 존재 여부 (Firestore 매핑 기반)
+const hasLocationImageForCenter = ref(false)
+
+// hasLocationImage 함수 (템플릿에서 사용)
+const hasLocationImage = (center, location) => {
+  return hasLocationImageForCenter.value
+}
+
+// 센터 변경 시 매핑 존재 여부 확인
+watch(
+  () => currentCenter.value,
+  async (center) => {
+    if (center) {
+      hasLocationImageForCenter.value = await hasLocationMappingForCenter(center)
+    } else {
+      hasLocationImageForCenter.value = false
+    }
+  },
+  { immediate: true }
+)
 
 // 반응형 drawer 너비 계산
 onMounted(() => {

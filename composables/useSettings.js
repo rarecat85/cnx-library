@@ -649,6 +649,45 @@ export const useSettings = () => {
     }
   }
 
+  /**
+   * 특정 센터에 위치 이미지 매핑이 있는지 확인
+   * @param {string} center - 센터명
+   * @returns {Promise<boolean>} 매핑 존재 여부
+   */
+  const hasLocationMappingForCenter = async (center) => {
+    if (!center) return false
+    
+    try {
+      const mapping = await loadLocationMapping()
+      const centerMapping = mapping[center]
+      
+      // 센터에 매핑된 칸이 하나라도 있으면 true
+      return centerMapping && Object.keys(centerMapping).length > 0
+    } catch (err) {
+      console.error('센터 매핑 확인 오류:', err)
+      return false
+    }
+  }
+
+  /**
+   * 특정 센터/칸에 이미지 매핑이 있는지 확인
+   * @param {string} center - 센터명
+   * @param {string} location - 칸
+   * @returns {Promise<boolean>} 매핑 존재 여부
+   */
+  const hasLocationMappingForLocation = async (center, location) => {
+    if (!center || !location) return false
+    
+    try {
+      const mapping = await loadLocationMapping()
+      const imageId = mapping[center]?.[location]
+      return !!imageId
+    } catch (err) {
+      console.error('칸 매핑 확인 오류:', err)
+      return false
+    }
+  }
+
   // ==================== 센터별 칸 관리 ====================
 
   /**
@@ -950,6 +989,8 @@ export const useSettings = () => {
     loadLocationMapping,
     saveLocationMapping,
     getLocationImageUrl,
+    hasLocationMappingForCenter,
+    hasLocationMappingForLocation,
     // 센터별 칸 관리
     loadCenterLocations,
     saveCenterLocations,

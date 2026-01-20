@@ -431,7 +431,6 @@
 
 <script setup>
 import { formatLocation, formatMultipleLocations } from '@/utils/labelConfig.js'
-import { hasLocationImage as checkHasLocationImage } from '@/utils/locationCoordinates.js'
 
 const props = defineProps({
   book: {
@@ -672,10 +671,22 @@ const singleLocation = computed(() => {
   return ''
 })
 
-// 위치 안내 이미지 존재 여부
-const hasLocationImage = computed(() => {
-  return checkHasLocationImage(props.center)
-})
+// 위치 안내 이미지 존재 여부 (Firestore 매핑 기반)
+const { hasLocationMappingForCenter } = useSettings()
+const hasLocationImage = ref(false)
+
+// 센터 변경 시 매핑 존재 여부 확인
+watch(
+  () => props.center,
+  async (center) => {
+    if (center) {
+      hasLocationImage.value = await hasLocationMappingForCenter(center)
+    } else {
+      hasLocationImage.value = false
+    }
+  },
+  { immediate: true }
+)
 
 // 위치 클릭 핸들러
 const handleLocationClick = () => {

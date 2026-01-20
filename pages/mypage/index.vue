@@ -518,7 +518,6 @@
 <script setup>
 import { CENTERS, getCenterByWorkplace } from '@/utils/centerMapping.js'
 import { formatLocation } from '@/utils/labelConfig.js'
-import { hasLocationImage } from '@/utils/locationCoordinates.js'
 
 definePageMeta({
   layout: false,
@@ -528,8 +527,26 @@ definePageMeta({
 const { user } = useAuth()
 const { returnBook } = useBooks()
 const { confirm, alert } = useDialog()
+const { hasLocationMappingForCenter } = useSettings()
 const { $firebaseFirestore } = useNuxtApp()
 const firestore = $firebaseFirestore
+
+// 센터별 위치 이미지 매핑 존재 여부 캐시
+const centerLocationMappingCache = ref({})
+
+// hasLocationImage 함수 (Firestore 매핑 기반)
+const hasLocationImage = (center, location) => {
+  if (!center) return false
+  return centerLocationMappingCache.value[center] || false
+}
+
+// 센터의 매핑 존재 여부 확인 및 캐시
+const checkCenterLocationMapping = async (center) => {
+  if (!center || centerLocationMappingCache.value[center] !== undefined) return
+  
+  const hasMapping = await hasLocationMappingForCenter(center)
+  centerLocationMappingCache.value[center] = hasMapping
+}
 
 // Navigation Drawer 상태 및 반응형 너비
 const { drawer, drawerWidth } = useDrawer()
@@ -845,6 +862,10 @@ const loadRentedBooks = async () => {
     })
     
     rentedBooks.value = books
+    
+    // 도서들의 센터에 대한 위치 이미지 매핑 존재 여부 확인
+    const centers = [...new Set(books.map(b => b.center).filter(Boolean))]
+    await Promise.all(centers.map(center => checkCenterLocationMapping(center)))
   } catch (error) {
     console.error('대여 도서 로드 오류:', error)
     rentedBooks.value = []

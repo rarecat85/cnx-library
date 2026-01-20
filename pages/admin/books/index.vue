@@ -792,7 +792,6 @@
 <script setup>
 import { CENTERS, getCenterByWorkplace } from '@/utils/centerMapping.js'
 import { CENTER_CODE_MAP, createLabelNumber, parseLabelNumber, formatLocation } from '@/utils/labelConfig.js'
-import { hasLocationImage } from '@/utils/locationCoordinates.js'
 
 definePageMeta({
   layout: false,
@@ -831,6 +830,15 @@ const selectedPopupLocation = ref('')
 const openLocationPopup = (location) => {
   selectedPopupLocation.value = location
   locationPopupVisible.value = true
+}
+
+// 위치 안내 이미지 존재 여부 (Firestore 매핑 기반)
+const { hasLocationMappingForCenter } = useSettings()
+const centerHasLocationImage = ref(false)
+
+// hasLocationImage 함수 (템플릿에서 사용, 센터 기반으로 체크)
+const hasLocationImage = (center, location) => {
+  return centerHasLocationImage.value
 }
 
 // 등록된 도서 관련
@@ -1014,6 +1022,19 @@ onMounted(async () => {
   // 대여 신청된 도서가 있으면 알림
   checkAndAlertRequestedBooks()
 })
+
+// 센터 변경 시 위치 이미지 매핑 존재 여부 확인
+watch(
+  () => currentCenter.value,
+  async (center) => {
+    if (center) {
+      centerHasLocationImage.value = await hasLocationMappingForCenter(center)
+    } else {
+      centerHasLocationImage.value = false
+    }
+  },
+  { immediate: true }
+)
 
 // 대여 신청된 도서 확인 및 다이얼로그 표시
 const checkAndAlertRequestedBooks = async () => {

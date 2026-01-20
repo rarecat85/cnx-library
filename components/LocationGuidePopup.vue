@@ -90,7 +90,6 @@
 </template>
 
 <script setup>
-import { getLocationImageInfo, hasLocationImage } from '@/utils/locationCoordinates.js'
 import { formatLocation } from '@/utils/labelConfig.js'
 
 const props = defineProps({
@@ -181,33 +180,17 @@ const loadFirestoreImage = async (center, location) => {
   }
 }
 
-// Nuxt 앱 설정에서 baseURL 가져오기
-const config = useRuntimeConfig()
-const baseURL = config.app.baseURL || '/'
-
-// 이미지 정보 (Firestore 우선, 없으면 하드코딩 fallback)
+// 이미지 정보 (Firestore에서 로드)
 const imageInfo = computed(() => {
   // Firestore에서 이미지를 찾은 경우
   if (firestoreImageUrl.value) {
     return {
       imagePath: firestoreImageUrl.value,
-      area: null // 좌표 정보는 사용하지 않음
+      area: null
     }
   }
   
-  // Firestore에 없으면 기존 하드코딩 데이터 사용 (하위 호환성)
-  if (!hasLocationImage(props.center)) {
-    return null
-  }
-  const info = getLocationImageInfo(props.center, props.location)
-  if (info) {
-    // baseURL이 '/'로 끝나면 중복 슬래시 방지
-    const base = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL
-    return {
-      ...info,
-      imagePath: `${base}${info.imagePath}`
-    }
-  }
+  // Firestore에 이미지가 없으면 null 반환
   return null
 })
 

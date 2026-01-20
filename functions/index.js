@@ -6,6 +6,7 @@ const { initializeApp } = require('firebase-admin/app')
 const { getAuth } = require('firebase-admin/auth')
 const { getFirestore, FieldValue } = require('firebase-admin/firestore')
 const functions = require('firebase-functions')
+const Brevo = require('@getbrevo/brevo')
 const nodemailer = require('nodemailer')
 const crypto = require('crypto')
 
@@ -14,6 +15,9 @@ const { migratePendingUserData } = require('./migration_helper')
 const aladinTtbKey = defineString('ALADIN_TTB_KEY', { default: '' })
 const naverClientId = defineString('NAVER_CLIENT_ID', { default: '' })
 const naverClientSecret = defineString('NAVER_CLIENT_SECRET', { default: '' })
+const brevoApiKey = defineString('BREVO_API_KEY', { default: '' })
+const brevoSenderEmail = defineString('BREVO_SENDER_EMAIL', { default: '' })
+// Gmail Fallback용 환경 변수
 const gmailUser = defineString('GMAIL_USER', { default: '' })
 const gmailAppPassword = defineString('GMAIL_APP_PASSWORD', { default: '' })
 
@@ -629,29 +633,8 @@ const createPasswordResetEmailTemplate = (resetUrl, userName, expiresInHours = 1
  * @returns {boolean} 발송 성공 여부
  */
 const sendPasswordResetEmailToUser = async (to, resetUrl, userName, expiresInHours = 1) => {
-  const transporter = createMailTransporter()
-  
-  if (!transporter) {
-    console.log('이메일 발송 스킵: 트랜스포터 없음')
-    return false
-  }
-  
-  try {
-    const html = createPasswordResetEmailTemplate(resetUrl, userName, expiresInHours)
-    
-    await transporter.sendMail({
-      from: `"CNX Library" <${gmailUser.value()}>`,
-      to,
-      subject: '[CNX Library] 비밀번호 재설정 안내',
-      html
-    })
-    
-    console.log(`비밀번호 재설정 이메일 발송 완료: ${to}`)
-    return true
-  } catch (error) {
-    console.error('비밀번호 재설정 이메일 발송 오류:', error)
-    return false
-  }
+  const html = createPasswordResetEmailTemplate(resetUrl, userName, expiresInHours)
+  return await sendEmailWithBrevo(to, '[CNX Library] 비밀번호 재설정 안내', html)
 }
 
 /**
@@ -1261,17 +1244,18 @@ exports.getAladinBestsellers = onCall({
   }
 })
 
-// ==================== 이메일 발송 시스템 ====================
+// ==================== 이메일 발송 시스템 (Brevo + Gmail Fallback) ====================
 
 /**
- * Nodemailer 트랜스포터 생성
+ * Gmail SMTP 트랜스포터 생성 (Fallback용)
+ * @returns {Object|null} Nodemailer 트랜스포터 또는 null
  */
-const createMailTransporter = () => {
+const createGmailTransporter = () => {
   const user = gmailUser.value()
   const pass = gmailAppPassword.value()
   
   if (!user || !pass) {
-    console.log('Gmail 인증 정보가 설정되지 않았습니다.')
+    console.log('[Gmail] 인증 정보가 설정되지 않았습니다.')
     return null
   }
   
@@ -1279,6 +1263,102 @@ const createMailTransporter = () => {
     service: 'gmail',
     auth: { user, pass }
   })
+}
+
+/**
+ * Brevo API로 이메일 발송
+ * @param {string} to - 수신자 이메일
+ * @param {string} subject - 제목
+ * @param {string} html - HTML 내용
+ * @returns {Promise<{success: boolean, error?: string}>} 발송 결과
+ */
+const sendViaBrevo = async (to, subject, html) => {
+  const apiKey = brevoApiKey.value()
+  const senderEmail = brevoSenderEmail.value()
+  
+  if (!apiKey || !senderEmail) {
+    return { success: false, error: 'Brevo 인증 정보가 설정되지 않았습니다.' }
+  }
+  
+  try {
+    const apiInstance = new Brevo.TransactionalEmailsApi()
+    apiInstance.setApiKey(Brevo.TransactionalEmailsApiApiKeys.apiKey, apiKey)
+    
+    const sendSmtpEmail = new Brevo.SendSmtpEmail()
+    sendSmtpEmail.sender = { name: 'CNX Library', email: senderEmail }
+    sendSmtpEmail.to = [{ email: to }]
+    sendSmtpEmail.subject = subject
+    sendSmtpEmail.htmlContent = html
+    
+    await apiInstance.sendTransacEmail(sendSmtpEmail)
+    return { success: true }
+  } catch (error) {
+    const errorMessage = error.response?.body?.message || error.message || String(error)
+    return { success: false, error: errorMessage }
+  }
+}
+
+/**
+ * Gmail SMTP로 이메일 발송 (Fallback)
+ * @param {string} to - 수신자 이메일
+ * @param {string} subject - 제목
+ * @param {string} html - HTML 내용
+ * @returns {Promise<{success: boolean, error?: string}>} 발송 결과
+ */
+const sendViaGmail = async (to, subject, html) => {
+  const transporter = createGmailTransporter()
+  
+  if (!transporter) {
+    return { success: false, error: 'Gmail 트랜스포터 생성 실패' }
+  }
+  
+  try {
+    await transporter.sendMail({
+      from: `"CNX Library" <${gmailUser.value()}>`,
+      to,
+      subject,
+      html
+    })
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error.message || String(error) }
+  }
+}
+
+/**
+ * 통합 이메일 발송 함수 (Brevo 우선, Gmail Fallback)
+ * 
+ * 1. Brevo API로 먼저 발송 시도
+ * 2. Brevo 실패 시 (일일 한도 초과, API 오류 등) Gmail SMTP로 fallback
+ * 3. 둘 다 실패하면 false 반환
+ * 
+ * @param {string} to - 수신자 이메일
+ * @param {string} subject - 제목
+ * @param {string} html - HTML 내용
+ * @returns {Promise<boolean>} 발송 성공 여부
+ */
+const sendEmailWithBrevo = async (to, subject, html) => {
+  // 1. Brevo API 먼저 시도
+  const brevoResult = await sendViaBrevo(to, subject, html)
+  
+  if (brevoResult.success) {
+    console.log(`[Brevo] 이메일 발송 성공: ${to}`)
+    return true
+  }
+  
+  console.warn(`[Brevo] 발송 실패, Gmail로 전환 시도: ${brevoResult.error}`)
+  
+  // 2. Brevo 실패 시 Gmail SMTP로 fallback
+  const gmailResult = await sendViaGmail(to, subject, html)
+  
+  if (gmailResult.success) {
+    console.log(`[Gmail Fallback] 이메일 발송 성공: ${to}`)
+    return true
+  }
+  
+  console.error(`[Gmail Fallback] 발송 실패: ${gmailResult.error}`)
+  console.error(`[이메일 발송 최종 실패] 수신자: ${to}, 제목: ${subject}`)
+  return false
 }
 
 /**
@@ -1439,31 +1519,10 @@ const createVerificationEmailTemplate = (type, verificationUrl, userName, expire
  * @returns {boolean} 발송 성공 여부
  */
 const sendVerificationEmail = async (to, type, verificationUrl, userName, expiresInHours = 24) => {
-  const transporter = createMailTransporter()
-  
-  if (!transporter) {
-    console.log('이메일 발송 스킵: 트랜스포터 없음')
-    return false
-  }
-  
-  try {
-    const isReauth = type === 'reauth'
-    const subject = isReauth ? '[CNX Library] 이메일 재인증 안내' : '[CNX Library] 이메일 인증 안내'
-    const html = createVerificationEmailTemplate(type, verificationUrl, userName, expiresInHours)
-    
-    await transporter.sendMail({
-      from: `"CNX Library" <${gmailUser.value()}>`,
-      to,
-      subject,
-      html
-    })
-    
-    console.log(`인증 이메일 발송 완료: ${to}`)
-    return true
-  } catch (error) {
-    console.error('인증 이메일 발송 오류:', error)
-    return false
-  }
+  const isReauth = type === 'reauth'
+  const subject = isReauth ? '[CNX Library] 이메일 재인증 안내' : '[CNX Library] 이메일 인증 안내'
+  const html = createVerificationEmailTemplate(type, verificationUrl, userName, expiresInHours)
+  return await sendEmailWithBrevo(to, subject, html)
 }
 
 /**
@@ -1596,29 +1655,8 @@ const createEmailTemplate = (type, title, message, extra = {}) => {
  * @param {Object} extra - 추가 정보
  */
 const sendNotificationEmail = async (to, type, title, message, extra = {}) => {
-  const transporter = createMailTransporter()
-  
-  if (!transporter) {
-    console.log('이메일 발송 스킵: 트랜스포터 없음')
-    return false
-  }
-  
-  try {
-    const html = createEmailTemplate(type, title, message, extra)
-    
-    await transporter.sendMail({
-      from: `"CNX Library" <${gmailUser.value()}>`,
-      to,
-      subject: `[CNX Library] ${title}`,
-      html
-    })
-    
-    console.log(`이메일 발송 성공: ${to}`)
-    return true
-  } catch (error) {
-    console.error('이메일 발송 오류:', error)
-    return false
-  }
+  const html = createEmailTemplate(type, title, message, extra)
+  return await sendEmailWithBrevo(to, `[CNX Library] ${title}`, html)
 }
 
 /**

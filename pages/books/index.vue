@@ -122,6 +122,7 @@
                   :show-return-notify-button="isGroupUnavailable(group) && !isMyRentedIsbn(group.isbn)"
                   :is-subscribed-to-return="isSubscribedToBook(group.isbn)"
                   :return-notify-loading="returnNotifyLoadingIsbn === group.isbn"
+                  :default-location="defaultLocation"
                   @select="() => handleGroupSelectClick(group)"
                   @rent="() => handleSingleRent(group)"
                   @subscribe-return-notify="() => handleSubscribeReturnNotify(group)"
@@ -568,6 +569,7 @@ const {
   loading: booksLoading 
 } = useBooks()
 const { confirm, alert } = useDialog()
+const { getDefaultLocation } = useSettings()
 const { $firebaseFirestore } = useNuxtApp()
 const firestore = $firebaseFirestore
 
@@ -625,6 +627,9 @@ const locationPopupVisible = ref(false)
 const returnNotifySubscriptions = ref([]) // 내가 구독중인 ISBN 목록
 const returnNotifyLoadingIsbn = ref(null)
 
+// 센터별 기본 칸 (NEW 표시 기준)
+const defaultLocation = ref('')
+
 // 위치 안내 이미지 존재 여부
 const hasLocationImageForCenter = computed(() => {
   return hasLocationImage(currentCenter.value)
@@ -671,6 +676,9 @@ onMounted(async () => {
   const workplace = await getUserWorkplace()
   userWorkplace.value = workplace
   currentCenter.value = workplace ? getCenterByWorkplace(workplace) : centerOptions[0]
+  
+  // 기본 칸 로드
+  defaultLocation.value = await getDefaultLocation(currentCenter.value) || ''
   
   await Promise.all([
     loadRegisteredBooks(),
@@ -793,6 +801,10 @@ const remainingRentCount = computed(() => {
 // 센터 변경 처리
 const handleCenterChange = async () => {
   selectedBooks.value = []
+  
+  // 센터 변경 시 기본 칸도 업데이트
+  defaultLocation.value = await getDefaultLocation(currentCenter.value) || ''
+  
   await Promise.all([
     loadRegisteredBooks(),
     loadReturnNotifySubscriptions()

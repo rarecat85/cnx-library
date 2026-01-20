@@ -86,6 +86,7 @@
             :subscribed-isbns="returnNotifySubscriptions"
             :my-rented-isbns="myRentedIsbns"
             :return-notify-loading-isbn="returnNotifyLoadingIsbn"
+            :default-location="defaultLocation"
             @rent="handleRent"
             @subscribe-return-notify="handleSubscribeReturnNotify"
           />
@@ -305,6 +306,7 @@ const userWorkplace = ref('')
 // 신규 도서 관련
 const newBooks = ref([])
 const newBooksLoading = ref(false)
+const defaultLocation = ref('') // 센터별 기본 칸 (NEW 표시 기준)
 
 // 반납 알림 관련
 const returnNotifySubscriptions = ref([]) // 내가 구독중인 ISBN 목록
@@ -432,6 +434,7 @@ const loadNewBooks = async () => {
     // 센터별 기본 칸 조회
     const { getDefaultLocation } = useSettings()
     const defaultLoc = await getDefaultLocation(currentCenter.value)
+    defaultLocation.value = defaultLoc || ''
     
     // 기본 칸에 있는 도서만 필터링 (기본 칸이 설정되지 않으면 빈 배열)
     const purchaseBooks = defaultLoc 

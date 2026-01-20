@@ -616,6 +616,11 @@ const props = defineProps({
   showRipple: {
     type: Boolean,
     default: true
+  },
+  // 센터별 기본 칸 (NEW 표시 기준)
+  defaultLocation: {
+    type: String,
+    default: ''
   }
 })
 
@@ -733,10 +738,11 @@ const handleRegister = async () => {
   }
 }
 
-// 구매칸에 있는 도서인지 확인 (NEW 표시)
+// 기본 칸에 있는 도서인지 확인 (NEW 표시)
 const isNewBook = computed(() => {
+  if (!props.defaultLocation) return false
   const location = props.location || props.book?.location
-  return location === '구매칸'
+  return location === props.defaultLocation
 })
 
 // 도서 상태

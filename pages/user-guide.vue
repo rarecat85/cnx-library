@@ -155,7 +155,7 @@
               <li><span class="status available">대여가능</span> 바로 대여할 수 있습니다.</li>
               <li><span class="status rented">대여중</span> 다른 사용자가 대여 중입니다.</li>
               <li><span class="status pending">대여신청중</span> 대여 신청이 진행 중입니다.</li>
-              <li><span class="status new">NEW</span> 구매칸에 있는 신규 도서입니다.</li>
+              <li><span class="status new">NEW</span> 기본 칸에 있는 신규 도서입니다.</li>
             </ul>
           </div>
           
@@ -350,11 +350,10 @@
           <div class="info-box">
             <h4>📍 위치 종류</h4>
             <ul>
-              <li><strong>구매칸:</strong> 새로 구매한 신규 도서가 배치됩니다 (NEW 표시)</li>
-              <li><strong>기부칸:</strong> 구성원으로부터 기부받은 도서가 배치됩니다</li>
-              <li><strong>1~16번 칸:</strong> 일반 서가 위치입니다</li>
+              <li><strong>기본 칸:</strong> 관리자가 설정한 기본 칸으로, 신규 등록 도서가 배치됩니다 (NEW 표시)</li>
+              <li><strong>그 외 칸:</strong> 관리자가 설정 관리에서 추가한 칸들입니다</li>
             </ul>
-            <p class="small-note">※ 구매칸/기부칸의 도서는 일정 기간 후 관리자에 의해 일반 서가 위치(1~16번 칸)로 이동됩니다.</p>
+            <p class="small-note">※ 기본 칸의 도서는 일정 기간 후 관리자에 의해 일반 서가 위치로 이동됩니다.</p>
           </div>
           
           <h3>위치 안내 보기</h3>

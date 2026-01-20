@@ -93,6 +93,7 @@
             :show-return-notify-button="shouldShowReturnNotifyButton(book)"
             :is-subscribed-to-return="isSubscribedToBook(book.isbn13 || book.isbn)"
             :return-notify-loading="returnNotifyLoadingIsbn === (book.isbn13 || book.isbn)"
+            :default-location="defaultLocation"
             @register="handleRegister"
             @rent="handleRent"
             @subscribe-return-notify="handleSubscribeReturnNotify"
@@ -242,6 +243,11 @@ const props = defineProps({
   returnNotifyLoadingIsbn: {
     type: String,
     default: null
+  },
+  // 센터별 기본 칸 (NEW 표시 기준)
+  defaultLocation: {
+    type: String,
+    default: ''
   }
 })
 

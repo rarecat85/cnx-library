@@ -418,7 +418,7 @@ await setPersistence(auth, browserSessionPersistence)</pre>
 }</pre>
             </div>
             <p class="schema-note">* <code>labelNumber</code>는 고유해야 함</p>
-            <p class="schema-note">* <code>location</code>이 '구매칸'인 도서는 NEW 표시됨</p>
+            <p class="schema-note">* <code>location</code>이 센터별 기본 칸(settings/defaultLocations)과 일치하면 NEW 표시됨</p>
           </div>
 
           <div class="schema-card">
@@ -957,7 +957,7 @@ npx firebase deploy --only firestore:rules</pre>
             </div>
             <div class="tip-card info">
               <h4>ℹ️ NEW 도서 로직</h4>
-              <p><code>location === '구매칸'</code>인 도서만 NEW 표시 (등록일과 무관)</p>
+              <p><code>location</code>이 센터별 기본 칸과 일치하는 도서만 NEW 표시 (등록일과 무관)</p>
             </div>
           </div>
         </div>

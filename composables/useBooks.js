@@ -12,7 +12,6 @@ import {
   updateDoc,
   deleteField
 } from 'firebase/firestore'
-import { DEFAULT_CATEGORIES } from '@/utils/labelConfig.js'
 import { sanitizeSearchQuery, sanitizeInput } from '@/utils/sanitize.js'
 
 export const useBooks = () => {
@@ -135,67 +134,40 @@ export const useBooks = () => {
   // ==================== 카테고리 관련 ====================
 
   /**
-   * 센터별 카테고리 목록 조회
+   * 센터별 카테고리 목록 조회 (DB 기반)
    * @param {string} center - 센터명
    * @returns {Promise<Array>} 카테고리 목록
    */
   const getCategories = async (center) => {
-    // 기본 카테고리는 항상 반환
-    let categories = [...DEFAULT_CATEGORIES]
-    
     if (!firestore) {
-      console.warn('Firebase가 초기화되지 않았습니다. 기본 카테고리만 반환합니다.')
-      return categories.sort((a, b) => a.localeCompare(b, 'ko'))
+      console.warn('Firebase가 초기화되지 않았습니다.')
+      return []
     }
 
     try {
-      // 추가된 카테고리 조회
-      const categoriesRef = collection(firestore, 'categories')
-      const q = query(categoriesRef, where('center', '==', center))
-      const snapshot = await getDocs(q)
+      // settings/categories에서 센터별 카테고리 조회
+      const settingsRef = doc(firestore, 'settings', 'categories')
+      const settingsDoc = await getDoc(settingsRef)
       
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data()
-        if (data.name && !categories.includes(data.name)) {
-          categories.push(data.name)
-        }
-      })
-      
-      // 센터별 사용여부 필터링 (settings/categories 문서 확인)
-      try {
-        const settingsRef = doc(firestore, 'settings', 'categories')
-        const settingsDoc = await getDoc(settingsRef)
-        
-        if (settingsDoc.exists()) {
-          const settings = settingsDoc.data()
-          const items = settings.items || {}
-          
-          // 센터별 사용여부가 설정된 카테고리만 필터링
-          categories = categories.filter(categoryName => {
-            // 설정이 없으면 모든 센터에서 사용 가능 (기본 동작 유지)
-            if (!items[categoryName]) {
-              return true
-            }
-            // 설정이 있으면 해당 센터가 포함되어 있는지 확인
-            return items[categoryName].includes(center)
-          })
-        }
-      } catch (settingsErr) {
-        // 설정 조회 실패 시 필터링 없이 진행 (하위 호환성)
-        console.warn('카테고리 설정 조회 실패 (기본 동작 유지):', settingsErr)
+      if (!settingsDoc.exists()) {
+        return []
       }
+      
+      const settings = settingsDoc.data()
+      // updatedAt 제외하고 해당 센터의 카테고리 배열 가져오기
+      const categories = settings[center] || []
+      
+      // 가나다순 정렬
+      return [...categories].sort((a, b) => a.localeCompare(b, 'ko'))
     } catch (err) {
-      console.error('추가 카테고리 조회 오류 (기본 카테고리는 사용 가능):', err)
+      console.error('카테고리 조회 오류:', err)
+      return []
     }
-    
-    // 가나다순 정렬
-    categories.sort((a, b) => a.localeCompare(b, 'ko'))
-    
-    return categories
   }
 
   /**
-   * 새 카테고리 추가
+   * 새 카테고리 추가 (useSettings.addCategory 사용 권장)
+   * @deprecated useSettings.addCategory를 사용하세요
    * @param {string} center - 센터명
    * @param {string} categoryName - 카테고리명
    * @returns {Promise<Object>} 추가 결과
@@ -212,25 +184,27 @@ export const useBooks = () => {
         throw new Error('카테고리명을 입력해주세요.')
       }
       
-      // 기본 카테고리에 있는지 확인
-      if (DEFAULT_CATEGORIES.includes(trimmedName)) {
-        return { success: true, message: '기본 카테고리입니다.' }
-      }
+      // settings/categories에서 센터별 카테고리 조회
+      const settingsRef = doc(firestore, 'settings', 'categories')
+      const settingsDoc = await getDoc(settingsRef)
+      const settings = settingsDoc.exists() ? settingsDoc.data() : {}
       
-      // 이미 추가된 카테고리인지 확인
-      const categoryId = `${center}_${trimmedName}`
-      const categoryRef = doc(firestore, 'categories', categoryId)
-      const categoryDoc = await getDoc(categoryRef)
+      // updatedAt 제외
+      const { updatedAt, ...categoryData } = settings
       
-      if (categoryDoc.exists()) {
+      // 해당 센터의 카테고리 배열 가져오기
+      categoryData[center] = categoryData[center] || []
+      
+      if (categoryData[center].includes(trimmedName)) {
         return { success: true, message: '이미 존재하는 카테고리입니다.' }
       }
       
-      // 새 카테고리 추가
-      await setDoc(categoryRef, {
-        center,
-        name: trimmedName,
-        createdAt: serverTimestamp()
+      // 카테고리 추가
+      categoryData[center].push(trimmedName)
+      
+      await setDoc(settingsRef, {
+        ...categoryData,
+        updatedAt: serverTimestamp()
       })
       
       return { success: true }

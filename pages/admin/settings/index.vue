@@ -25,9 +25,23 @@
 
         <!-- 카테고리 관리 섹션 -->
         <div class="section mb-8">
-          <h3 class="section-title mb-4">
-            카테고리 관리
-          </h3>
+          <div class="section-header d-flex align-center justify-space-between mb-4">
+            <h3 class="section-title mb-0">
+              카테고리 관리
+            </h3>
+            <div class="section-actions">
+              <v-btn
+                v-if="selectedCategories.length > 0"
+                class="action-btn"
+                variant="flat"
+                size="small"
+                :loading="categoryDeleteLoading"
+                @click="handleDeleteSelectedCategories"
+              >
+                카테고리 삭제 ({{ selectedCategories.length }})
+              </v-btn>
+            </div>
+          </div>
 
           <div
             v-if="categoriesLoading"
@@ -48,43 +62,23 @@
               v-for="category in filteredCategories"
               :key="category.name"
               class="category-item"
+              :class="{ 'category-item-selected': selectedCategories.includes(category.name) }"
+              @click="toggleCategorySelection(category.name)"
             >
-              <v-checkbox
-                :model-value="category.centers.includes(currentCenter)"
-                density="compact"
-                hide-details
-                color="primary"
-                class="category-checkbox"
-                @update:model-value="(val) => handleCategoryToggle(category, val)"
-              />
               <span class="category-label">
                 {{ category.name }}
                 <span class="category-count">({{ category.bookCount || 0 }})</span>
               </span>
-              <v-btn
-                v-if="!category.isDefault && category.bookCount === 0"
-                icon
-                size="x-small"
-                variant="text"
-                color="error"
-                class="category-delete-btn"
-                @click="handleDeleteCategory(category)"
-              >
-                <v-icon size="small">
-                  mdi-close
-                </v-icon>
-              </v-btn>
             </div>
 
-            <!-- 카테고리 추가 버튼 (리스트 마지막에 위치) -->
+            <!-- 카테고리 추가 버튼 (점선 스타일) -->
             <div
               class="category-item category-add-item"
               @click="openAddCategoryDialog"
             >
               <v-icon
-                size="small"
+                size="18"
                 color="primary"
-                class="mr-1"
               >
                 mdi-plus
               </v-icon>
@@ -540,7 +534,6 @@
 </template>
 
 <script setup>
-import { DEFAULT_CATEGORIES } from '@/utils/labelConfig'
 import { CENTERS, getCenterByWorkplace } from '@/utils/centerMapping'
 
 definePageMeta({
@@ -553,11 +546,9 @@ const { user } = useAuth()
 const { $firebaseFirestore } = useNuxtApp()
 const firestore = $firebaseFirestore
 const {
-  loadCategorySettings,
-  saveCategorySettings,
-  loadAdditionalCategories,
+  loadCategoriesByCenter,
   addCategory,
-  deleteCategory,
+  deleteCategories,
   getBookCountByCategory,
   loadShelfImages,
   uploadShelfImage,
@@ -584,14 +575,16 @@ const currentCenter = ref('')
 
 // ==================== 카테고리 관련 상태 ====================
 const categoriesLoading = ref(false)
-const allCategories = ref([])
+const allCategories = ref([]) // [{ name, bookCount }]
+const selectedCategories = ref([]) // 선택된 카테고리명 배열
 const categoryDialog = ref(false)
 const categoryForm = ref({
   name: ''
 })
 const categoryLoading = ref(false)
+const categoryDeleteLoading = ref(false)
 
-// 현재 센터 기준으로 필터링된 카테고리 (전체 표시, 사용여부는 체크박스로)
+// 현재 센터의 카테고리 목록
 const filteredCategories = computed(() => {
   return allCategories.value
 })
@@ -696,70 +689,40 @@ onMounted(async () => {
   }
   
   await Promise.all([
-    loadAllCategories(),
+    loadCategoriesData(),
     loadAllImages(),
     loadAllMapping(),
     loadCustomLocations()
   ])
 })
 
-// 센터 변경 시 매핑 및 커스텀 칸 업데이트
+// 센터 변경 시 카테고리, 매핑 및 커스텀 칸 업데이트
 watch(currentCenter, async () => {
+  selectedCategories.value = [] // 선택 초기화
+  await loadCategoriesData()
   updateCurrentMapping()
   await loadCustomLocations()
 })
 
 // ==================== 카테고리 함수 ====================
 
-const loadAllCategories = async () => {
+const loadCategoriesData = async () => {
   try {
     categoriesLoading.value = true
 
-    // 카테고리 설정 로드 (오류 발생 시 기본값 사용)
-    let settings = { items: {} }
-    let additionalCategories = []
+    // 현재 센터의 카테고리 목록 로드
+    const categoryNames = await loadCategoriesByCenter(currentCenter.value)
     
-    try {
-      settings = await loadCategorySettings()
-    } catch (err) {
-      console.warn('카테고리 설정 로드 실패, 기본값 사용:', err)
-    }
-    
-    try {
-      additionalCategories = await loadAdditionalCategories()
-    } catch (err) {
-      console.warn('추가 카테고리 로드 실패:', err)
-    }
-
-    // 기본 카테고리 목록 생성
-    const categories = DEFAULT_CATEGORIES.map(name => ({
-      name,
-      isDefault: true,
-      centers: settings.items?.[name] || [...CENTERS],
-      bookCount: 0
-    }))
-
-    // 추가 카테고리 병합
-    const additionalNames = [...new Set(additionalCategories.map(c => c.name))]
-    for (const name of additionalNames) {
-      if (!categories.find(c => c.name === name)) {
-        categories.push({
-          name,
-          isDefault: false,
-          centers: settings.items?.[name] || [...CENTERS],
-          bookCount: 0
-        })
-      }
-    }
-
-    // 도서 수 로드 (개별 오류 무시)
-    for (const category of categories) {
+    // 카테고리 목록 생성 (이름과 도서 수)
+    const categories = []
+    for (const name of categoryNames) {
+      let bookCount = 0
       try {
-        category.bookCount = await getBookCountByCategory(category.name)
+        bookCount = await getBookCountByCategory(currentCenter.value, name)
       } catch (err) {
-        console.warn(`카테고리 ${category.name} 도서 수 로드 실패:`, err)
-        category.bookCount = 0
+        console.warn(`카테고리 ${name} 도서 수 로드 실패:`, err)
       }
+      categories.push({ name, bookCount })
     }
 
     // 가나다순 정렬
@@ -768,13 +731,7 @@ const loadAllCategories = async () => {
     allCategories.value = categories
   } catch (error) {
     console.error('카테고리 로드 오류:', error)
-    // 오류가 발생해도 기본 카테고리는 표시
-    allCategories.value = DEFAULT_CATEGORIES.map(name => ({
-      name,
-      isDefault: true,
-      centers: [...CENTERS],
-      bookCount: 0
-    }))
+    allCategories.value = []
   } finally {
     categoriesLoading.value = false
   }
@@ -795,12 +752,12 @@ const handleSaveCategory = async () => {
   try {
     categoryLoading.value = true
     
-    // 추가 - 현재 센터에만 추가
-    await addCategory(categoryForm.value.name, [currentCenter.value])
+    // 현재 센터에 카테고리 추가
+    await addCategory(currentCenter.value, categoryForm.value.name)
     await alert('카테고리가 추가되었습니다.', { type: 'success' })
 
     closeCategoryDialog()
-    await loadAllCategories()
+    await loadCategoriesData()
   } catch (error) {
     console.error('카테고리 저장 오류:', error)
     await alert(error.message || '카테고리 저장에 실패했습니다.', { type: 'error' })
@@ -809,80 +766,56 @@ const handleSaveCategory = async () => {
   }
 }
 
-const handleCategoryToggle = async (category, checked) => {
-  // 기존 상태 저장 (롤백용)
-  const previousCenters = [...category.centers]
-  
-  try {
-    // 먼저 로컬 상태 업데이트 (UI 반응성)
-    let newCenters = [...category.centers]
-    
-    if (checked) {
-      // 센터 추가
-      if (!newCenters.includes(currentCenter.value)) {
-        newCenters.push(currentCenter.value)
-      }
-    } else {
-      // 센터 제거
-      newCenters = newCenters.filter(c => c !== currentCenter.value)
-    }
-    
-    category.centers = newCenters
-    
-    // Firestore에 저장
-    let settings = { items: {} }
-    try {
-      settings = await loadCategorySettings()
-    } catch {
-      // 설정이 없으면 새로 생성
-    }
-    settings.items = settings.items || {}
-    settings.items[category.name] = newCenters
-    
-    await saveCategorySettings(settings)
-    
-    // 추가 카테고리인 경우 categories 컬렉션도 업데이트 (도서 등록 페이지와 연동)
-    if (!category.isDefault) {
-      const { doc, setDoc, deleteDoc, serverTimestamp } = await import('firebase/firestore')
-      const categoryId = `${currentCenter.value}_${category.name}`
-      const categoryRef = doc(firestore, 'categories', categoryId)
-      
-      if (checked) {
-        // 센터 추가 시 categories 컬렉션에 문서 추가
-        await setDoc(categoryRef, {
-          center: currentCenter.value,
-          name: category.name,
-          createdAt: serverTimestamp()
-        })
-      } else {
-        // 센터 제거 시 categories 컬렉션에서 문서 삭제
-        await deleteDoc(categoryRef)
-      }
-    }
-  } catch (error) {
-    console.error('센터 사용여부 저장 오류:', error)
-    // 롤백
-    category.centers = previousCenters
-    await alert('저장에 실패했습니다. Firestore 규칙이 배포되었는지 확인해주세요.', { type: 'error' })
+// 카테고리 선택 토글
+const toggleCategorySelection = (categoryName) => {
+  const index = selectedCategories.value.indexOf(categoryName)
+  if (index === -1) {
+    selectedCategories.value.push(categoryName)
+  } else {
+    selectedCategories.value.splice(index, 1)
   }
 }
 
-const handleDeleteCategory = async (category) => {
-  if (category.bookCount > 0) {
-    await alert('해당 카테고리에 등록된 도서가 있어 삭제할 수 없습니다.', { type: 'error' })
-    return
-  }
+// 선택된 카테고리 삭제
+const handleDeleteSelectedCategories = async () => {
+  if (selectedCategories.value.length === 0) return
 
-  const confirmed = await confirm(`"${category.name}" 카테고리를 삭제하시겠습니까?`)
+  const confirmed = await confirm(
+    `선택한 ${selectedCategories.value.length}개의 카테고리를 삭제하시겠습니까?\n도서가 등록된 카테고리는 삭제되지 않습니다.`
+  )
   if (!confirmed) return
 
   try {
-    await deleteCategory(category.name)
-    await alert('카테고리가 삭제되었습니다.', { type: 'success' })
-    await loadAllCategories()
+    categoryDeleteLoading.value = true
+    
+    const result = await deleteCategories(currentCenter.value, selectedCategories.value)
+    
+    // 결과 메시지 생성
+    let message = ''
+    if (result.deleted.length > 0) {
+      message += `${result.deleted.length}개 카테고리가 삭제되었습니다.`
+    }
+    if (result.failed.length > 0) {
+      const failedNames = result.failed.map(f => f.name).join(', ')
+      message += message ? '\n' : ''
+      message += `삭제 실패: ${failedNames}\n(도서가 등록되어 있습니다.)`
+    }
+    
+    if (result.deleted.length > 0 && result.failed.length === 0) {
+      await alert(message, { type: 'success' })
+    } else if (result.deleted.length > 0 && result.failed.length > 0) {
+      await alert(message, { type: 'warning' })
+    } else {
+      await alert(message, { type: 'error' })
+    }
+    
+    selectedCategories.value = []
+    await loadCategoriesData()
   } catch (error) {
     console.error('카테고리 삭제 오류:', error)
-    await alert(error.message || '카테고리 삭제에 실패했습니다.', { type: 'error' })
+    await alert('카테고리 삭제에 실패했습니다.', { type: 'error' })
+  } finally {
+    categoryDeleteLoading.value = false
   }
 }
 
@@ -1343,19 +1276,18 @@ useHead({
   background-color: #f5f5f5;
   border-radius: rem(8);
   padding: rem(8) rem(12);
-  gap: rem(4);
+  gap: rem(8);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
   
   &:hover {
     background-color: #eeeeee;
   }
-}
-
-.category-checkbox {
-  flex-shrink: 0;
-  margin: 0;
   
-  :deep(.v-selection-control) {
-    min-height: auto;
+  &.category-item-selected {
+    background-color: #e3f2fd;
+    border-color: #1976d2;
   }
 }
 
@@ -1370,14 +1302,9 @@ useHead({
   font-size: rem(12);
 }
 
-.category-delete-btn {
-  margin-left: rem(4);
-  flex-shrink: 0;
-}
-
 .category-add-item {
   cursor: pointer;
-  border: rem(1) dashed #bdbdbd;
+  border: rem(2) dashed #bdbdbd;
   background-color: transparent;
   
   &:hover {
@@ -1390,6 +1317,21 @@ useHead({
   font-size: rem(14);
   color: #1976d2;
   font-weight: 500;
+}
+
+// 액션 버튼 (도서 관리 페이지와 동일)
+.action-btn {
+  background-color: #002C5B;
+  color: #FFFFFF;
+  
+  &:hover:not(:disabled) {
+    background-color: #003d7a;
+  }
+  
+  &:disabled {
+    background-color: #fafafa;
+    color: #bdbdbd;
+  }
 }
 
 // 서가 이미지 컨테이너

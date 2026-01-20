@@ -1,12 +1,11 @@
 /**
  * 설정 관리 컴포저블
- * - 카테고리 설정 (센터별 사용여부)
+ * - 카테고리 설정 (센터별 독립 관리)
  * - 서가 이미지 관리
  * - 칸-이미지 매핑 관리
  */
 
 import { ref } from 'vue'
-import { DEFAULT_CATEGORIES } from '@/utils/labelConfig'
 import { CENTERS } from '@/utils/centerMapping'
 
 export const useSettings = () => {
@@ -15,16 +14,16 @@ export const useSettings = () => {
   const loading = ref(false)
   const error = ref(null)
 
-  // ==================== 카테고리 설정 ====================
+  // ==================== 카테고리 설정 (센터별 독립 관리) ====================
 
   /**
-   * 카테고리 설정 로드
-   * @returns {Promise<Object>} { items: { 카테고리명: [센터배열] } }
+   * 카테고리 설정 로드 (전체)
+   * @returns {Promise<Object>} { "강남센터": ["카테고리1", ...], "용산센터": ["카테고리1", ...] }
    */
   const loadCategorySettings = async () => {
     if (!firestore) {
       console.warn('Firebase가 초기화되지 않았습니다.')
-      return { items: {} }
+      return {}
     }
 
     try {
@@ -33,11 +32,13 @@ export const useSettings = () => {
       const settingsDoc = await getDoc(settingsRef)
 
       if (settingsDoc.exists()) {
-        return settingsDoc.data()
+        const data = settingsDoc.data()
+        // updatedAt 필드 제외
+        const { updatedAt, ...categories } = data
+        return categories
       }
 
-      // 문서가 없으면 기본값 반환 (모든 카테고리를 모든 센터에서 사용)
-      return { items: {} }
+      return {}
     } catch (err) {
       console.error('카테고리 설정 로드 오류:', err)
       throw err
@@ -45,8 +46,8 @@ export const useSettings = () => {
   }
 
   /**
-   * 카테고리 설정 저장
-   * @param {Object} settings - { items: { 카테고리명: [센터배열] } }
+   * 카테고리 설정 저장 (전체)
+   * @param {Object} settings - { "강남센터": ["카테고리1", ...], ... }
    */
   const saveCategorySettings = async (settings) => {
     if (!firestore) {
@@ -68,45 +69,33 @@ export const useSettings = () => {
   }
 
   /**
-   * 추가 카테고리 목록 로드 (기존 categories 컬렉션에서)
-   * @returns {Promise<Array>} 추가 카테고리 목록
+   * 특정 센터의 카테고리 목록 로드
+   * @param {string} center - 센터명
+   * @returns {Promise<Array>} 카테고리 목록 ["카테고리1", "카테고리2", ...]
    */
-  const loadAdditionalCategories = async () => {
+  const loadCategoriesByCenter = async (center) => {
     if (!firestore) {
       return []
     }
 
     try {
-      const { collection, getDocs } = await import('firebase/firestore')
-      const categoriesRef = collection(firestore, 'categories')
-      const snapshot = await getDocs(categoriesRef)
-
-      const additionalCategories = []
-      snapshot.forEach((doc) => {
-        const data = doc.data()
-        if (data.name && !DEFAULT_CATEGORIES.includes(data.name)) {
-          additionalCategories.push({
-            id: doc.id,
-            name: data.name,
-            center: data.center,
-            createdAt: data.createdAt
-          })
-        }
-      })
-
-      return additionalCategories
+      const settings = await loadCategorySettings()
+      const categories = settings[center] || []
+      
+      // 가나다순 정렬
+      return [...categories].sort((a, b) => a.localeCompare(b, 'ko'))
     } catch (err) {
-      console.error('추가 카테고리 로드 오류:', err)
+      console.error('카테고리 로드 오류:', err)
       return []
     }
   }
 
   /**
-   * 카테고리 추가
+   * 카테고리 추가 (특정 센터)
+   * @param {string} center - 센터명
    * @param {string} categoryName - 카테고리명
-   * @param {Array<string>} centers - 사용할 센터 목록
    */
-  const addCategory = async (categoryName, centers) => {
+  const addCategory = async (center, categoryName) => {
     if (!firestore) {
       throw new Error('Firebase가 초기화되지 않았습니다.')
     }
@@ -116,30 +105,17 @@ export const useSettings = () => {
       throw new Error('카테고리명을 입력해주세요.')
     }
 
-    if (DEFAULT_CATEGORIES.includes(trimmedName)) {
-      throw new Error('기본 카테고리와 동일한 이름은 사용할 수 없습니다.')
-    }
-
     try {
-      const { doc, setDoc, serverTimestamp } = await import('firebase/firestore')
-
-      // 각 센터별로 categories 컬렉션에 추가 (기존 구조 유지)
-      for (const center of centers) {
-        const categoryId = `${center}_${trimmedName}`
-        const categoryRef = doc(firestore, 'categories', categoryId)
-        
-        await setDoc(categoryRef, {
-          center,
-          name: trimmedName,
-          createdAt: serverTimestamp()
-        })
+      const settings = await loadCategorySettings()
+      settings[center] = settings[center] || []
+      
+      // 이미 존재하는 카테고리인지 확인
+      if (settings[center].includes(trimmedName)) {
+        throw new Error('이미 존재하는 카테고리입니다.')
       }
 
-      // settings/categories에도 저장
-      const settings = await loadCategorySettings()
-      settings.items = settings.items || {}
-      settings.items[trimmedName] = centers
-
+      // 카테고리 추가
+      settings[center].push(trimmedName)
       await saveCategorySettings(settings)
 
       return { success: true }
@@ -151,10 +127,11 @@ export const useSettings = () => {
 
   /**
    * 카테고리명 수정 (도서 라벨번호 일괄 수정 포함)
+   * @param {string} center - 센터명
    * @param {string} oldName - 기존 카테고리명
    * @param {string} newName - 새 카테고리명
    */
-  const updateCategoryName = async (oldName, newName) => {
+  const updateCategoryName = async (center, oldName, newName) => {
     if (!firestore) {
       throw new Error('Firebase가 초기화되지 않았습니다.')
     }
@@ -169,16 +146,16 @@ export const useSettings = () => {
     }
 
     try {
-      const { collection, query, where, getDocs, doc, updateDoc, writeBatch, deleteDoc, setDoc, serverTimestamp } = await import('firebase/firestore')
+      const { collection, getDocs, doc, writeBatch } = await import('firebase/firestore')
 
-      // 1. 해당 카테고리로 등록된 도서 조회 (labelNumber가 oldName_으로 시작하는 도서)
+      // 1. 해당 센터의 해당 카테고리로 등록된 도서 조회
       const booksRef = collection(firestore, 'books')
       const snapshot = await getDocs(booksRef)
 
       const booksToUpdate = []
       snapshot.forEach((docSnap) => {
         const data = docSnap.data()
-        if (data.labelNumber && data.labelNumber.startsWith(`${oldName}_`)) {
+        if (data.center === center && data.labelNumber && data.labelNumber.startsWith(`${oldName}_`)) {
           booksToUpdate.push({
             id: docSnap.id,
             oldLabelNumber: data.labelNumber,
@@ -198,37 +175,14 @@ export const useSettings = () => {
       }
       await batch.commit()
 
-      // 3. categories 컬렉션 업데이트 (추가 카테고리인 경우)
-      if (!DEFAULT_CATEGORIES.includes(oldName)) {
-        for (const center of CENTERS) {
-          const oldCategoryId = `${center}_${oldName}`
-          const newCategoryId = `${center}_${trimmedNewName}`
-          
-          const oldCategoryRef = doc(firestore, 'categories', oldCategoryId)
-          const { getDoc } = await import('firebase/firestore')
-          const oldCategoryDoc = await getDoc(oldCategoryRef)
-          
-          if (oldCategoryDoc.exists()) {
-            // 새 문서 생성
-            const newCategoryRef = doc(firestore, 'categories', newCategoryId)
-            await setDoc(newCategoryRef, {
-              center,
-              name: trimmedNewName,
-              createdAt: serverTimestamp()
-            })
-            
-            // 기존 문서 삭제
-            await deleteDoc(oldCategoryRef)
-          }
-        }
-      }
-
-      // 4. settings/categories 업데이트
+      // 3. settings/categories 업데이트
       const settings = await loadCategorySettings()
-      if (settings.items && settings.items[oldName]) {
-        settings.items[trimmedNewName] = settings.items[oldName]
-        delete settings.items[oldName]
-        await saveCategorySettings(settings)
+      if (settings[center]) {
+        const index = settings[center].indexOf(oldName)
+        if (index !== -1) {
+          settings[center][index] = trimmedNewName
+          await saveCategorySettings(settings)
+        }
       }
 
       return { success: true, updatedCount: booksToUpdate.length }
@@ -239,29 +193,26 @@ export const useSettings = () => {
   }
 
   /**
-   * 카테고리 삭제
+   * 카테고리 삭제 (특정 센터)
+   * @param {string} center - 센터명
    * @param {string} categoryName - 카테고리명
    */
-  const deleteCategory = async (categoryName) => {
+  const deleteCategory = async (center, categoryName) => {
     if (!firestore) {
       throw new Error('Firebase가 초기화되지 않았습니다.')
     }
 
-    if (DEFAULT_CATEGORIES.includes(categoryName)) {
-      throw new Error('기본 카테고리는 삭제할 수 없습니다.')
-    }
-
     try {
-      const { collection, query, where, getDocs, doc, deleteDoc } = await import('firebase/firestore')
+      const { collection, getDocs } = await import('firebase/firestore')
 
-      // 해당 카테고리로 등록된 도서가 있는지 확인
+      // 해당 센터의 해당 카테고리에 등록된 도서가 있는지 확인
       const booksRef = collection(firestore, 'books')
       const snapshot = await getDocs(booksRef)
 
       let hasBooks = false
       snapshot.forEach((docSnap) => {
         const data = docSnap.data()
-        if (data.labelNumber && data.labelNumber.startsWith(`${categoryName}_`)) {
+        if (data.center === center && data.labelNumber && data.labelNumber.startsWith(`${categoryName}_`)) {
           hasBooks = true
         }
       })
@@ -270,18 +221,14 @@ export const useSettings = () => {
         throw new Error('해당 카테고리에 등록된 도서가 있어 삭제할 수 없습니다.')
       }
 
-      // categories 컬렉션에서 삭제
-      for (const center of CENTERS) {
-        const categoryId = `${center}_${categoryName}`
-        const categoryRef = doc(firestore, 'categories', categoryId)
-        await deleteDoc(categoryRef)
-      }
-
       // settings/categories에서 삭제
       const settings = await loadCategorySettings()
-      if (settings.items && settings.items[categoryName]) {
-        delete settings.items[categoryName]
-        await saveCategorySettings(settings)
+      if (settings[center]) {
+        const index = settings[center].indexOf(categoryName)
+        if (index !== -1) {
+          settings[center].splice(index, 1)
+          await saveCategorySettings(settings)
+        }
       }
 
       return { success: true }
@@ -292,11 +239,71 @@ export const useSettings = () => {
   }
 
   /**
-   * 특정 카테고리에 등록된 도서 수 조회
+   * 다중 카테고리 삭제 (특정 센터)
+   * @param {string} center - 센터명
+   * @param {Array<string>} categoryNames - 삭제할 카테고리명 배열
+   * @returns {Promise<Object>} { deleted: [], failed: [{ name, reason }] }
+   */
+  const deleteCategories = async (center, categoryNames) => {
+    if (!firestore) {
+      throw new Error('Firebase가 초기화되지 않았습니다.')
+    }
+
+    const deleted = []
+    const failed = []
+
+    try {
+      const { collection, getDocs } = await import('firebase/firestore')
+
+      // 모든 도서 조회 (한 번만)
+      const booksRef = collection(firestore, 'books')
+      const snapshot = await getDocs(booksRef)
+
+      // 카테고리별 도서 존재 여부 확인
+      const categoryHasBooks = {}
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data()
+        if (data.center === center && data.labelNumber) {
+          for (const catName of categoryNames) {
+            if (data.labelNumber.startsWith(`${catName}_`)) {
+              categoryHasBooks[catName] = true
+            }
+          }
+        }
+      })
+
+      // 삭제 가능 / 불가 분류
+      for (const catName of categoryNames) {
+        if (categoryHasBooks[catName]) {
+          failed.push({ name: catName, reason: '도서가 등록되어 있습니다.' })
+        } else {
+          deleted.push(catName)
+        }
+      }
+
+      // 삭제 가능한 카테고리만 settings에서 제거
+      if (deleted.length > 0) {
+        const settings = await loadCategorySettings()
+        if (settings[center]) {
+          settings[center] = settings[center].filter(cat => !deleted.includes(cat))
+          await saveCategorySettings(settings)
+        }
+      }
+
+      return { deleted, failed }
+    } catch (err) {
+      console.error('다중 카테고리 삭제 오류:', err)
+      throw err
+    }
+  }
+
+  /**
+   * 특정 센터의 특정 카테고리에 등록된 도서 수 조회
+   * @param {string} center - 센터명
    * @param {string} categoryName - 카테고리명
    * @returns {Promise<number>} 도서 수
    */
-  const getBookCountByCategory = async (categoryName) => {
+  const getBookCountByCategory = async (center, categoryName) => {
     if (!firestore) {
       return 0
     }
@@ -309,7 +316,7 @@ export const useSettings = () => {
       let count = 0
       snapshot.forEach((docSnap) => {
         const data = docSnap.data()
-        if (data.labelNumber && data.labelNumber.startsWith(`${categoryName}_`)) {
+        if (data.center === center && data.labelNumber && data.labelNumber.startsWith(`${categoryName}_`)) {
           count++
         }
       })
@@ -856,13 +863,14 @@ export const useSettings = () => {
   return {
     loading,
     error,
-    // 카테고리
+    // 카테고리 (센터별 독립 관리)
     loadCategorySettings,
     saveCategorySettings,
-    loadAdditionalCategories,
+    loadCategoriesByCenter,
     addCategory,
     updateCategoryName,
     deleteCategory,
+    deleteCategories,
     getBookCountByCategory,
     // 서가 이미지
     loadShelfImages,

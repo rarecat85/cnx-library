@@ -47,9 +47,22 @@ export default defineNuxtConfig({
     // GitHub Pages 배포 시 baseURL 설정
     baseURL: isGitHubPages ? '/cnx-library/' : '/',
     
-    // 헤드 설정 (구글 폰트)
+    // 헤드 설정 (구글 폰트, favicon, 바탕화면 바로가기 아이콘)
     head: {
       link: [
+        {
+          rel: 'icon',
+          type: 'image/png',
+          href: `${isGitHubPages ? '/cnx-library/' : '/'}images/favicon.png`
+        },
+        {
+          rel: 'apple-touch-icon',
+          href: `${isGitHubPages ? '/cnx-library/' : '/'}images/favicon.png`
+        },
+        {
+          rel: 'manifest',
+          href: `${isGitHubPages ? '/cnx-library/' : '/'}manifest.webmanifest`
+        },
         {
           rel: 'preconnect',
           href: 'https://fonts.googleapis.com'

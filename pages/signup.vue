@@ -91,7 +91,7 @@
 
         <v-alert
           v-if="successMessage"
-          type="success"
+          :type="signupEmailFailed ? 'warning' : 'success'"
           variant="tonal"
           class="success-alert mb-4"
         >
@@ -99,11 +99,20 @@
             {{ successMessage }}
           </div>
           <div
-            v-if="countdown > 0"
+            v-if="!signupEmailFailed && countdown > 0"
             class="countdown-text mt-2"
           >
             {{ countdown }}초 뒤 로그인 페이지로 이동합니다.
           </div>
+          <v-btn
+            v-if="signupEmailFailed"
+            color="primary"
+            variant="flat"
+            class="mt-3"
+            @click="router.push('/login')"
+          >
+            로그인 페이지로 이동 (인증 메일 재전송)
+          </v-btn>
         </v-alert>
 
         <v-btn
@@ -161,6 +170,7 @@ const signupForm = ref()
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
 const countdown = ref(0)
+const signupEmailFailed = ref(false) // 인증 메일 발송 실패 시 재전송 안내용
 let countdownInterval = null
 
 const workplaceOptions = [...WORKPLACES]
@@ -195,6 +205,7 @@ const handleSignup = async () => {
   console.log('[signup.vue] handleSignup 시작!')
   error.value = ''
   successMessage.value = ''
+  signupEmailFailed.value = false
   
   // 폼 검증
   const { valid } = await signupForm.value.validate()
@@ -210,11 +221,14 @@ const handleSignup = async () => {
   console.log('[signup.vue] signup 함수 결과:', result)
   
   if (result.success) {
-    // 메일 발송 실패 경고가 있는 경우
+    // 메일 발송 실패 경고가 있는 경우 (재전송 안내만, 자동 이동 없음)
     if (result.warning) {
       successMessage.value = result.warning
+      signupEmailFailed.value = true // 재전송 안내용 플래그
     } else {
       successMessage.value = '회원가입이 완료되었습니다. 이메일을 확인하여 인증을 완료해주세요.\n\n📧 인증 메일은 5~10분 정도 소요될 수 있습니다. 재전송 시 처음부터 다시 기다려야 하니 충분히 기다려주세요.'
+      // 인증 메일 발송 성공 시에만 5초 후 로그인 페이지로 자동 이동
+      startCountdown()
     }
     // 폼 초기화
     name.value = ''
@@ -223,9 +237,6 @@ const handleSignup = async () => {
     confirmPassword.value = ''
     workplace.value = ''
     signupForm.value.resetValidation()
-    
-    // 5초 카운트다운 후 로그인 페이지로 이동
-    startCountdown()
   } else {
     error.value = result.error || '회원가입에 실패했습니다.'
   }

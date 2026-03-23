@@ -1759,6 +1759,19 @@ const getAdminsByCenter = async (center) => {
 }
 
 /**
+ * 대여자 표시 이름 (정식 회원 users / 임시 회원 pendingUsers)
+ */
+const getRenterName = async (rentedBy, rentedByType) => {
+  if (!rentedBy) return '알 수 없음'
+  if (rentedByType === 'pending') {
+    const pendingDoc = await firestore.collection('pendingUsers').doc(rentedBy).get()
+    return pendingDoc.exists ? (pendingDoc.data().name || '알 수 없음') : '알 수 없음'
+  }
+  const renterDoc = await firestore.collection('users').doc(rentedBy).get()
+  return renterDoc.exists ? (renterDoc.data().name || '알 수 없음') : '알 수 없음'
+}
+
+/**
  * 도서 등록 신청 시 관리자에게 알림
  * Trigger: bookRequests 컬렉션에 문서 생성 시
  */
@@ -1902,7 +1915,7 @@ exports.scheduledNotifications = onSchedule(
       
       for (const bookDoc of booksSnapshot.docs) {
         const book = bookDoc.data()
-        const { rentedBy, rentedAt, title, center } = book
+        const { rentedBy, rentedAt, title, center, rentedByType, rentedByEmail } = book
         
         if (!rentedAt || !rentedBy) continue
         
@@ -1942,6 +1955,22 @@ exports.scheduledNotifications = onSchedule(
               { bookId: bookDoc.id, bookTitle: title, center }
             )
             console.log(`반납예정 알림 생성: ${title} -> ${rentedBy}`)
+
+            // 임시 회원은 users 문서가 없어 sendEmailIfEnabled가 동작하지 않음 → 등록 이메일로 발송
+            if (rentedByType === 'pending' && rentedByEmail) {
+              try {
+                await sendNotificationEmail(
+                  rentedByEmail,
+                  'return_reminder',
+                  '반납예정일 알림',
+                  `"${title}" 도서의 반납예정일이 내일입니다.`,
+                  { bookId: bookDoc.id, bookTitle: title, center }
+                )
+                console.log(`반납예정 메일(임시회원): ${title} -> ${rentedByEmail}`)
+              } catch (emailErr) {
+                console.error('반납예정 메일(임시회원) 오류:', emailErr)
+              }
+            }
           }
         }
         
@@ -1977,13 +2006,26 @@ exports.scheduledNotifications = onSchedule(
               { bookId: bookDoc.id, bookTitle: title, center, overdueDays }
             )
             console.log(`연체 알림 생성 (사용자): ${title} -> ${rentedBy}`)
+
+            if (rentedByType === 'pending' && rentedByEmail) {
+              try {
+                await sendNotificationEmail(
+                  rentedByEmail,
+                  'overdue',
+                  '도서 연체 알림',
+                  `"${title}" 도서가 ${overdueDays}일 연체되었습니다. 빠른 반납 부탁드립니다.`,
+                  { bookId: bookDoc.id, bookTitle: title, center, overdueDays }
+                )
+                console.log(`연체 메일(임시회원): ${title} -> ${rentedByEmail}`)
+              } catch (emailErr) {
+                console.error('연체 메일(임시회원) 오류:', emailErr)
+              }
+            }
             
             // 관리자에게 연체 알림
             const adminIds = await getAdminsByCenter(center)
             
-            // 대여자 정보 조회
-            const renterDoc = await firestore.collection('users').doc(rentedBy).get()
-            const renterName = renterDoc.exists ? renterDoc.data().name || '알 수 없음' : '알 수 없음'
+            const renterName = await getRenterName(rentedBy, rentedByType || 'user')
             
             for (const adminId of adminIds) {
               await createNotification(

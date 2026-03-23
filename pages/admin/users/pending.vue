@@ -107,6 +107,10 @@
                   </div>
                   <div class="user-info text-body-2">
                     <strong>현재 대여:</strong> {{ getRentedCount(pendingUser.id) }}권
+                    <span
+                      v-if="getOverdueCount(pendingUser.id) > 0"
+                      class="text-warning ml-1"
+                    >(연체 {{ getOverdueCount(pendingUser.id) }}권)</span>
                   </div>
                 </div>
 
@@ -255,6 +259,7 @@ const { confirm, alert } = useDialog()
 const { $firebaseFirestore } = useNuxtApp()
 const firestore = $firebaseFirestore
 const { user } = useAuth()
+const { calculateBookStatus } = useBooks()
 
 // Navigation Drawer 상태 및 반응형 너비
 const { drawer, drawerWidth } = useDrawer()
@@ -263,8 +268,9 @@ const { drawer, drawerWidth } = useDrawer()
 const pendingUsers = ref([])
 const loading = ref(false)
 
-// 각 임시 회원의 대여 권수
+// 각 임시 회원의 대여 권수(반납 전 전체) 및 연체 권수
 const rentedCounts = ref({})
+const overdueCounts = ref({})
 
 // 검색 및 필터
 const searchQuery = ref('')
@@ -342,9 +348,13 @@ const isFormValid = computed(() => {
          !formErrors.value.workplace
 })
 
-// 대여 권수 가져오기
+// 대여 권수 가져오기 (삭제 가능 여부 등 — 연체 포함 전체)
 const getRentedCount = (pendingUserId) => {
   return rentedCounts.value[pendingUserId] || 0
+}
+
+const getOverdueCount = (pendingUserId) => {
+  return overdueCounts.value[pendingUserId] || 0
 }
 
 // 반응형 drawer 너비 계산
@@ -411,21 +421,30 @@ const loadPendingUsers = async () => {
   } catch (error) {
     console.error('임시 회원 목록 로드 오류:', error)
     pendingUsers.value = []
+    rentedCounts.value = {}
+    overdueCounts.value = {}
   } finally {
     loading.value = false
   }
 }
 
-// 대여 권수 로드
+// 대여 권수 로드 (연체는 rentedAt 기준 계산 — useBooks.calculateBookStatus)
 const loadRentedCounts = async () => {
-  if (!firestore || pendingUsers.value.length === 0) return
-  
+  if (!firestore) return
+
+  if (pendingUsers.value.length === 0) {
+    rentedCounts.value = {}
+    overdueCounts.value = {}
+    return
+  }
+
   try {
     const { collection, query, where, getDocs } = await import('firebase/firestore')
     const booksRef = collection(firestore, 'books')
-    
+
     const counts = {}
-    
+    const overdue = {}
+
     for (const user of pendingUsers.value) {
       const rentedQuery = query(
         booksRef,
@@ -433,19 +452,27 @@ const loadRentedCounts = async () => {
         where('rentedByType', '==', 'pending')
       )
       const snapshot = await getDocs(rentedQuery)
-      
-      let count = 0
-      snapshot.forEach(doc => {
-        const data = doc.data()
-        if (data.status === 'rented' || data.status === 'overdue') {
-          count++
+
+      let total = 0
+      let overdueN = 0
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data()
+        const book = { id: docSnap.id, ...data }
+        const st = calculateBookStatus(book)
+        if (st === 'rented' || st === 'overdue') {
+          total++
+          if (st === 'overdue') {
+            overdueN++
+          }
         }
       })
-      
-      counts[user.id] = count
+
+      counts[user.id] = total
+      overdue[user.id] = overdueN
     }
-    
+
     rentedCounts.value = counts
+    overdueCounts.value = overdue
   } catch (error) {
     console.error('대여 권수 조회 오류:', error)
   }

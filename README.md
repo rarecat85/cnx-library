@@ -414,11 +414,34 @@ Error: In non-interactive mode but have no value for the following environment v
 # 해결: functions/.env 파일에 필요한 변수 추가
 ```
 
-### 이메일 발송 실패
+### 이메일 발송 실패 (회원가입 인증 메일 등)
 
-1. Gmail 앱 비밀번호 확인
-2. 2단계 인증 활성화 확인
-3. Functions 로그에서 오류 확인: `npx firebase functions:log`
+**증상:** 회원가입은 완료되지만 "인증 메일 발송에 실패했습니다" 메시지가 뜨고, 로그인 페이지에서 재전송하라고 안내됨.
+
+**원인:** Firebase Functions에서 이메일 발송에 사용하는 **환경 변수**가 설정되지 않았거나 잘못된 경우.
+
+**점검 순서:**
+
+1. **Firebase에 환경 변수 설정 여부**  
+   이 프로젝트는 `firebase-functions/params`의 `defineString`을 사용합니다.  
+   Firebase Console → 프로젝트 → **Functions** → **환경 변수**(또는 배포 시 `--set-secret` 등)에서 아래가 설정돼 있는지 확인합니다.  
+   - `GMAIL_USER` – 발송용 Gmail 주소 (예: cnx.library.noreply@gmail.com)  
+   - `GMAIL_APP_PASSWORD` – Gmail **앱 비밀번호** (일반 비밀번호 아님)  
+   - `BREVO_API_KEY` – Brevo API 키 (Gmail 실패 시 fallback)  
+   - `BREVO_SENDER_EMAIL` – Brevo 발신 이메일  
+
+2. **Gmail 앱 비밀번호**  
+   - 해당 Google 계정에 **2단계 인증**이 켜져 있어야 함.  
+   - [Google 계정 → 보안 → 앱 비밀번호](https://myaccount.google.com/apppasswords)에서 앱 비밀번호 생성 후 `GMAIL_APP_PASSWORD`에 입력.
+
+3. **Functions 로그로 원인 확인**  
+   ```bash
+   npx firebase functions:log
+   ```  
+   - `[Gmail] 발송 실패`, `[Brevo Fallback] 발송 실패`, `인증 이메일 발송에 실패했습니다` 등이 있으면 그 옆 에러 메시지를 확인.
+
+4. **로컬 `.env`만 있는 경우**  
+   `functions/.env`는 로컬 실행용입니다. **배포된 Cloud Functions**에는 Firebase Console 또는 `firebase deploy` 시 설정한 환경 변수/시크릿만 적용됩니다. 배포 후에도 메일이 안 가면 위 1~3을 확인하세요.
 
 ### Firestore 권한 오류
 

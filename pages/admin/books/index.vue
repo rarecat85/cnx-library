@@ -1757,9 +1757,11 @@ const confirmRentBooks = async () => {
       }
     }
     
-    // 센터 확인
-    if (targetUserData.center !== rentFormCenter.value) {
-      rentFormError.value = `해당 사용자는 ${targetUserData.center} 소속입니다.`
+    // 센터 확인 — pendingUsers에는 center가 있으나, 정식 users 문서는 workplace만 있는 경우가 많음
+    const userCenter =
+      targetUserData.center || getCenterByWorkplace(targetUserData.workplace || '')
+    if (userCenter !== rentFormCenter.value) {
+      rentFormError.value = `해당 사용자는 ${userCenter} 소속입니다.`
       return
     }
     

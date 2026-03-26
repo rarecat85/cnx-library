@@ -10,7 +10,8 @@ import {
   serverTimestamp,
   deleteDoc,
   updateDoc,
-  deleteField
+  deleteField,
+  Timestamp
 } from 'firebase/firestore'
 import { sanitizeSearchQuery, sanitizeInput } from '@/utils/sanitize.js'
 
@@ -617,9 +618,10 @@ export const useBooks = () => {
    * @param {string} isbn - ISBN (ISBN 중복 대여 체크용)
    * @param {string} userType - 사용자 타입 ('user' 또는 'pending')
    * @param {string} userEmail - 사용자 이메일 (반납 시 히스토리 저장용)
+   * @param {Date|string|null} rentedAtOverride - 지정 시 실제 대여일(관리자 처리). 미지정 시 서버 시각.
    * @returns {Promise<Object>} 대여 결과
    */
-  const rentBook = async (labelNumber, center, userId, isbn = null, userType = 'user', userEmail = '') => {
+  const rentBook = async (labelNumber, center, userId, isbn = null, userType = 'user', userEmail = '', rentedAtOverride = null) => {
     if (!firestore) {
       throw new Error('Firebase가 초기화되지 않았습니다.')
     }
@@ -659,17 +661,37 @@ export const useBooks = () => {
         throw new Error('다른 사용자가 대여 신청한 도서입니다.')
       }
 
-      // 대여일로부터 일주일 후 반납 예정일 계산
-      const rentedAt = new Date()
-      const expectedReturnDate = new Date(rentedAt)
-      expectedReturnDate.setDate(expectedReturnDate.getDate() + 7)
+      // 대여일·반납 예정일 (관리자가 실제 대여일을 넘기면 그 기준, 아니면 서버 시각)
+      let rentedAtForFirestore
+      let expectedReturnDate
+      if (rentedAtOverride != null && rentedAtOverride !== '') {
+        const d = rentedAtOverride instanceof Date
+          ? new Date(rentedAtOverride.getTime())
+          : new Date(rentedAtOverride)
+        if (Number.isNaN(d.getTime())) {
+          throw new Error('유효하지 않은 대여일입니다.')
+        }
+        const endOfToday = new Date()
+        endOfToday.setHours(23, 59, 59, 999)
+        if (d > endOfToday) {
+          throw new Error('대여일은 오늘 이후로 설정할 수 없습니다.')
+        }
+        expectedReturnDate = new Date(d)
+        expectedReturnDate.setDate(expectedReturnDate.getDate() + 7)
+        rentedAtForFirestore = Timestamp.fromDate(d)
+      } else {
+        const rentedAt = new Date()
+        expectedReturnDate = new Date(rentedAt)
+        expectedReturnDate.setDate(expectedReturnDate.getDate() + 7)
+        rentedAtForFirestore = serverTimestamp()
+      }
 
       await updateDoc(bookRef, {
         status: 'rented',
         rentedBy: userId,
         rentedByType: userType,
         rentedByEmail: userEmail,
-        rentedAt: serverTimestamp(),
+        rentedAt: rentedAtForFirestore,
         expectedReturnDate: expectedReturnDate,
         requestedBy: deleteField(),
         requestedAt: deleteField(),

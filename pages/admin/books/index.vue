@@ -419,6 +419,17 @@
             class="mb-3"
           />
           <v-text-field
+            v-model="rentFormRentedDate"
+            type="date"
+            label="실제 대여일"
+            variant="outlined"
+            density="comfortable"
+            class="mb-3"
+            :max="rentDateMax"
+            hint="반납 예정·연체 알림은 이 날짜 기준 7일입니다."
+            persistent-hint
+          />
+          <v-text-field
             v-model="rentFormEmail"
             label="이메일"
             variant="outlined"
@@ -439,7 +450,7 @@
             color="primary"
             variant="flat"
             :loading="rentDialogLoading"
-            :disabled="!rentFormCenter || !rentFormEmail"
+            :disabled="!rentFormCenter || !rentFormEmail || !rentFormRentedDate"
             @click="confirmRentBooks"
           >
             대여 처리
@@ -897,7 +908,28 @@ const rentDialogBooks = ref([])
 const rentDialogLoading = ref(false)
 const rentFormCenter = ref('')
 const rentFormEmail = ref('')
+const rentFormRentedDate = ref('')
 const rentFormError = ref('')
+
+const formatDateForInput = (d) => {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+const rentDateMax = computed(() => formatDateForInput(new Date()))
+
+const parseLocalYmdToDate = (ymd) => {
+  if (!ymd) return null
+  const parts = String(ymd).split('-')
+  if (parts.length !== 3) return null
+  const y = parseInt(parts[0], 10)
+  const m = parseInt(parts[1], 10) - 1
+  const day = parseInt(parts[2], 10)
+  if (Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(day)) return null
+  return new Date(y, m, day, 12, 0, 0)
+}
 
 // 반납 다이얼로그 관련
 const returnDialog = ref(false)
@@ -1615,6 +1647,7 @@ const handleRentBooks = async () => {
   rentDialogBooks.value = availableBooks
   rentFormCenter.value = currentCenter.value
   rentFormEmail.value = ''
+  rentFormRentedDate.value = formatDateForInput(new Date())
   rentFormError.value = ''
   rentDialog.value = true
 }
@@ -1705,6 +1738,7 @@ const openRentDialog = async (book) => {
   rentDialogBooks.value = [book]
   rentFormCenter.value = currentCenter.value
   rentFormEmail.value = ''
+  rentFormRentedDate.value = formatDateForInput(new Date())
   rentFormError.value = ''
   rentDialog.value = true
 }
@@ -1715,13 +1749,20 @@ const closeRentDialog = () => {
   rentDialogBooks.value = []
   rentFormCenter.value = ''
   rentFormEmail.value = ''
+  rentFormRentedDate.value = ''
   rentFormError.value = ''
 }
 
 // 대여 처리 확인
 const confirmRentBooks = async () => {
-  if (!rentFormCenter.value || !rentFormEmail.value) return
-  
+  if (!rentFormCenter.value || !rentFormEmail.value || !rentFormRentedDate.value) return
+
+  const rentedAtDate = parseLocalYmdToDate(rentFormRentedDate.value)
+  if (!rentedAtDate) {
+    rentFormError.value = '실제 대여일을 올바르게 선택해주세요.'
+    return
+  }
+
   try {
     rentDialogLoading.value = true
     rentFormError.value = ''
@@ -1783,7 +1824,7 @@ const confirmRentBooks = async () => {
     // 선택된 도서들 대여 처리
     for (const book of rentDialogBooks.value) {
       const labelNumber = book.labelNumber || book.id.split('_')[0]
-      await rentBook(labelNumber, currentCenter.value, targetUserId, book.isbn, userType, rentFormEmail.value)
+      await rentBook(labelNumber, currentCenter.value, targetUserId, book.isbn, userType, rentFormEmail.value, rentedAtDate)
     }
     
     const rentedBookCount = rentDialogBooks.value.length

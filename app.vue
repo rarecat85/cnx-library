@@ -1,15 +1,21 @@
 <template>
   <NuxtLayout>
-    <NuxtPage />
+    <NuxtPage :page-key="resolvePageKey" />
   </NuxtLayout>
   
   <!-- 전역 다이얼로그 -->
   <GlobalDialog />
+
+  <!-- 사이트 공지 레이어 팝업 (로그인 사용자) -->
+  <SitePopupOverlay />
 </template>
 
 <script setup>
 // Nuxt 3 앱 진입점
 // 인증 상태 초기화는 useAuth composable에서 처리됩니다
+
+/** Nuxt 내부 RouteProvider key — 경로·이름이 바뀔 때마다 페이지 강제 갱신 */
+const resolvePageKey = (r) => `${r.fullPath}::${String(r.name ?? '')}`
 
 const { user, logout } = useAuth()
 

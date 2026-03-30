@@ -88,6 +88,15 @@
           <v-icon>mdi-cog</v-icon>
           <span>설정 관리</span>
         </NuxtLink>
+
+        <NuxtLink
+          to="/admin/popups"
+          class="menu-item"
+          @click="closeDrawer"
+        >
+          <v-icon>mdi-image-area</v-icon>
+          <span>팝업 관리</span>
+        </NuxtLink>
       </div>
 
       <!-- 최고관리자 메뉴 (admin 역할만 표시) -->

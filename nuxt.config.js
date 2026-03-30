@@ -1,14 +1,37 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
 // GitHub Pages 배포 시 baseURL 설정 (로컬에서는 '/', 프로덕션에서는 '/cnx-library/')
 const isGitHubPages = process.env.GITHUB_ACTIONS === 'true'
+const projectRoot = path.dirname(fileURLToPath(import.meta.url))
+
+/** Vite가 `node_modules/nuxt/.../manifest.js`의 `import("#app-manifest")`를 분석할 때 해석 실패하는 경우 보완 */
+function vitePluginResolveAppManifest() {
+  const manifestPath = path.resolve(projectRoot, '.nuxt/manifest/meta/dev.json')
+  return {
+    name: 'cnx-resolve-app-manifest',
+    enforce: 'pre',
+    resolveId(id) {
+      if (id === '#app-manifest') {
+        return manifestPath
+      }
+    }
+  }
+}
 
 export default defineNuxtConfig({
   devtools: { enabled: true },
-  
+
+  // Nuxt 3.21+ 스키마 해석 시 get("future") 순서 이슈 방지
+  future: {
+    compatibilityVersion: 3
+  },
+
   // SPA 모드 (Firebase 클라이언트 사용)
   ssr: false,
-  
+
   // Runtime Config (환경 변수)
   runtimeConfig: {
     public: {
@@ -34,6 +57,7 @@ export default defineNuxtConfig({
 
   // Vite 설정
   vite: {
+    plugins: [vitePluginResolveAppManifest()],
     define: {
       'process.env.DEBUG': 'false'
     },
@@ -46,7 +70,7 @@ export default defineNuxtConfig({
   app: {
     // GitHub Pages 배포 시 baseURL 설정
     baseURL: isGitHubPages ? '/cnx-library/' : '/',
-    
+
     // 헤드 설정 (구글 폰트, favicon, 바탕화면 바로가기 아이콘)
     head: {
       link: [
@@ -80,4 +104,3 @@ export default defineNuxtConfig({
     }
   }
 })
-

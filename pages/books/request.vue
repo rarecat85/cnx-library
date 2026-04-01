@@ -170,7 +170,7 @@ import { CENTERS, getCenterByWorkplace } from '@/utils/centerMapping.js'
 
 definePageMeta({
   layout: false,
-  middleware: 'auth'
+  middleware: ['auth', 'books-request-disabled']
 })
 
 const { user } = useAuth()

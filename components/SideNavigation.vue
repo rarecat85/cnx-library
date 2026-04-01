@@ -26,6 +26,7 @@
         </NuxtLink>
 
         <NuxtLink
+          v-if="isBookRequestEnabled"
           to="/books/request"
           class="menu-item"
           @click="closeDrawer"
@@ -154,6 +155,9 @@
 const drawer = useState('navigationDrawer', () => false)
 const { logout } = useAuth()
 const { isAdmin, isSuperAdmin } = useUser()
+
+// 도서 신청 기능은 당분간 숨김 처리 (라우트/페이지는 유지)
+const isBookRequestEnabled = false
 
 const closeDrawer = () => {
   drawer.value = false

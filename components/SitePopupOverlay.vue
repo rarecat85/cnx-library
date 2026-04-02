@@ -22,14 +22,14 @@
           class="site-popup-image-link"
         >
           <img
-            :src="popup.imageUrl"
+            :src="popupImageUrl"
             alt="공지"
             class="site-popup-image"
           >
         </a>
         <img
           v-else
-          :src="popup.imageUrl"
+          :src="popupImageUrl"
           alt="공지"
           class="site-popup-image"
         >
@@ -61,7 +61,7 @@
 </template>
 
 <script setup>
-import { sanitizePopupLinkUrl } from '~/composables/usePopups.js'
+import { pickPopupImageUrl, sanitizePopupLinkUrl } from '~/composables/usePopups.js'
 
 const LS_DISMISS = 'cnx_library_site_popup_dismiss'
 
@@ -72,11 +72,14 @@ const { getActivePopupForNow } = usePopups()
 const visible = ref(false)
 const popup = ref(null)
 const dontShowToday = ref(false)
+const isMobile = ref(false)
 
 const safeLinkUrl = computed(() => {
   const u = popup.value?.linkUrl
   return u ? sanitizePopupLinkUrl(u) : ''
 })
+
+const popupImageUrl = computed(() => pickPopupImageUrl(popup.value, isMobile.value))
 
 /** 관리자 페이지에서는 공지 레이어를 띄우지 않음(다이얼로그가 화면을 가리는 문제 방지) */
 const isAdminRoute = () => {
@@ -155,6 +158,22 @@ const syncVisibility = async () => {
 watch([user, () => route.fullPath], () => {
   syncVisibility()
 }, { immediate: true })
+
+onMounted(() => {
+  if (!process.client) {
+    return
+  }
+  const mq = window.matchMedia('(max-width: 600px)')
+  const apply = () => { isMobile.value = !!mq.matches }
+  apply()
+  if (typeof mq.addEventListener === 'function') {
+    mq.addEventListener('change', apply)
+    onBeforeUnmount(() => mq.removeEventListener('change', apply))
+  } else if (typeof mq.addListener === 'function') {
+    mq.addListener(apply)
+    onBeforeUnmount(() => mq.removeListener(apply))
+  }
+})
 
 const handleClose = (forToday) => {
   if (!popup.value || !process.client) {

@@ -6,6 +6,25 @@ export const POPUP_MAX_FILE_BYTES = 2 * 1024 * 1024
 export const POPUP_MAX_IMAGE_DIMENSION = 1920
 
 /**
+ * 팝업 이미지 URL 선택 (모바일/데스크탑 분리 지원 + 레거시 호환)
+ * @param {any} popup
+ * @param {boolean} isMobile
+ * @returns {string}
+ */
+export const pickPopupImageUrl = (popup, isMobile) => {
+  if (!popup) {
+    return ''
+  }
+  const desktop = popup.imageUrlDesktop || popup.desktopImageUrl || ''
+  const mobile = popup.imageUrlMobile || popup.mobileImageUrl || ''
+  const legacy = popup.imageUrl || ''
+  if (isMobile) {
+    return mobile || desktop || legacy
+  }
+  return desktop || mobile || legacy
+}
+
+/**
  * 관리 화면 텍스트 인풋용: HTML/스크립트 삽입에 쓰이는 문자 제거
  * @param {unknown} raw
  * @returns {string}
@@ -156,8 +175,12 @@ export const usePopups = () => {
 
   /**
    * @param {Object} payload
-   * @param {string} payload.imageUrl
-   * @param {string} payload.storagePath
+   * @param {string} [payload.imageUrl] 레거시 호환(미사용 권장)
+   * @param {string} [payload.storagePath] 레거시 호환(미사용 권장)
+   * @param {string} [payload.imageUrlDesktop]
+   * @param {string} [payload.storagePathDesktop]
+   * @param {string} [payload.imageUrlMobile]
+   * @param {string} [payload.storagePathMobile]
    * @param {import('firebase/firestore').Timestamp} payload.startAt
    * @param {import('firebase/firestore').Timestamp | null} [payload.endAt] null이면 종료일 미정
    * @param {boolean} [payload.enabled]
@@ -168,9 +191,19 @@ export const usePopups = () => {
       throw new Error('Firebase가 초기화되지 않았습니다.')
     }
     const { collection, addDoc, serverTimestamp } = await import('firebase/firestore')
+    const imageUrlDesktop = payload.imageUrlDesktop || null
+    const storagePathDesktop = payload.storagePathDesktop || null
+    const imageUrlMobile = payload.imageUrlMobile || null
+    const storagePathMobile = payload.storagePathMobile || null
+    const legacyImageUrl = payload.imageUrl || imageUrlDesktop || imageUrlMobile || null
+    const legacyStoragePath = payload.storagePath || storagePathDesktop || storagePathMobile || null
     const docRef = await addDoc(collection(firestore, 'popups'), {
-      imageUrl: payload.imageUrl,
-      storagePath: payload.storagePath,
+      imageUrl: legacyImageUrl,
+      storagePath: legacyStoragePath,
+      imageUrlDesktop,
+      storagePathDesktop,
+      imageUrlMobile,
+      storagePathMobile,
       startAt: payload.startAt,
       endAt: payload.endAt ?? null,
       enabled: payload.enabled !== false,
@@ -210,12 +243,24 @@ export const usePopups = () => {
     if ('storagePath' in patch) {
       data.storagePath = patch.storagePath
     }
+    if ('imageUrlDesktop' in patch) {
+      data.imageUrlDesktop = patch.imageUrlDesktop
+    }
+    if ('storagePathDesktop' in patch) {
+      data.storagePathDesktop = patch.storagePathDesktop
+    }
+    if ('imageUrlMobile' in patch) {
+      data.imageUrlMobile = patch.imageUrlMobile
+    }
+    if ('storagePathMobile' in patch) {
+      data.storagePathMobile = patch.storagePathMobile
+    }
     await updateDoc(ref, data)
   }
 
   /**
    * @param {string} id
-   * @param {string} storagePath
+   * @param {string | Array<string> | { desktop?: string, mobile?: string, legacy?: string }} storagePath
    */
   const deletePopup = async (id, storagePath) => {
     if (!firestore) {
@@ -224,16 +269,27 @@ export const usePopups = () => {
     const { doc, deleteDoc } = await import('firebase/firestore')
     await deleteDoc(doc(firestore, 'popups', id))
     if (storage && storagePath) {
-      try {
-        const { ref, deleteObject } = await import('firebase/storage')
-        await deleteObject(ref(storage, storagePath))
-      } catch (e) {
-        console.warn('팝업 Storage 삭제 실패:', e)
+      const paths = Array.isArray(storagePath)
+        ? storagePath
+        : (typeof storagePath === 'string'
+            ? [storagePath]
+            : [storagePath.desktop, storagePath.mobile, storagePath.legacy].filter(Boolean)
+          )
+      if (paths.length) {
+        try {
+          const { ref, deleteObject } = await import('firebase/storage')
+          await Promise.all(paths.map((p) => deleteObject(ref(storage, p)).catch((e) => {
+            console.warn('팝업 Storage 삭제 실패:', p, e)
+          })))
+        } catch (e) {
+          console.warn('팝업 Storage 삭제 실패:', e)
+        }
       }
     }
   }
 
   return {
+    pickPopupImageUrl,
     validatePopupImageFile,
     uploadPopupImage,
     listPopups,

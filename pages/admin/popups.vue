@@ -29,7 +29,7 @@
             class="mb-4 re-register-alert"
           >
             <div class="d-flex align-center flex-wrap justify-space-between gap-2">
-              <span class="text-body-2">선택한 팝업의 일정·링크를 수정 중입니다.</span>
+              <span class="text-body-2">선택한 팝업을 수정 중입니다.</span>
               <v-btn
                 variant="text"
                 size="small"
@@ -40,34 +40,63 @@
             </div>
           </v-alert>
 
-          <div class="file-upload-row mb-4">
-            <v-text-field
-              :model-value="registerFileHint"
-              readonly
-              label="이미지 파일"
-              placeholder="파일을 선택해 주세요"
-              variant="outlined"
-              density="comfortable"
-              hide-details="auto"
-              class="file-upload-input flex-grow-1"
-            />
-            <v-btn
-              color="primary"
-              variant="flat"
-              class="file-upload-btn"
-              height="48"
-              @click="triggerRegisterFile"
-            >
-              이미지 업로드
-            </v-btn>
-            <input
-              ref="registerFileRef"
-              type="file"
-              accept="image/*"
-              class="d-none"
-              @change="onRegisterFile"
-            >
-          </div>
+        <div class="file-upload-row mb-4">
+          <v-text-field
+            :model-value="registerDesktopFileHint"
+            readonly
+            label="데스크탑용 이미지"
+            placeholder="데스크탑용 파일을 선택해 주세요"
+            variant="outlined"
+            density="comfortable"
+            hide-details="auto"
+            class="file-upload-input flex-grow-1"
+          />
+          <v-btn
+            color="primary"
+            variant="flat"
+            class="file-upload-btn"
+            height="48"
+            @click="triggerRegisterDesktopFile"
+          >
+            데스크탑 업로드
+          </v-btn>
+          <input
+            ref="registerDesktopFileRef"
+            type="file"
+            accept="image/*"
+            class="d-none"
+            @change="onRegisterDesktopFile"
+          >
+        </div>
+
+        <div class="file-upload-row mb-4">
+          <v-text-field
+            :model-value="registerMobileFileHint"
+            readonly
+            label="모바일용 이미지"
+            placeholder="모바일용 파일을 선택해 주세요"
+            variant="outlined"
+            density="comfortable"
+            hide-details="auto"
+            class="file-upload-input flex-grow-1"
+          />
+          <v-btn
+            color="primary"
+            variant="flat"
+            class="file-upload-btn"
+            height="48"
+            @click="triggerRegisterMobileFile"
+          >
+            모바일 업로드
+          </v-btn>
+          <input
+            ref="registerMobileFileRef"
+            type="file"
+            accept="image/*"
+            class="d-none"
+            @change="onRegisterMobileFile"
+          >
+        </div>
           <p class="text-caption text-medium-emphasis upload-hint mb-4">
             이미지 파일은 <strong>{{ popupMaxMb }}MB</strong> 이하, 가로·세로 각 <strong>{{ POPUP_MAX_IMAGE_DIMENSION }}px</strong> 이하여야 업로드됩니다.
             사용자 화면에는 가로 최대 약 <strong>600px</strong>(또는 화면의 90%) 너비로 비율을 유지해 표시됩니다.
@@ -146,13 +175,49 @@
               팝업 미리보기
             </div>
             <div
-              v-if="registerPreviewUrl"
-              class="preview-box"
+              v-if="registerPreviewDesktopUrl || registerPreviewMobileUrl"
+              class="preview-grid"
             >
-              <img
-                :src="registerPreviewUrl"
-                alt="미리보기"
-              >
+              <div class="preview-col">
+                <div class="preview-label text-caption text-medium-emphasis mb-1">
+                  데스크탑
+                </div>
+                <div
+                  v-if="registerPreviewDesktopUrl"
+                  class="preview-box"
+                >
+                  <img
+                    :src="registerPreviewDesktopUrl"
+                    alt="데스크탑 미리보기"
+                  >
+                </div>
+                <div
+                  v-else
+                  class="preview-placeholder text-medium-emphasis"
+                >
+                  데스크탑 이미지를 선택해주세요.
+                </div>
+              </div>
+              <div class="preview-col">
+                <div class="preview-label text-caption text-medium-emphasis mb-1">
+                  모바일
+                </div>
+                <div
+                  v-if="registerPreviewMobileUrl"
+                  class="preview-box"
+                >
+                  <img
+                    :src="registerPreviewMobileUrl"
+                    alt="모바일 미리보기"
+                  >
+                </div>
+                <div
+                  v-else
+                  class="preview-placeholder text-medium-emphasis"
+                >
+                  모바일 이미지를 선택해주세요.
+                </div>
+              </div>
             </div>
             <div
               v-else
@@ -173,6 +238,19 @@
             @click="submitRegister"
           >
             {{ registerButtonLabel }}
+          </v-btn>
+
+          <v-btn
+            v-if="reRegisterPopupId && editingItem && canEndPopupNow(editingItem)"
+            color="warning"
+            variant="outlined"
+            block
+            size="large"
+            class="mt-2"
+            :loading="endInEditLoading"
+            @click="endPopupFromEdit"
+          >
+            팝업 종료
           </v-btn>
         </div>
 
@@ -230,18 +308,17 @@
                 @click.stop
               >
                 <v-btn
-                  v-if="canEndPopupNow(item)"
                   variant="outlined"
                   size="small"
-                  color="warning"
-                  class="action-end"
-                  :loading="endNowLoadingId === item.id"
-                  @click="onPopupEndNow(item)"
+                  color="primary"
+                  class="action-edit"
+                  @click="onEdit(item)"
                 >
-                  팝업 종료
+                  수정
                 </v-btn>
                 <v-btn
-                  variant="outlined"
+                  v-if="isEndedPopup(item)"
+                  variant="flat"
                   size="small"
                   color="primary"
                   class="action-repost"
@@ -280,12 +357,44 @@
           </v-btn>
         </v-card-title>
         <v-card-text>
-          <img
-            :src="previewItem.imageUrl"
-            alt=""
-            class="w-100"
-            style="max-height: 70vh; object-fit: contain;"
-          >
+          <div class="preview-grid">
+            <div class="preview-col">
+              <div class="preview-label text-caption text-medium-emphasis mb-1">
+                데스크탑
+              </div>
+              <img
+                v-if="previewItem.imageUrlDesktop || previewItem.imageUrl"
+                :src="previewItem.imageUrlDesktop || previewItem.imageUrl"
+                alt=""
+                class="w-100"
+                style="max-height: 60vh; object-fit: contain;"
+              >
+              <div
+                v-else
+                class="preview-placeholder text-medium-emphasis"
+              >
+                데스크탑 이미지가 없습니다.
+              </div>
+            </div>
+            <div class="preview-col">
+              <div class="preview-label text-caption text-medium-emphasis mb-1">
+                모바일
+              </div>
+              <img
+                v-if="previewItem.imageUrlMobile || previewItem.imageUrl"
+                :src="previewItem.imageUrlMobile || previewItem.imageUrl"
+                alt=""
+                class="w-100"
+                style="max-height: 60vh; object-fit: contain;"
+              >
+              <div
+                v-else
+                class="preview-placeholder text-medium-emphasis"
+              >
+                모바일 이미지가 없습니다.
+              </div>
+            </div>
+          </div>
         </v-card-text>
       </v-card>
     </v-dialog>
@@ -336,14 +445,19 @@ const {
 const { drawer, drawerWidth } = useDrawer()
 
 const registerSectionRef = ref(null)
-const registerFileRef = ref(null)
-const registerFile = ref(null)
-const registerPreviewUrl = ref('')
+const registerDesktopFileRef = ref(null)
+const registerMobileFileRef = ref(null)
+const registerDesktopFile = ref(null)
+const registerMobileFile = ref(null)
+const registerPreviewDesktopUrl = ref('')
+const registerPreviewMobileUrl = ref('')
 const registerLoading = ref(false)
+const endInEditLoading = ref(false)
 const reRegisterPopupId = ref(null)
-const reRegisterOldStoragePath = ref(null)
+const editingItem = ref(null)
+const reRegisterOldStoragePaths = ref({ desktop: null, mobile: null, legacy: null })
 /** 재등록 모드에서 파일 선택 실패 시 복원할 기존 이미지 URL */
-const reRegisterFallbackImageUrl = ref('')
+const reRegisterFallbackImageUrls = ref({ desktop: '', mobile: '', legacy: '' })
 
 const registerForm = ref({
   linkUrl: '',
@@ -357,7 +471,6 @@ const registerImmediate = ref(false)
 const registerNoEndDate = ref(false)
 
 const listLoading = ref(false)
-const endNowLoadingId = ref(null)
 const popups = ref([])
 
 const previewDialog = ref(false)
@@ -366,26 +479,39 @@ const previewItem = ref(null)
 const isBlobPreviewUrl = (u) => typeof u === 'string' && u.startsWith('blob:')
 
 const revokePreviewIfBlob = () => {
-  if (isBlobPreviewUrl(registerPreviewUrl.value)) {
-    URL.revokeObjectURL(registerPreviewUrl.value)
+  if (isBlobPreviewUrl(registerPreviewDesktopUrl.value)) {
+    URL.revokeObjectURL(registerPreviewDesktopUrl.value)
+  }
+  if (isBlobPreviewUrl(registerPreviewMobileUrl.value)) {
+    URL.revokeObjectURL(registerPreviewMobileUrl.value)
   }
 }
 
-const registerFileHint = computed(() => {
-  if (registerFile.value) {
-    return sanitizePopupAdminString(registerFile.value.name)
+const registerDesktopFileHint = computed(() => {
+  if (registerDesktopFile.value) {
+    return sanitizePopupAdminString(registerDesktopFile.value.name)
   }
-  if (reRegisterPopupId.value && registerPreviewUrl.value && !isBlobPreviewUrl(registerPreviewUrl.value)) {
-    return '기존 이미지 (일정·링크 변경 또는 새 파일로 이미지 교체)'
+  if (reRegisterPopupId.value && registerPreviewDesktopUrl.value && !isBlobPreviewUrl(registerPreviewDesktopUrl.value)) {
+    return '기존 데스크탑 이미지 (일정·링크 변경 또는 새 파일로 교체)'
+  }
+  return ''
+})
+
+const registerMobileFileHint = computed(() => {
+  if (registerMobileFile.value) {
+    return sanitizePopupAdminString(registerMobileFile.value.name)
+  }
+  if (reRegisterPopupId.value && registerPreviewMobileUrl.value && !isBlobPreviewUrl(registerPreviewMobileUrl.value)) {
+    return '기존 모바일 이미지 (일정·링크 변경 또는 새 파일로 교체)'
   }
   return ''
 })
 
 const registerSubmitDisabled = computed(() => {
   if (reRegisterPopupId.value) {
-    return !registerPreviewUrl.value
+    return !(registerPreviewDesktopUrl.value || registerPreviewMobileUrl.value)
   }
-  return !registerFile.value
+  return !(registerDesktopFile.value || registerMobileFile.value)
 })
 
 const registerButtonLabel = computed(() =>
@@ -425,7 +551,8 @@ watch(registerNoEndDate, (v) => {
   }
 })
 
-const triggerRegisterFile = () => registerFileRef.value?.click()
+const triggerRegisterDesktopFile = () => registerDesktopFileRef.value?.click()
+const triggerRegisterMobileFile = () => registerMobileFileRef.value?.click()
 
 /** 필드 아무 곳이나 눌러도 datetime-local 피커 열기 (크롬 등 showPicker 지원) */
 const openDatetimePicker = (event) => {
@@ -449,7 +576,7 @@ const openDatetimePicker = (event) => {
   input.click()
 }
 
-const onRegisterFile = async (e) => {
+const onRegisterDesktopFile = async (e) => {
   const input = e.target
   const file = input.files?.[0]
   input.value = ''
@@ -458,24 +585,59 @@ const onRegisterFile = async (e) => {
   }
   try {
     await validatePopupImageFile(file)
-    revokePreviewIfBlob()
-    registerFile.value = file
-    registerPreviewUrl.value = URL.createObjectURL(file)
+    if (isBlobPreviewUrl(registerPreviewDesktopUrl.value)) {
+      URL.revokeObjectURL(registerPreviewDesktopUrl.value)
+    }
+    registerDesktopFile.value = file
+    registerPreviewDesktopUrl.value = URL.createObjectURL(file)
   } catch (err) {
-    registerFile.value = null
-    revokePreviewIfBlob()
-    registerPreviewUrl.value = reRegisterPopupId.value ? (reRegisterFallbackImageUrl.value || '') : ''
+    registerDesktopFile.value = null
+    if (isBlobPreviewUrl(registerPreviewDesktopUrl.value)) {
+      URL.revokeObjectURL(registerPreviewDesktopUrl.value)
+    }
+    registerPreviewDesktopUrl.value = reRegisterPopupId.value
+      ? (reRegisterFallbackImageUrls.value.desktop || reRegisterFallbackImageUrls.value.legacy || '')
+      : ''
+    await alert(err.message || '이미지 검증에 실패했습니다.', { type: 'error' })
+  }
+}
+
+const onRegisterMobileFile = async (e) => {
+  const input = e.target
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) {
+    return
+  }
+  try {
+    await validatePopupImageFile(file)
+    if (isBlobPreviewUrl(registerPreviewMobileUrl.value)) {
+      URL.revokeObjectURL(registerPreviewMobileUrl.value)
+    }
+    registerMobileFile.value = file
+    registerPreviewMobileUrl.value = URL.createObjectURL(file)
+  } catch (err) {
+    registerMobileFile.value = null
+    if (isBlobPreviewUrl(registerPreviewMobileUrl.value)) {
+      URL.revokeObjectURL(registerPreviewMobileUrl.value)
+    }
+    registerPreviewMobileUrl.value = reRegisterPopupId.value
+      ? (reRegisterFallbackImageUrls.value.mobile || reRegisterFallbackImageUrls.value.legacy || '')
+      : ''
     await alert(err.message || '이미지 검증에 실패했습니다.', { type: 'error' })
   }
 }
 
 const cancelReRegister = () => {
   revokePreviewIfBlob()
-  registerPreviewUrl.value = ''
-  registerFile.value = null
+  registerPreviewDesktopUrl.value = ''
+  registerPreviewMobileUrl.value = ''
+  registerDesktopFile.value = null
+  registerMobileFile.value = null
   reRegisterPopupId.value = null
-  reRegisterOldStoragePath.value = null
-  reRegisterFallbackImageUrl.value = ''
+  editingItem.value = null
+  reRegisterOldStoragePaths.value = { desktop: null, mobile: null, legacy: null }
+  reRegisterFallbackImageUrls.value = { desktop: '', mobile: '', legacy: '' }
   registerImmediate.value = false
   registerNoEndDate.value = false
   defaultRegisterDates()
@@ -534,11 +696,11 @@ const submitRegister = async () => {
   const { Timestamp } = await import('firebase/firestore')
   const endAtTs = end ? Timestamp.fromDate(end) : null
 
-  if (!reRegisterPopupId.value && !registerFile.value) {
-    await alert('이미지를 선택해주세요.', { type: 'warning' })
+  if (!reRegisterPopupId.value && !(registerDesktopFile.value || registerMobileFile.value)) {
+    await alert('데스크탑 또는 모바일 이미지를 선택해주세요.', { type: 'warning' })
     return
   }
-  if (reRegisterPopupId.value && !registerPreviewUrl.value) {
+  if (reRegisterPopupId.value && !(registerPreviewDesktopUrl.value || registerPreviewMobileUrl.value)) {
     await alert('이미지가 없습니다.', { type: 'warning' })
     return
   }
@@ -554,52 +716,79 @@ const submitRegister = async () => {
   try {
     if (reRegisterPopupId.value) {
       const id = reRegisterPopupId.value
-      const oldPath = reRegisterOldStoragePath.value
-      const file = registerFile.value
+      const old = reRegisterOldStoragePaths.value || { desktop: null, mobile: null, legacy: null }
+      const desktopFile = registerDesktopFile.value
+      const mobileFile = registerMobileFile.value
 
-      if (file) {
-        const { imageUrl, storagePath } = await uploadPopupImage(file)
-        await updatePopup(id, {
-          imageUrl,
-          storagePath,
-          linkUrl,
-          startAt: Timestamp.fromDate(start),
-          endAt: endAtTs
-        })
-        if (oldPath && oldPath !== storagePath) {
-          const { $firebaseStorage: st } = useNuxtApp()
-          if (st) {
-            try {
-              const { ref: storageRef, deleteObject } = await import('firebase/storage')
-              await deleteObject(storageRef(st, oldPath))
-            } catch (e) {
-              console.warn(e)
-            }
-          }
-        }
-      } else {
-        await updatePopup(id, {
-          linkUrl,
-          startAt: Timestamp.fromDate(start),
-          endAt: endAtTs
-        })
+      const patch = {
+        linkUrl,
+        startAt: Timestamp.fromDate(start),
+        endAt: endAtTs
       }
+
+      let newDesktopPath = null
+      let newMobilePath = null
+
+      if (desktopFile) {
+        const { imageUrl, storagePath } = await uploadPopupImage(desktopFile)
+        patch.imageUrlDesktop = imageUrl
+        patch.storagePathDesktop = storagePath
+        newDesktopPath = storagePath
+        registerDesktopFile.value = null
+      }
+
+      if (mobileFile) {
+        const { imageUrl, storagePath } = await uploadPopupImage(mobileFile)
+        patch.imageUrlMobile = imageUrl
+        patch.storagePathMobile = storagePath
+        newMobilePath = storagePath
+        registerMobileFile.value = null
+      }
+
+      await updatePopup(id, patch)
+
+      const { $firebaseStorage: st } = useNuxtApp()
+      if (st) {
+        try {
+          const { ref: storageRef, deleteObject } = await import('firebase/storage')
+          if (newDesktopPath && old.desktop && old.desktop !== newDesktopPath) {
+            await deleteObject(storageRef(st, old.desktop))
+          }
+          if (newMobilePath && old.mobile && old.mobile !== newMobilePath) {
+            await deleteObject(storageRef(st, old.mobile))
+          }
+        } catch (e) {
+          console.warn(e)
+        }
+      }
+
       await alert('저장되었습니다.', { type: 'success' })
       cancelReRegister()
     } else {
-      const { imageUrl, storagePath } = await uploadPopupImage(registerFile.value)
+      let desktop = null
+      let mobile = null
+      if (registerDesktopFile.value) {
+        desktop = await uploadPopupImage(registerDesktopFile.value)
+      }
+      if (registerMobileFile.value) {
+        mobile = await uploadPopupImage(registerMobileFile.value)
+      }
       await createPopup({
-        imageUrl,
-        storagePath,
+        imageUrlDesktop: desktop?.imageUrl,
+        storagePathDesktop: desktop?.storagePath,
+        imageUrlMobile: mobile?.imageUrl,
+        storagePathMobile: mobile?.storagePath,
         linkUrl,
         startAt: Timestamp.fromDate(start),
         endAt: endAtTs,
         enabled: true
       })
       await alert('등록되었습니다.', { type: 'success' })
-      registerFile.value = null
       revokePreviewIfBlob()
-      registerPreviewUrl.value = ''
+      registerPreviewDesktopUrl.value = ''
+      registerPreviewMobileUrl.value = ''
+      registerDesktopFile.value = null
+      registerMobileFile.value = null
       registerImmediate.value = false
       registerNoEndDate.value = false
       defaultRegisterDates()
@@ -665,7 +854,10 @@ const canEndPopupNow = (item) => {
   return item.endAt.toMillis() >= now
 }
 
-const onPopupEndNow = async (item) => {
+const endPopupFromEdit = async () => {
+  if (!reRegisterPopupId.value || !editingItem.value) {
+    return
+  }
   const ok = await confirm('지금 시각을 기준으로 이 팝업 노출을 종료할까요?', {
     title: '팝업 종료',
     confirmText: '종료',
@@ -674,17 +866,18 @@ const onPopupEndNow = async (item) => {
   if (!ok) {
     return
   }
-  endNowLoadingId.value = item.id
+  endInEditLoading.value = true
   try {
     const { Timestamp } = await import('firebase/firestore')
-    await updatePopup(item.id, { endAt: Timestamp.fromDate(new Date()) })
+    await updatePopup(reRegisterPopupId.value, { endAt: Timestamp.fromDate(new Date()) })
     await alert('팝업이 종료 처리되었습니다.', { type: 'success' })
+    cancelReRegister()
     await loadList()
   } catch (err) {
     console.error(err)
     await alert('종료 처리에 실패했습니다.', { type: 'error' })
   } finally {
-    endNowLoadingId.value = null
+    endInEditLoading.value = false
   }
 }
 
@@ -702,20 +895,67 @@ const scheduleChipColor = (item) => {
   return 'warning'
 }
 
+const isEndedPopup = (item) => scheduleLabel(item) === '종료'
+
 const openPreview = (item) => {
   previewItem.value = item
   previewDialog.value = true
 }
 
-const onReRegister = (item) => {
+const onEdit = (item) => {
+  editingItem.value = item
   reRegisterPopupId.value = item.id
-  reRegisterOldStoragePath.value = item.storagePath || null
-  reRegisterFallbackImageUrl.value = item.imageUrl || ''
+  reRegisterOldStoragePaths.value = {
+    desktop: item.storagePathDesktop || null,
+    mobile: item.storagePathMobile || null,
+    legacy: item.storagePath || null
+  }
+  reRegisterFallbackImageUrls.value = {
+    desktop: item.imageUrlDesktop || '',
+    mobile: item.imageUrlMobile || '',
+    legacy: item.imageUrl || ''
+  }
   registerImmediate.value = false
   registerNoEndDate.value = item.endAt == null
   revokePreviewIfBlob()
-  registerFile.value = null
-  registerPreviewUrl.value = item.imageUrl || ''
+  registerDesktopFile.value = null
+  registerMobileFile.value = null
+  registerPreviewDesktopUrl.value = item.imageUrlDesktop || item.imageUrl || ''
+  registerPreviewMobileUrl.value = item.imageUrlMobile || item.imageUrl || ''
+  const startD = item.startAt?.toDate?.() ?? new Date()
+  const endLocal = item.endAt?.toDate
+    ? toDatetimeLocalValue(item.endAt.toDate())
+    : toDatetimeLocalValue(new Date(startD.getTime() + 7 * 24 * 60 * 60 * 1000))
+  registerForm.value = {
+    linkUrl: sanitizePopupAdminString(item.linkUrl || ''),
+    startLocal: item.startAt?.toDate ? toDatetimeLocalValue(item.startAt.toDate()) : '',
+    endLocal
+  }
+  nextTick(() => {
+    registerSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+}
+
+const onReRegister = (item) => {
+  editingItem.value = item
+  reRegisterPopupId.value = item.id
+  reRegisterOldStoragePaths.value = {
+    desktop: item.storagePathDesktop || null,
+    mobile: item.storagePathMobile || null,
+    legacy: item.storagePath || null
+  }
+  reRegisterFallbackImageUrls.value = {
+    desktop: item.imageUrlDesktop || '',
+    mobile: item.imageUrlMobile || '',
+    legacy: item.imageUrl || ''
+  }
+  registerImmediate.value = false
+  registerNoEndDate.value = item.endAt == null
+  revokePreviewIfBlob()
+  registerDesktopFile.value = null
+  registerMobileFile.value = null
+  registerPreviewDesktopUrl.value = item.imageUrlDesktop || item.imageUrl || ''
+  registerPreviewMobileUrl.value = item.imageUrlMobile || item.imageUrl || ''
   const startD = item.startAt?.toDate?.() ?? new Date()
   const endLocal = item.endAt?.toDate
     ? toDatetimeLocalValue(item.endAt.toDate())
@@ -740,7 +980,11 @@ const onDelete = async (item) => {
     return
   }
   try {
-    await deletePopup(item.id, item.storagePath)
+    await deletePopup(item.id, {
+      desktop: item.storagePathDesktop || null,
+      mobile: item.storagePathMobile || null,
+      legacy: item.storagePath || null
+    })
     await alert('삭제되었습니다.', { type: 'success' })
     if (reRegisterPopupId.value === item.id) {
       cancelReRegister()
@@ -805,6 +1049,7 @@ const onDelete = async (item) => {
 
 .file-upload-btn {
   flex-shrink: 0;
+  min-width: rem(140);
 }
 
 .upload-hint {
@@ -872,6 +1117,24 @@ const onDelete = async (item) => {
 
 .register-preview-block {
   width: 100%;
+}
+
+.preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: rem(12);
+
+  @media (max-width: 599px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.preview-col {
+  min-width: 0;
+}
+
+.preview-label {
+  line-height: 1.2;
 }
 
 .preview-placeholder {

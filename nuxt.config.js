@@ -2,6 +2,7 @@
 
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import fs from 'node:fs'
 
 // GitHub Pages 배포 시 baseURL 설정 (로컬에서는 '/', 프로덕션에서는 '/cnx-library/')
 const isGitHubPages = process.env.GITHUB_ACTIONS === 'true'
@@ -10,12 +11,21 @@ const projectRoot = path.dirname(fileURLToPath(import.meta.url))
 /** Vite가 `node_modules/nuxt/.../manifest.js`의 `import("#app-manifest")`를 분석할 때 해석 실패하는 경우 보완 */
 function vitePluginResolveAppManifest() {
   const manifestPath = path.resolve(projectRoot, '.nuxt/manifest/meta/dev.json')
+  const virtualId = '\0cnx:app-manifest'
   return {
     name: 'cnx-resolve-app-manifest',
     enforce: 'pre',
     resolveId(id) {
       if (id === '#app-manifest') {
-        return manifestPath
+        // `.nuxt` 산출물이 없거나 재시작 중이면 실제 파일이 없을 수 있어
+        // 가상 모듈로 안전하게 대체한다.
+        return fs.existsSync(manifestPath) ? manifestPath : virtualId
+      }
+    }
+    ,
+    load(id) {
+      if (id === virtualId) {
+        return 'export default {}'
       }
     }
   }

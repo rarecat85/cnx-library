@@ -639,6 +639,10 @@ export const useBooks = () => {
       }
 
       const bookData = bookDoc.data()
+
+      if (bookData.status === 'lost') {
+        throw new Error('분실 처리된 도서입니다.')
+      }
       
       // ISBN 중복 대여/신청 체크
       const bookIsbn = isbn || bookData.isbn
@@ -736,6 +740,10 @@ export const useBooks = () => {
       }
 
       const bookData = bookDoc.data()
+
+      if (bookData.status === 'lost') {
+        throw new Error('분실 처리된 도서입니다.')
+      }
       
       // ISBN 중복 대여/신청 체크
       const bookIsbn = isbn || bookData.isbn
@@ -989,12 +997,123 @@ export const useBooks = () => {
     }
   }
 
+  /**
+   * 도서 분실 처리 (문서 유지, status만 변경)
+   * @param {string} labelNumber - 라벨번호
+   * @param {string} center - 센터명
+   * @param {Object} [options]
+   * @param {string} [options.lostBy] - 처리자 UID
+   * @param {string} [options.lostNote] - 비고
+   * @returns {Promise<Object>}
+   */
+  const markBookAsLost = async (labelNumber, center, options = {}) => {
+    if (!firestore) {
+      throw new Error('Firebase가 초기화되지 않았습니다.')
+    }
+
+    const { lostBy = null, lostNote = '' } = options
+
+    try {
+      loading.value = true
+      error.value = null
+
+      const bookId = createBookId(labelNumber, center)
+      const bookRef = doc(firestore, 'books', bookId)
+      const bookDoc = await getDoc(bookRef)
+
+      if (!bookDoc.exists()) {
+        throw new Error('도서를 찾을 수 없습니다.')
+      }
+
+      const bookData = bookDoc.data()
+
+      if (bookData.status === 'lost') {
+        throw new Error('이미 분실 처리된 도서입니다.')
+      }
+      if (bookData.status === 'rented' && bookData.rentedBy) {
+        throw new Error('대여 중인 도서는 분실 처리할 수 없습니다.')
+      }
+      if (bookData.status === 'requested' && bookData.requestedBy) {
+        throw new Error('대여 신청 중인 도서는 분실 처리할 수 없습니다.')
+      }
+
+      const updatePayload = {
+        status: 'lost',
+        lostAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      }
+      if (lostBy) {
+        updatePayload.lostBy = lostBy
+      }
+      const trimmedNote = typeof lostNote === 'string' ? lostNote.trim() : ''
+      if (trimmedNote) {
+        updatePayload.lostNote = trimmedNote
+      }
+
+      await updateDoc(bookRef, updatePayload)
+
+      return { success: true }
+    } catch (err) {
+      console.error('도서 분실 처리 오류:', err)
+      error.value = err.message || '도서 분실 처리에 실패했습니다.'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * 분실 처리 해제 → 대여 가능 상태로 복구
+   * @param {string} labelNumber - 라벨번호
+   * @param {string} center - 센터명
+   * @returns {Promise<Object>}
+   */
+  const unmarkLostBook = async (labelNumber, center) => {
+    if (!firestore) {
+      throw new Error('Firebase가 초기화되지 않았습니다.')
+    }
+
+    try {
+      loading.value = true
+      error.value = null
+
+      const bookId = createBookId(labelNumber, center)
+      const bookRef = doc(firestore, 'books', bookId)
+      const bookDoc = await getDoc(bookRef)
+
+      if (!bookDoc.exists()) {
+        throw new Error('도서를 찾을 수 없습니다.')
+      }
+
+      const bookData = bookDoc.data()
+      if (bookData.status !== 'lost') {
+        throw new Error('분실 처리된 도서가 아닙니다.')
+      }
+
+      await updateDoc(bookRef, {
+        status: 'available',
+        lostAt: deleteField(),
+        lostBy: deleteField(),
+        lostNote: deleteField(),
+        updatedAt: serverTimestamp()
+      })
+
+      return { success: true }
+    } catch (err) {
+      console.error('분실 해제 오류:', err)
+      error.value = err.message || '분실 해제에 실패했습니다.'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   // ==================== 상태 계산 ====================
 
   /**
    * 도서 상태 계산 (대여일 기준 일주일 지나면 연체)
    * @param {Object} book - 도서 데이터
-   * @returns {string|null} 상태 ('rented', 'overdue', 'requested', null)
+   * @returns {string|null} 상태 ('rented', 'overdue', 'requested', 'lost', null)
    */
   const calculateBookStatus = (book) => {
     if (!book) return null
@@ -1002,6 +1121,10 @@ export const useBooks = () => {
     // 삭제된 도서는 null 반환
     if (book.status === 'deleted') {
       return null
+    }
+
+    if (book.status === 'lost') {
+      return 'lost'
     }
 
     // 대여 신청 중인 경우
@@ -1056,6 +1179,8 @@ export const useBooks = () => {
     // 수정/삭제
     updateBookInfo,
     deleteBook,
+    markBookAsLost,
+    unmarkLostBook,
     // 상태
     calculateBookStatus
   }

@@ -32,7 +32,7 @@
                 총 <strong>{{ totalBookCount }}</strong>권 ({{ groupedBookCount }}종)
               </div>
               <div class="text-body-2 text-medium-emphasis">
-                대여중 <strong>{{ rentedCount }}</strong>권, 연체중 <strong>{{ overdueCount }}</strong>권, 대여신청 <strong>{{ requestedCount }}</strong>권
+                대여중 <strong>{{ rentedCount }}</strong>권, 연체중 <strong>{{ overdueCount }}</strong>권, 대여신청 <strong>{{ requestedCount }}</strong>권, 분실 <strong>{{ lostCount }}</strong>권
               </div>
             </div>
             <div class="d-flex align-center registered-search-group">
@@ -99,6 +99,17 @@
                   @click="handleDeleteBooks"
                 >
                   도서 삭제
+                </v-btn>
+                <v-btn
+                  class="action-btn"
+                  variant="flat"
+                  size="small"
+                  color="secondary"
+                  :disabled="selectedBooks.length === 0"
+                  :loading="actionLoading"
+                  @click="handleMarkBooksLost"
+                >
+                  분실 처리
                 </v-btn>
                 <v-btn
                   class="action-btn"
@@ -222,6 +233,14 @@
                             대여신청
                           </v-chip>
                           <v-chip
+                            v-else-if="getBookStatus(book) === 'lost'"
+                            size="x-small"
+                            color="grey-darken-1"
+                            variant="flat"
+                          >
+                            분실
+                          </v-chip>
+                          <v-chip
                             v-else
                             size="x-small"
                             color="success"
@@ -269,7 +288,16 @@
                       <!-- 3줄: 대여/반납 버튼 -->
                       <div class="copy-actions">
                         <v-btn
-                          v-if="getBookStatus(book) === 'rented' || getBookStatus(book) === 'overdue'"
+                          v-if="getBookStatus(book) === 'lost'"
+                          color="secondary"
+                          size="small"
+                          variant="flat"
+                          @click.stop="handleUnmarkLostBook(book)"
+                        >
+                          분실 해제
+                        </v-btn>
+                        <v-btn
+                          v-else-if="getBookStatus(book) === 'rented' || getBookStatus(book) === 'overdue'"
                           color="primary"
                           size="small"
                           variant="flat"
@@ -361,6 +389,16 @@
               @click="handleDeleteBooks"
             >
               삭제
+            </v-btn>
+            <v-btn
+              class="sticky-action-btn"
+              variant="flat"
+              size="small"
+              color="secondary"
+              :loading="actionLoading"
+              @click="handleMarkBooksLost"
+            >
+              분실
             </v-btn>
             <v-btn
               class="sticky-action-btn rent"
@@ -815,6 +853,8 @@ const {
   rentBook,
   returnBook,
   deleteBook,
+  markBookAsLost,
+  unmarkLostBook,
   updateBookInfo,
   checkLabelNumberExists,
   getCategories,
@@ -868,6 +908,7 @@ const sortOptions = [
   { title: '대여중도서', value: 'rented' },
   { title: '연체중도서', value: 'overdue' },
   { title: '대여신청도서', value: 'requested' },
+  { title: '분실도서', value: 'lost' },
   { title: '위치별로 보기', value: 'location' }
 ]
 
@@ -1238,6 +1279,7 @@ const groupedBooks = computed(() => {
         availableCount: 0,
         rentedCount: 0,
         requestedCount: 0,
+        lostCount: 0,
         locations: []
       })
     }
@@ -1253,6 +1295,8 @@ const groupedBooks = computed(() => {
       group.rentedCount++
     } else if (status === 'requested') {
       group.requestedCount++
+    } else if (status === 'lost') {
+      group.lostCount++
     }
     
     if (book.location && !group.locations.includes(book.location)) {
@@ -1313,6 +1357,8 @@ const filteredGroupedBooks = computed(() => {
     })
   } else if (sortBy.value === 'requested') {
     groups = groups.filter(group => group.requestedCount > 0)
+  } else if (sortBy.value === 'lost') {
+    groups = groups.filter(group => group.lostCount > 0)
   } else if (sortBy.value === 'location') {
     // 위치별보기 - 선택한 칸에 위치한 도서가 있는 그룹만 필터링
     if (selectedLocationFilter.value) {
@@ -1371,6 +1417,12 @@ const requestedCount = computed(() => {
   return registeredBooks.value.filter(book => {
     const status = calculateBookStatus(book)
     return status === 'requested'
+  }).length
+})
+
+const lostCount = computed(() => {
+  return registeredBooks.value.filter(book => {
+    return calculateBookStatus(book) === 'lost'
   }).length
 })
 
@@ -1630,17 +1682,105 @@ const handleDeleteBooks = async () => {
   }
 }
 
+// 도서 분실 처리 (삭제와 동일하게 대여/신청 중이 아닐 때만)
+const handleMarkBooksLost = async () => {
+  if (selectedBooks.value.length === 0) return
+
+  const losableBooks = []
+  const unlosableBooks = []
+  const alreadyLostBooks = []
+
+  for (const book of selectedBooks.value) {
+    const status = calculateBookStatus(book)
+    if (status === 'lost') {
+      alreadyLostBooks.push(book)
+    } else if (status === 'rented' || status === 'overdue') {
+      unlosableBooks.push({ book, reason: '대여중' })
+    } else if (status === 'requested') {
+      unlosableBooks.push({ book, reason: '대여신청중' })
+    } else {
+      losableBooks.push(book)
+    }
+  }
+
+  if (losableBooks.length === 0) {
+    const lines = []
+    if (alreadyLostBooks.length > 0) {
+      lines.push(`• 이미 분실 처리됨: ${alreadyLostBooks.length}권`)
+    }
+    if (unlosableBooks.length > 0) {
+      lines.push(...unlosableBooks.map(item => `• ${item.book.title} (${item.reason})`))
+    }
+    await alert(`분실 처리할 수 있는 도서가 없습니다.\n\n${lines.join('\n')}\n\n대여중/대여신청중인 도서는 반납 또는 신청 취소 후 처리해주세요.`, { type: 'warning' })
+    return
+  }
+
+  let confirmMessage = `선택한 ${selectedBooks.value.length}권 중 ${losableBooks.length}권을 분실 처리하시겠습니까?\n문서는 삭제되지 않으며 대여 목록에서 제외됩니다.`
+
+  if (unlosableBooks.length > 0 || alreadyLostBooks.length > 0) {
+    const skipList = [
+      ...alreadyLostBooks.map(b => `• ${b.title} (이미 분실)`),
+      ...unlosableBooks.map(item => `• ${item.book.title} (${item.reason})`)
+    ].join('\n')
+    confirmMessage += `\n\n다음 도서는 처리되지 않습니다:\n${skipList}`
+  }
+
+  if (!await confirm(confirmMessage)) {
+    return
+  }
+
+  try {
+    actionLoading.value = true
+    const lostOpts = { lostBy: user.value?.uid || null }
+    await Promise.all(losableBooks.map((book) => {
+      const labelNumber = book.labelNumber || book.id.split('_')[0]
+      return markBookAsLost(labelNumber, currentCenter.value, lostOpts)
+    }))
+    selectedBooks.value = []
+    await loadRegisteredBooks()
+
+    const skipMsg = (unlosableBooks.length + alreadyLostBooks.length) > 0
+      ? `\n(${unlosableBooks.length + alreadyLostBooks.length}권은 제외되었습니다.)`
+      : ''
+    await alert(`${losableBooks.length}권이 분실 처리되었습니다.${skipMsg}`, { type: 'success' })
+  } catch (error) {
+    console.error('도서 분실 처리 오류:', error)
+    await alert(error.message || '도서 분실 처리에 실패했습니다.', { type: 'error' })
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+const handleUnmarkLostBook = async (book) => {
+  if (!book) return
+  const labelNumber = book.labelNumber || book.id.split('_')[0]
+  if (!await confirm(`「${book.title}」(${labelNumber}) 도서의 분실 처리를 해제하고 대여 가능으로 되돌리시겠습니까?`)) {
+    return
+  }
+  try {
+    actionLoading.value = true
+    await unmarkLostBook(labelNumber, currentCenter.value)
+    await loadRegisteredBooks()
+    await alert('분실 처리가 해제되었습니다.', { type: 'success' })
+  } catch (error) {
+    console.error('분실 해제 오류:', error)
+    await alert(error.message || '분실 해제에 실패했습니다.', { type: 'error' })
+  } finally {
+    actionLoading.value = false
+  }
+}
+
 // 도서 대여 처리
 const handleRentBooks = async () => {
   if (selectedBooks.value.length === 0) return
   
   const availableBooks = selectedBooks.value.filter(book => {
     const status = calculateBookStatus(book)
-    return status !== 'rented' && status !== 'overdue'
+    return status !== 'rented' && status !== 'overdue' && status !== 'lost'
   })
   
   if (availableBooks.length === 0) {
-    await alert('선택한 도서가 모두 대여중입니다.', { type: 'warning' })
+    await alert('선택한 도서가 모두 대여중이거나 분실 처리되어 대여할 수 없습니다.', { type: 'warning' })
     return
   }
   
@@ -1699,6 +1839,11 @@ const getUserRentedCount = async (userId, userType = 'user') => {
 // 개별 대여 처리 (다이얼로그 열기)
 const openRentDialog = async (book) => {
   const status = calculateBookStatus(book)
+
+  if (status === 'lost') {
+    await alert('분실 처리된 도서는 대여할 수 없습니다. 분실 해제 후 이용해주세요.', { type: 'warning' })
+    return
+  }
   
   // 대여 신청된 도서인 경우 신청자 정보로 바로 대여 처리
   if (status === 'requested' && book.requestedBy) {

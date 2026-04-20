@@ -625,6 +625,8 @@ const props = defineProps({
 
 const emit = defineEmits(['register', 'select', 'return', 'rent', 'adminRent', 'adminReturn', 'locationClick', 'cancelRequest', 'cancelRentRequest', 'subscribeReturnNotify'])
 
+const { calculateBookStatus } = useBooks()
+
 // 위치 안내 팝업
 const locationPopupVisible = ref(false)
 
@@ -711,7 +713,10 @@ const isBookRegistered = computed(() => {
     const registeredIsbn = registeredBook.isbn13 || registeredBook.isbn || registeredBook.id || ''
     const normalizedIsbn = isbn.toString().trim()
     const normalizedRegisteredIsbn = registeredIsbn.toString().trim()
-    return normalizedIsbn === normalizedRegisteredIsbn && registeredBook.center === props.center
+    if (normalizedIsbn !== normalizedRegisteredIsbn || registeredBook.center !== props.center) {
+      return false
+    }
+    return calculateBookStatus(registeredBook) !== 'lost'
   })
 })
 
@@ -775,7 +780,8 @@ const statusText = computed(() => {
     new: 'NEW',
     rented: '대여중',
     overdue: '연체중',
-    requested: '대여신청'
+    requested: '대여신청',
+    lost: '분실'
   }
   return statusMap[status] || ''
 })
@@ -791,7 +797,8 @@ const statusColor = computed(() => {
     new: 'primary',
     rented: 'info',
     overdue: 'error',
-    requested: 'warning'
+    requested: 'warning',
+    lost: 'grey-darken-1'
   }
   return colorMap[status] || 'primary'
 })

@@ -1807,6 +1807,23 @@ const getRenterName = async (rentedBy, rentedByType) => {
 }
 
 /**
+ * 미가입자(pendingUsers) 이메일 조회 (구 데이터 호환용)
+ * @param {string} pendingUserId
+ * @returns {Promise<string>} email or ''
+ */
+const getPendingUserEmail = async (pendingUserId) => {
+  if (!pendingUserId) return ''
+  try {
+    const pendingDoc = await firestore.collection('pendingUsers').doc(pendingUserId).get()
+    if (!pendingDoc.exists) return ''
+    return pendingDoc.data()?.email || ''
+  } catch (err) {
+    console.error('pendingUsers 이메일 조회 오류:', err)
+    return ''
+  }
+}
+
+/**
  * 도서 등록 신청 시 관리자에게 알림
  * Trigger: bookRequests 컬렉션에 문서 생성 시
  */
@@ -1943,6 +1960,32 @@ exports.scheduledNotifications = onSchedule(
     today.setHours(0, 0, 0, 0)
     
     try {
+      // 스케줄 실행 내에서만 사용하는 미가입자 이메일 캐시 (중복 조회 방지)
+      const pendingEmailCache = new Map()
+
+      const resolvePendingEmail = async (userId, userType, fallbackEmail) => {
+        if (!userId) return ''
+
+        // 명시적으로 pending이면 fallbackEmail 우선, 없으면 pendingUsers 조회
+        if (userType === 'pending') {
+          if (fallbackEmail) return fallbackEmail
+          if (pendingEmailCache.has(userId)) return pendingEmailCache.get(userId)
+          const email = await getPendingUserEmail(userId)
+          pendingEmailCache.set(userId, email || '')
+          return email || ''
+        }
+
+        // 구 데이터 호환: rentedByType이 누락된 경우에만 pendingUsers 존재 여부로 판별
+        if (!userType) {
+          if (pendingEmailCache.has(userId)) return pendingEmailCache.get(userId)
+          const email = await getPendingUserEmail(userId)
+          pendingEmailCache.set(userId, email || '')
+          return email || ''
+        }
+
+        return ''
+      }
+
       // 1. 대여중인 도서 조회 (rentedAt이 있는 도서)
       const booksSnapshot = await firestore.collection('books')
         .where('rentedBy', '!=', null)
@@ -1992,16 +2035,19 @@ exports.scheduledNotifications = onSchedule(
             console.log(`반납예정 알림 생성: ${title} -> ${rentedBy}`)
 
             // 임시 회원은 users 문서가 없어 sendEmailIfEnabled가 동작하지 않음 → 등록 이메일로 발송
-            if (rentedByType === 'pending' && rentedByEmail) {
+            // 구 데이터 호환: rentedByType 누락 시에도 pendingUsers에서 이메일을 찾아 발송
+            const pendingEmailForReminder = await resolvePendingEmail(rentedBy, rentedByType, rentedByEmail)
+
+            if (pendingEmailForReminder) {
               try {
                 await sendNotificationEmail(
-                  rentedByEmail,
+                  pendingEmailForReminder,
                   'return_reminder',
                   '반납예정일 알림',
                   `"${title}" 도서의 반납예정일이 내일입니다.`,
                   { bookId: bookDoc.id, bookTitle: title, center }
                 )
-                console.log(`반납예정 메일(임시회원): ${title} -> ${rentedByEmail}`)
+                console.log(`반납예정 메일(임시회원): ${title} -> ${pendingEmailForReminder}`)
               } catch (emailErr) {
                 console.error('반납예정 메일(임시회원) 오류:', emailErr)
               }
@@ -2056,16 +2102,20 @@ exports.scheduledNotifications = onSchedule(
               })
             }
 
-            if (rentedByType === 'pending' && rentedByEmail) {
+            // 임시 회원은 users 문서가 없어 sendEmailIfEnabled가 동작하지 않음 → 등록 이메일로 발송
+            // 구 데이터 호환: rentedByType 누락 시에도 pendingUsers에서 이메일을 찾아 발송
+            const pendingEmailForOverdue = await resolvePendingEmail(rentedBy, rentedByType, rentedByEmail)
+
+            if (pendingEmailForOverdue) {
               try {
                 await sendNotificationEmail(
-                  rentedByEmail,
+                  pendingEmailForOverdue,
                   'overdue',
                   '도서 연체 알림',
                   `"${title}" 도서가 ${overdueDays}일 연체되었습니다. 빠른 반납 부탁드립니다.`,
                   { bookId: bookDoc.id, bookTitle: title, center, overdueDays }
                 )
-                console.log(`연체 메일(임시회원): ${title} -> ${rentedByEmail}`)
+                console.log(`연체 메일(임시회원): ${title} -> ${pendingEmailForOverdue}`)
               } catch (emailErr) {
                 console.error('연체 메일(임시회원) 오류:', emailErr)
               }

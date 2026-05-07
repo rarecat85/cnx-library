@@ -1696,6 +1696,41 @@ const sendEmailIfEnabled = async (userId, type, title, message, extra = {}) => {
   }
 }
 
+/**
+ * 사용자 이메일 알림 설정과 무관하게(=강제) 이메일 발송
+ * - 단, 이미 emailNotification=true 인 경우 createNotification()에서 1회 발송되므로 중복 발송 방지로 스킵
+ * @param {string} userId - 사용자 UID
+ * @param {string} type - 알림 타입
+ * @param {string} title - 알림 제목
+ * @param {string} message - 알림 메시지
+ * @param {Object} extra - 추가 정보
+ */
+const sendEmailForced = async (userId, type, title, message, extra = {}) => {
+  try {
+    const userDoc = await firestore.collection('users').doc(userId).get()
+    if (!userDoc.exists) {
+      console.log(`사용자 문서 없음(강제메일): ${userId}`)
+      return
+    }
+
+    const userData = userDoc.data()
+
+    // 이미 설정 ON이면 createNotification 경로로 발송되므로 중복 방지
+    if (userData.emailNotification === true) {
+      return
+    }
+
+    if (!userData.email) {
+      console.log(`이메일 주소 없음(강제메일): ${userId}`)
+      return
+    }
+
+    await sendNotificationEmail(userData.email, type, title, message, extra)
+  } catch (error) {
+    console.error('강제 이메일 발송 오류:', error)
+  }
+}
+
 // ==================== 알림 시스템 ====================
 
 // 센터 -> 근무지 매핑 (역방향)
@@ -2006,6 +2041,20 @@ exports.scheduledNotifications = onSchedule(
               { bookId: bookDoc.id, bookTitle: title, center, overdueDays }
             )
             console.log(`연체 알림 생성 (사용자): ${title} -> ${rentedBy}`)
+
+            // 5일 단위(5/10/15/...) 연체는 사용자 설정과 무관하게 강제 이메일 발송
+            // - emailNotification=true 사용자는 createNotification()에서 이미 발송되므로 중복 방지
+            if (overdueDays > 0 && overdueDays % 5 === 0) {
+              sendEmailForced(
+                rentedBy,
+                'overdue',
+                '도서 연체 알림',
+                `"${title}" 도서가 ${overdueDays}일 연체되었습니다. 빠른 반납 부탁드립니다.`,
+                { bookId: bookDoc.id, bookTitle: title, center, overdueDays, forced: true }
+              ).catch(err => {
+                console.error('연체 강제 메일 백그라운드 오류:', err)
+              })
+            }
 
             if (rentedByType === 'pending' && rentedByEmail) {
               try {

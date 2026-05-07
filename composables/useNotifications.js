@@ -103,23 +103,48 @@ export const useNotifications = () => {
     if (!firestore || !user.value) return
 
     try {
-      const { collection, query, where, getDocs, doc, updateDoc, writeBatch } = await import('firebase/firestore')
+      const { collection, query, where, getDocs, writeBatch } = await import('firebase/firestore')
       
       const notificationsRef = collection(firestore, 'notifications')
-      const q = query(
-        notificationsRef,
-        where('userId', '==', user.value.uid),
-        where('isRead', '==', false)
-      )
+      // NOTE:
+      // 기존 데이터 중에는 isRead 필드가 없는 문서가 있어도 "미읽음"으로 표시됩니다.
+      // Firestore where('isRead','==',false)는 isRead가 '없는' 문서를 매칭하지 못하므로
+      // 사용자 알림을 전부 가져온 뒤 isRead !== true 인 것들을 배치 업데이트합니다.
+      const q = query(notificationsRef, where('userId', '==', user.value.uid))
       
       const snapshot = await getDocs(q)
       
-      if (snapshot.empty) return
+      if (snapshot.empty) {
+        unreadCount.value = 0
+        return
+      }
       
       const batch = writeBatch(firestore)
+      let updatedCount = 0
+      const unreadIds = new Set()
+
       snapshot.forEach((docSnapshot) => {
-        batch.update(docSnapshot.ref, { isRead: true })
+        const data = docSnapshot.data()
+        // isRead가 명시적으로 true가 아닌 경우는 모두 미읽음 취급
+        if (data?.isRead !== true) {
+          batch.update(docSnapshot.ref, { isRead: true })
+          updatedCount += 1
+          unreadIds.add(docSnapshot.id)
+        }
       })
+
+      if (updatedCount === 0) {
+        unreadCount.value = 0
+        return
+      }
+      
+      // UI 즉시 반영 (스냅샷 업데이트를 기다리지 않도록)
+      if (notifications.value?.length) {
+        notifications.value = notifications.value.map((n) => (
+          unreadIds.has(n.id) ? { ...n, isRead: true } : n
+        ))
+      }
+      unreadCount.value = 0
       
       await batch.commit()
     } catch (err) {
